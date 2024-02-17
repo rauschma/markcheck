@@ -45,3 +45,7 @@ pub const ATTR_KEY_STDERR: &str = "stderr";
     ),
 ]
 ```
+
+## Tests
+
+* Assemble lines with multiple global LineMods

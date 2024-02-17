@@ -9,7 +9,8 @@ import * as path from 'node:path';
 import { Config } from './config.js';
 import { UserError } from './errors.js';
 import { parseMarkdown } from './parse-markdown.js';
-import { ConfigMod, Snippet, LineMod, type MarktestEntity } from './entities.js';
+import { ConfigMod, Snippet, LineMod, type MarktestEntity, assembleLines } from './entities.js';
+import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
 
 export function runFile(entities: Array<MarktestEntity>): void {
   const config = new Config();
@@ -20,6 +21,8 @@ export function runFile(entities: Array<MarktestEntity>): void {
   });
   config.lang.set("json", "ignore");
 
+  const globalLineMods = new Map<string, Array<LineMod>>();
+
   const dirPath = path.resolve(process.cwd(), 'marktest');
   if (!fs.existsSync(dirPath)) {
     throw new UserError('Marktest directory does not exist: ' + JSON.stringify(dirPath));
@@ -29,9 +32,16 @@ export function runFile(entities: Array<MarktestEntity>): void {
   for (const entity of entities) {
     if (entity instanceof ConfigMod) {
       config.applyMod(entity.configModJson);
+    } else if (entity instanceof LineMod) {
+      assertNonNullable(entity.targetLanguage);
+      let lineModArr = globalLineMods.get(entity.targetLanguage);
+      if (!lineModArr) {
+        lineModArr = [];
+        globalLineMods.set(entity.targetLanguage, lineModArr);
+      }
+      lineModArr.push(entity);
     } else if (entity instanceof Snippet) {
-      const lines = new Array<string>();
-      entity.assembleLines(lines);
+      const lines = assembleLines(globalLineMods.get(entity.lang), entity);
 
       if (entity.fileNameToWrite) {
         // For `write`, the language doesn’t matter
@@ -44,7 +54,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
 
       const langDef = config.lang.get(entity.lang);
       if (!langDef) {
-        throw new UserError(`Unsupported language: ${JSON.stringify(entity.lang)}`);
+        throw new UserError(`Cannot run this language: ${JSON.stringify(entity.lang)}`);
       }
       if (langDef === 'ignore') {
         continue;
@@ -62,8 +72,6 @@ export function runFile(entities: Array<MarktestEntity>): void {
         console.log(result.stdout);
         console.log(result.stderr);
       }
-    } else if (entity instanceof LineMod) {
-
     } else {
       throw new UnsupportedValueError(entity);
     }

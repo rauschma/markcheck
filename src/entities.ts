@@ -38,6 +38,22 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
   }
 }
 
+export function assembleLines(globalLineMods: undefined | Array<LineMod>, snippet: Snippet): Array<string> {
+  const lines = new Array<string>();
+  if (globalLineMods) {
+    for (let i = 0; i < globalLineMods.length; i++) {
+      globalLineMods[i].pushBeforeLines(lines);
+    }
+  }
+  snippet.assembleLines(lines);
+  if (globalLineMods) {
+    for (let i = globalLineMods.length - 1; i >= 0; i--) {
+      globalLineMods[i].pushAfterLines(lines);
+    }
+  }
+  return lines;
+}
+
 //#################### Snippet ####################
 
 export abstract class Snippet {
@@ -50,7 +66,7 @@ export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
     // Attributes: id, sequence, include, only, skip, write
     const snippet = new SingleSnippet(directive.lineNumber);
-    
+
     snippet.id = directive.getAttribute(ATTR_KEY_ID) ?? null;
 
     const fileNameToWrite = directive.getAttribute(ATTR_KEY_WRITE) ?? null;
@@ -125,7 +141,7 @@ export class SequenceSnippet extends Snippet {
     if (num.pos !== 1) {
       throw new UserError(
         'First snippet in a sequence must have position 1 (1/*): ' + num,
-        {lineNumber: singleSnippet.lineNumber}
+        { lineNumber: singleSnippet.lineNumber }
       );
     }
     this.elements.push(singleSnippet);
@@ -137,13 +153,13 @@ export class SequenceSnippet extends Snippet {
     if (num.total !== this.total) {
       throw new UserError(
         `Snippet has different total than current sequence (${this.total}): ${num}`,
-        {lineNumber: singleSnippet.lineNumber}
+        { lineNumber: singleSnippet.lineNumber }
       );
     }
     if (num.pos !== this.elements.length) {
       throw new UserError(
         `Expected sequence position ${this.elements.length}, but snippet has: ${num}`,
-        {lineNumber: singleSnippet.lineNumber}
+        { lineNumber: singleSnippet.lineNumber }
       );
     }
     this.elements.push(singleSnippet);
