@@ -9,11 +9,11 @@
 https://github.com/TypeStrong/ts-expect
 
 ```ts
-import { expectType } from "ts-expect";
+import { expectType } from 'ts-expect';
 
-expectType<string>("test");
+expectType<string>('test');
 expectType<number>(123);
-expectType<number>("test"); // Compiler error!
+expectType<number>('test'); // Compiler error!
 ```
 
 How to compare types?
