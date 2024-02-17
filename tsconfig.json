@@ -1,0 +1,33 @@
+{
+  "include": ["src/**/*", "test/**/*"],
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "target": "es2022",
+    "lib": [
+      "es2022", "DOM"
+    ],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noImplicitOverride": true,
+    //
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true, // enables importers to jump to source
+
+    // Ensure TS code can by compiled by esbuild
+    // https://esbuild.github.io/content-types/#isolated-modules
+    "isolatedModules": true,
+    // Enforce `type` modifier for TypeScript-only imports
+    // https://www.typescriptlang.org/tsconfig#verbatimModuleSyntax
+    "verbatimModuleSyntax": true,
+
+    // Importing JSON is generally useful
+    "resolveJsonModule": true,
+
+    // https://preactjs.com/guide/v10/typescript#typescript-configuration
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+  }
+}

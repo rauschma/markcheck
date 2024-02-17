@@ -1,0 +1,29 @@
+{
+  "name": "@rauschma/marktest",
+  "version": "1.0.0",
+  "author": "",
+  "description": "",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "marktest": "./dist/src/marktest.js"
+  },
+
+  "scripts": {
+    "\n========== Library ==========": "",
+    "build": "npm run clean && tsc && npm run chmod",
+    "watch": "tsc --watch",
+    "clean": "shx rm -rf ./dist/*",
+    "chmod": "chmod u+x ./dist/src/marktest.js",
+    "test": "mocha --enable-source-maps --ui qunit",
+    "testall": "mocha --enable-source-maps --ui qunit \"./dist/**/*_test.js\""
+  },
+  "dependencies": {
+    "@rauschma/helpers": "file:../../libraries/helpers",
+    "@types/markdown-it": "^13.0.7",
+    "@types/node": "^20.11.19",
+    "install": "^0.13.0",
+    "markdown-it": "^14.0.0",
+    "mocha": "^10.3.0"
+  }
+}

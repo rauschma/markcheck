@@ -1,0 +1,8 @@
+{
+  "name": "demo",
+  "private": "true",
+  "dependencies": {
+    "@babel/plugin-proposal-decorators": "^7.23.9",
+    "babel-register-esm": "^1.2.5"
+  }
+}
