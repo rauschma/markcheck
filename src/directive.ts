@@ -37,6 +37,34 @@ const RE_TOKEN = /[ \t]+((?<bodyLabel>[A-Za-z0-9\-_]+:)|(?<key>[A-Za-z0-9\-_]+)(
 
 const MARKTEST_MARKER = 'marktest';
 
+//========== Sequence numbers ==========
+
+export class SequenceNumber {
+  pos: number;
+  total: number;
+  constructor(pos: number, total: number) {
+    this.pos = pos;
+    this.total = total;
+  }
+  toString() {
+    return this.pos + '/' + this.total;
+  }
+}
+
+const RE_SEQUENCE_NUMBER = /^ *([0-9]+) *\/ *([0-9]+) *$/u;
+export function parseSequenceNumber(str: string): null | SequenceNumber {
+  const match = RE_SEQUENCE_NUMBER.exec(str);
+  if (!match) return null;
+  const pos = Number(match[1]);
+  const total = Number(match[2]);
+  if (Number.isNaN(pos) || Number.isNaN(total)) {
+    return null;
+  }
+  return new SequenceNumber(pos, total);
+}
+
+//========== Directive ==========
+
 export class Directive {
   static parse(lineNumber: LineNumber, commentLines: Array<string>): null | Directive {
     let [firstLine, ...remainingLines] = commentLines;
@@ -51,7 +79,7 @@ export class Directive {
       const match = RE_TOKEN.exec(firstLine);
       if (!match) break;
       if (directive.bodyLabel !== null) {
-        throw new UserError(`Body label ${JSON.stringify(directive.bodyLabel)} must come after all attributes`, {lineNumber});
+        throw new UserError(`Body label ${JSON.stringify(directive.bodyLabel)} must come after all attributes`, { lineNumber });
       }
       assertTrue(match.groups !== undefined);
       if (match.groups.key) {

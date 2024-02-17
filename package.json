@@ -8,7 +8,6 @@
   "bin": {
     "marktest": "./dist/src/marktest.js"
   },
-
   "scripts": {
     "\n========== Library ==========": "",
     "build": "npm run clean && tsc && npm run chmod",
@@ -24,6 +23,7 @@
     "@types/node": "^20.11.19",
     "install": "^0.13.0",
     "markdown-it": "^14.0.0",
-    "mocha": "^10.3.0"
+    "mocha": "^10.3.0",
+    "zod": "^3.22.4"
   }
 }
