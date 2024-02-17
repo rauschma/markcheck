@@ -2,17 +2,31 @@
 
 import { clearDirectorySync } from '@rauschma/helpers/nodejs/file.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
+import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Config } from './config.js';
+import { ConfigMod, LineMod, Snippet, assembleLines, type MarktestEntity } from './entities.js';
 import { UserError } from './errors.js';
 import { parseMarkdown } from './parse-markdown.js';
-import { ConfigMod, Snippet, LineMod, type MarktestEntity, assembleLines } from './entities.js';
-import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
 
 export function runFile(entities: Array<MarktestEntity>): void {
+  const idToSnippet = new Map<string, Snippet>();
+  for (const entity of entities) {
+    if (entity instanceof Snippet && entity.id) {
+      const other = idToSnippet.get(entity.id);
+      if (other) {
+        throw new UserError(
+          `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
+          {lineNumber: entity.lineNumber}
+        );
+      }
+      idToSnippet.set(entity.id, entity);
+    }
+  }
+
   const config = new Config();
   config.lang.set(
     "js", {
@@ -41,7 +55,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
       }
       lineModArr.push(entity);
     } else if (entity instanceof Snippet) {
-      const lines = assembleLines(globalLineMods.get(entity.lang), entity);
+      const lines = assembleLines(idToSnippet, globalLineMods.get(entity.lang), entity);
 
       if (entity.fileNameToWrite) {
         // For `write`, the language doesn’t matter

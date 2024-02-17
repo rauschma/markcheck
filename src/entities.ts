@@ -1,7 +1,7 @@
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import * as os from 'node:os';
 import { ConfigModJsonSchema } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_LANG, ATTR_KEY_SEQUENCE, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, type Directive, type SequenceNumber } from './directive.js';
+import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_SEQUENCE, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, type Directive, type SequenceNumber } from './directive.js';
 import { InternalError, UserError } from './errors.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
@@ -38,14 +38,14 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
   }
 }
 
-export function assembleLines(globalLineMods: undefined | Array<LineMod>, snippet: Snippet): Array<string> {
+export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods: undefined | Array<LineMod>, snippet: Snippet): Array<string> {
   const lines = new Array<string>();
   if (globalLineMods) {
     for (let i = 0; i < globalLineMods.length; i++) {
       globalLineMods[i].pushBeforeLines(lines);
     }
   }
-  snippet.assembleLines(lines);
+  snippet.assembleLines(idToSnippet, lines, new Set());
   if (globalLineMods) {
     for (let i = globalLineMods.length - 1; i >= 0; i--) {
       globalLineMods[i].pushAfterLines(lines);
@@ -57,10 +57,13 @@ export function assembleLines(globalLineMods: undefined | Array<LineMod>, snippe
 //#################### Snippet ####################
 
 export abstract class Snippet {
-  abstract assembleLines(lines: Array<string>): void;
+  abstract get lineNumber(): number;
+  abstract get id(): null | string;
   abstract get lang(): string;
   abstract get fileNameToWrite(): null | string;
+  
   abstract isActive(): boolean;
+  abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
 }
 export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
@@ -69,14 +72,19 @@ export class SingleSnippet extends Snippet {
 
     snippet.id = directive.getAttribute(ATTR_KEY_ID) ?? null;
 
-    const fileNameToWrite = directive.getAttribute(ATTR_KEY_WRITE) ?? null;
-    if (fileNameToWrite) {
-      snippet.fileNameToWrite = fileNameToWrite;
+    const write = directive.getAttribute(ATTR_KEY_WRITE) ?? null;
+    if (write) {
+      snippet.fileNameToWrite = write;
     }
 
-    const sequenceNumberStr = directive.getAttribute(ATTR_KEY_SEQUENCE) ?? null;
-    if (sequenceNumberStr) {
-      snippet.sequenceNumber = parseSequenceNumber(sequenceNumberStr);
+    const sequence = directive.getAttribute(ATTR_KEY_SEQUENCE) ?? null;
+    if (sequence) {
+      snippet.sequenceNumber = parseSequenceNumber(sequence);
+    }
+
+    const include = directive.getAttribute(ATTR_KEY_INCLUDE) ?? null;
+    if (include) {
+      snippet.includeIds = include.split(/ *, */);
     }
 
     return snippet;
@@ -91,6 +99,7 @@ export class SingleSnippet extends Snippet {
   lang = '';
   fileNameToWrite: null | string = null;
   sequenceNumber: null | SequenceNumber = null;
+  includeIds = new Array<string>();
 
   body = new Array<string>();
 
@@ -120,7 +129,23 @@ export class SingleSnippet extends Snippet {
     return this;
   }
 
-  override assembleLines(lines: Array<string>): void {
+  override assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+    for (const includeId of this.includeIds) {
+      if (pathOfIncludeIds.has(includeId)) {
+        const idPath = [...pathOfIncludeIds, includeId];
+        throw new UserError(`Cycle of includedIds ` + JSON.stringify(idPath));
+      }
+      const snippet = idToSnippet.get(includeId);
+      if (snippet === undefined) {
+        throw new UserError(
+          `Snippet includes the unknown ID ${JSON.stringify(includeId)}`,
+          { lineNumber: this.lineNumber }
+        );
+      }
+      pathOfIncludeIds.add(includeId);
+      snippet.assembleLines(idToSnippet, lines, pathOfIncludeIds);
+      pathOfIncludeIds.delete(includeId);
+    }
     if (this.lineMod) {
       this.lineMod.pushBeforeLines(lines);
     }
@@ -175,9 +200,9 @@ export class SequenceSnippet extends Snippet {
     return num.total;
   }
 
-  override assembleLines(lines: string[]): void {
+  override assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     for (const element of this.elements) {
-      element.assembleLines(lines);
+      element.assembleLines(idToSnippet, lines, pathOfIncludeIds);
     }
   }
   get firstElement(): SingleSnippet {
@@ -189,6 +214,13 @@ export class SequenceSnippet extends Snippet {
     const last = this.elements.at(-1);
     assertNonNullable(last);
     return last;
+  }
+
+  override get lineNumber(): number {
+    return this.firstElement.lineNumber;
+  }
+  override get id(): null | string {
+    return this.firstElement.id;
   }
   override get lang(): string {
     return this.firstElement.lang;
