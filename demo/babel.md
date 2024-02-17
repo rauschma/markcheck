@@ -7,9 +7,9 @@
   "lang": {
     "json": "skip",
     "js": {
-      "filename": "main.mjs",
+      "fileName": "main.mjs",
       "command": ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", "main.mjs"],
-      # https://github.com/giltayar/babel-register-esm
+      // https://github.com/giltayar/babel-register-esm
     },
   },
 }
@@ -52,8 +52,6 @@ import assert from 'node:assert/strict';
 This code will be transpiled via Babel before it runs:
 
 ```js
-import assert from 'node:assert/strict';
-
 @annotation
 class MyClass {}
 

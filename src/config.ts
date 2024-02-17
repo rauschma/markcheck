@@ -5,7 +5,15 @@ export type LangDef = {
   command: Array<string>,
 };
 export class Config {
-  lang = new Map<string, LangDef | 'ignore'>();
+  lang = new Map<string, LangDef | 'skip'>();
+  constructor() {
+    this.lang.set(
+      "js", {
+      fileName: 'main.mjs',
+      command: ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", "main.mjs"],
+    });
+    this.lang.set("json", "skip");  
+  }
   applyMod(mod: ConfigModJson): void {
     if (mod.lang) {
       for (const [key, def] of Object.entries(mod.lang)) {
@@ -18,7 +26,8 @@ export class Config {
 //#################### ConfigModJson ####################
 
 export type ConfigModJson = {
-  lang?: Record<string, LangDef | 'ignore'>,
+  marktestDirectory?: string,
+  lang?: Record<string, LangDef | 'skip'>,
 };
 
 //#################### ConfigModJsonSchema ####################
@@ -29,9 +38,10 @@ export const LangDefSchema = z.object({
 });
 
 export const ConfigModJsonSchema = z.object({
+  marktestDirectory: z.optional(z.string()),
   lang: z.optional(
     z.record(
-      z.union([LangDefSchema, z.literal('ignore')])
+      z.union([LangDefSchema, z.literal('skip')])
     )
   ),
 });

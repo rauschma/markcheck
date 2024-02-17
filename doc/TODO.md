@@ -1,8 +1,5 @@
 # Todo
 
-* Determining the Marktest directory:
-  * Search starting in CWD
-  * Config setting
 * Attributes: only, skip, neverSkip
 * Attributes: `stdout="id"`, `stderr="id"`
   * Consequence of latter: existence of stderr content does not lead to failure

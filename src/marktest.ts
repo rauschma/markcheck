@@ -12,7 +12,39 @@ import { ConfigMod, LineMod, Snippet, assembleLines, type MarktestEntity } from 
 import { UserError } from './errors.js';
 import { parseMarkdown } from './parse-markdown.js';
 
+
+function findMarktestDir(entities: Array<MarktestEntity>): string {
+  const firstConfigMod = entities.find((entity) => entity instanceof ConfigMod);
+  if (firstConfigMod instanceof ConfigMod) {
+    const dir = firstConfigMod.configModJson.marktestDirectory;
+    if (dir) {
+      return dir;
+    }
+  }
+
+  const startDir = process.cwd();
+  let parentDir = startDir;
+  while (true) {
+    const mtd = path.resolve(parentDir, 'marktest');
+    if (fs.existsSync(mtd)) {
+      return mtd;
+    }
+    const nextParentDir = path.dirname(parentDir);
+    if (nextParentDir === parentDir) {
+      break;
+    }
+    parentDir = nextParentDir;
+  }
+  throw new UserError(
+    'Could not find a "marktest" directory neither configured not in the following directory or its ancestors: ' + JSON.stringify(parentDir)
+  );
+}
+
 export function runFile(entities: Array<MarktestEntity>): void {
+  const marktestDir = findMarktestDir(entities);
+  console.log('Marktest directory: ' + marktestDir);
+  clearDirectorySync(marktestDir);
+
   const idToSnippet = new Map<string, Snippet>();
   for (const entity of entities) {
     if (entity instanceof Snippet && entity.id) {
@@ -28,21 +60,8 @@ export function runFile(entities: Array<MarktestEntity>): void {
   }
 
   const config = new Config();
-  config.lang.set(
-    "js", {
-    fileName: 'main.mjs',
-    command: ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", "main.mjs"],
-  });
-  config.lang.set("json", "ignore");
 
   const globalLineMods = new Map<string, Array<LineMod>>();
-
-  const dirPath = path.resolve(process.cwd(), 'marktest');
-  if (!fs.existsSync(dirPath)) {
-    throw new UserError('Marktest directory does not exist: ' + JSON.stringify(dirPath));
-  }
-  console.log('Marktest directory: ' + JSON.stringify(dirPath))
-  clearDirectorySync(dirPath);
   for (const entity of entities) {
     if (entity instanceof ConfigMod) {
       config.applyMod(entity.configModJson);
@@ -60,7 +79,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
       if (entity.fileNameToWrite) {
         // For `write`, the language doesn’t matter
         if (entity.isActive()) {
-          const filePath = path.resolve(dirPath, entity.fileNameToWrite);
+          const filePath = path.resolve(marktestDir, entity.fileNameToWrite);
           fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
         }
         continue;
@@ -68,19 +87,19 @@ export function runFile(entities: Array<MarktestEntity>): void {
 
       const langDef = config.lang.get(entity.lang);
       if (!langDef) {
-        throw new UserError(`Cannot run this language: ${JSON.stringify(entity.lang)}`);
+        throw new UserError(`Unknown language: ${JSON.stringify(entity.lang)}`);
       }
-      if (langDef === 'ignore') {
+      if (langDef === 'skip') {
         continue;
       }
-      const filePath = path.resolve(dirPath, langDef.fileName);
+      const filePath = path.resolve(marktestDir, langDef.fileName);
       fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
       if (entity.isActive() && langDef.command.length > 0) {
         const [command, ...args] = langDef.command;
         console.log(langDef.command.join(' '));
         const result = child_process.spawnSync(command, args, {
           shell: true,
-          cwd: dirPath,
+          cwd: marktestDir,
           encoding: 'utf-8',
         });
         console.log(result.stdout);
@@ -94,11 +113,12 @@ export function runFile(entities: Array<MarktestEntity>): void {
 
 function main() {
   const args = process.argv.slice(2);
-  const filePath = args[0];
-  console.log('RUN: ' + JSON.stringify(filePath));
-  const text = fs.readFileSync(filePath, 'utf-8');
-  const constructs = parseMarkdown(text);
-  runFile(constructs);
+  for (const filePath of args) {
+    console.log('RUN: ' + JSON.stringify(filePath));
+    const text = fs.readFileSync(filePath, 'utf-8');
+    const entities = parseMarkdown(text);
+    runFile(entities);
+  }
 }
 
 main();

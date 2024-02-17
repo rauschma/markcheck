@@ -1,6 +1,7 @@
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import json5 from 'json5';
 import * as os from 'node:os';
-import { ConfigModJsonSchema } from './config.js';
+import { ConfigModJsonSchema, type ConfigModJson } from './config.js';
 import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_SEQUENCE, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, type Directive, type SequenceNumber } from './directive.js';
 import { InternalError, UserError } from './errors.js';
 
@@ -278,9 +279,10 @@ export class LineMod {
 //#################### ConfigMod ####################
 
 export class ConfigMod {
-  configModJson;
+  configModJson: ConfigModJson;
   constructor(directive: Directive) {
     const text = directive.body.join(os.EOL);
-    this.configModJson = ConfigModJsonSchema.parse(text);
+    const json = json5.parse(text);
+    this.configModJson = ConfigModJsonSchema.parse(json);
   }
 }

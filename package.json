@@ -19,9 +19,11 @@
   },
   "dependencies": {
     "@rauschma/helpers": "file:../../libraries/helpers",
+    "@types/json5": "^2.2.0",
     "@types/markdown-it": "^13.0.7",
     "@types/node": "^20.11.19",
     "install": "^0.13.0",
+    "json5": "^2.2.3",
     "markdown-it": "^14.0.0",
     "mocha": "^10.3.0",
     "zod": "^3.22.4"
