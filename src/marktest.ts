@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Config } from './config.js';
-import { ConfigMod, LineMod, Snippet, assembleLines, type MarktestEntity } from './entities.js';
+import { ConfigMod, LineMod, Snippet, assembleLines, type MarktestEntity, GlobalSkipMode, SkipMode } from './entities.js';
 import { UserError } from './errors.js';
 import { parseMarkdown } from './parse-markdown.js';
 
@@ -59,8 +59,12 @@ export function runFile(entities: Array<MarktestEntity>): void {
     }
   }
 
-  const config = new Config();
+  let globalSkipMode = GlobalSkipMode.Normal;
+  if (entities.some((e) => e instanceof Snippet && e.skipMode === SkipMode.Only)) {
+    globalSkipMode = GlobalSkipMode.Only;
+  }
 
+  const config = new Config();
   const globalLineMods = new Map<string, Array<LineMod>>();
   for (const entity of entities) {
     if (entity instanceof ConfigMod) {
@@ -78,7 +82,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
 
       if (entity.fileNameToWrite) {
         // For `write`, the language doesn’t matter
-        if (entity.isActive()) {
+        if (entity.isActive(globalSkipMode)) {
           const filePath = path.resolve(marktestDir, entity.fileNameToWrite);
           fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
         }
@@ -94,7 +98,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
       }
       const filePath = path.resolve(marktestDir, langDef.fileName);
       fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
-      if (entity.isActive() && langDef.command.length > 0) {
+      if (entity.isActive(globalSkipMode) && langDef.command.length > 0) {
         const [command, ...args] = langDef.command;
         console.log(langDef.command.join(' '));
         const result = child_process.spawnSync(command, args, {

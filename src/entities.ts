@@ -1,8 +1,9 @@
+import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
 import { ConfigModJsonSchema, type ConfigModJson } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_SEQUENCE, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, type Directive, type SequenceNumber } from './directive.js';
+import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, type Directive, type SequenceNumber } from './directive.js';
 import { InternalError, UserError } from './errors.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
@@ -57,18 +58,30 @@ export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods:
 
 //#################### Snippet ####################
 
+export enum SkipMode {
+  Normal = 'Normal',
+  Only = 'Only',
+  Skip = 'Skip',
+  NeverSkip = 'NeverSkip',
+}
+export enum GlobalSkipMode {
+  Normal = 'Normal',
+  Only = 'Only',
+}
+
 export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
   abstract get lang(): string;
   abstract get fileNameToWrite(): null | string;
-  
-  abstract isActive(): boolean;
+  abstract get skipMode(): SkipMode;
+
+  abstract isActive(globalSkipMode: GlobalSkipMode): boolean;
   abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
 }
 export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
-    // Attributes: id, sequence, include, only, skip, write
+    // Attributes: id, sequence, include, write, only, skip, neverSkip
     const snippet = new SingleSnippet(directive.lineNumber);
 
     snippet.id = directive.getAttribute(ATTR_KEY_ID) ?? null;
@@ -88,20 +101,31 @@ export class SingleSnippet extends Snippet {
       snippet.includeIds = include.split(/ *, */);
     }
 
+    if (directive.hasAttribute(ATTR_KEY_ONLY)) {
+      snippet.skipMode = SkipMode.Only;
+    }
+    if (directive.hasAttribute(ATTR_KEY_SKIP)) {
+      snippet.skipMode = SkipMode.Skip;
+    }
+    if (directive.hasAttribute(ATTR_KEY_NEVER_SKIP)) {
+      snippet.skipMode = SkipMode.NeverSkip;
+    }
+
     return snippet;
   }
   static createFromCodeBlock(lineNumber: number, lang: string, lines: Array<string>): SingleSnippet {
     return new SingleSnippet(lineNumber).closeWithBody(lang, lines);
   }
-  id: null | string = null;
-  isClosed = false;
-  lineMod: null | LineMod = null;
   lineNumber: number;
   lang = '';
+  id: null | string = null;
+  lineMod: null | LineMod = null;
   fileNameToWrite: null | string = null;
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
+  skipMode: SkipMode = SkipMode.Normal;
 
+  isClosed = false;
   body = new Array<string>();
 
   private constructor(lineNumber: number) {
@@ -109,7 +133,7 @@ export class SingleSnippet extends Snippet {
     this.lineNumber = lineNumber;
   }
 
-  override isActive(): boolean {
+  override isActive(globalSkipMode: GlobalSkipMode): boolean {
     // Rules:
     // - An ID means a snippet is inactive.
     //   - Rationale: included somewhere.
@@ -118,6 +142,32 @@ export class SingleSnippet extends Snippet {
     // - Attributes: only, skip, neverSkip
     if (this.id) {
       return false;
+    }
+    switch (globalSkipMode) {
+      case GlobalSkipMode.Normal:
+        switch (this.skipMode) {
+          case SkipMode.Normal:
+          case SkipMode.Only:
+          case SkipMode.NeverSkip:
+            return true;
+          case SkipMode.Skip:
+            return false;
+          default:
+            throw new UnsupportedValueError(this.skipMode);
+        }
+      case GlobalSkipMode.Only:
+        switch (this.skipMode) {
+          case SkipMode.Only:
+          case SkipMode.NeverSkip:
+            return true;
+          case SkipMode.Normal:
+          case SkipMode.Skip:
+            return false;
+          default:
+            throw new UnsupportedValueError(this.skipMode);
+        }
+      default:
+        throw new UnsupportedValueError(globalSkipMode);
     }
     return true;
   }
@@ -229,8 +279,12 @@ export class SequenceSnippet extends Snippet {
   override get fileNameToWrite(): string | null {
     return this.firstElement.fileNameToWrite;
   }
-  override isActive(): boolean {
-    return this.firstElement.isActive();
+  override get skipMode(): SkipMode {
+    return this.firstElement.skipMode;
+  }
+
+  override isActive(globalSkipMode: GlobalSkipMode): boolean {
+    return this.firstElement.isActive(globalSkipMode);
   }
 }
 

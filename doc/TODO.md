@@ -1,6 +1,5 @@
 # Todo
 
-* Attributes: only, skip, neverSkip
 * Attributes: `stdout="id"`, `stderr="id"`
   * Consequence of latter: existence of stderr content does not lead to failure
 * Built-in support for Babel – how?
@@ -42,3 +41,4 @@
 * Assemble lines with multiple global LineMods
   * ❌ Tricky: `after` is applied in reverse order
   * Should the first `around` be applied first? Then its before lines would come last.
+* Directive parsing, especially key-only attributes
