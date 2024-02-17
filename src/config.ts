@@ -7,12 +7,21 @@ export type LangDef = {
 export class Config {
   lang = new Map<string, LangDef | 'skip'>();
   constructor() {
+    this.lang.set('', 'skip');
     this.lang.set(
-      "js", {
-      fileName: 'main.mjs',
-      command: ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", "main.mjs"],
-    });
-    this.lang.set("json", "skip");  
+      "js",
+      {
+        fileName: 'main.mjs',
+        command: ["node", "main.mjs"],
+      }
+    );
+    this.lang.set(
+      "babel",
+      {
+        fileName: 'main.mjs',
+        command: ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", "main.mjs"],
+      }
+    );
   }
   applyMod(mod: ConfigModJson): void {
     if (mod.lang) {

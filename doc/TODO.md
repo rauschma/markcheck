@@ -2,8 +2,13 @@
 
 * Attributes: `stdout="id"`, `stderr="id"`
   * Consequence of latter: existence of stderr content does not lead to failure
-* Built-in support for Babel – how?
-
+* Support reordering of writing (`javascript.md`):
+  ```js
+  import { NAME } from './other.mjs';
+  ```
+* Built-in support for:
+  * Babel: support redefining `js`
+  * JSON
 
 
 ```rust

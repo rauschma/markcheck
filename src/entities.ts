@@ -15,27 +15,33 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
   switch (directive.bodyLabel) {
     case BODY_LABEL_CONFIG:
       return new ConfigMod(directive);
-    case BODY_LABEL_BEFORE:
-    case BODY_LABEL_AFTER:
-    case BODY_LABEL_AROUND: {
-      const lineMod = new LineMod(directive);
-      const each = directive.getAttribute(ATTR_KEY_EACH);
-      if (each) {
-        lineMod.targetLanguage = each;
-        return lineMod;
-      }
-      const snippet = SingleSnippet.createOpen(directive);
-      snippet.lineMod = lineMod;
-      return snippet;
-    }
-    case BODY_LABEL_BODY: {
+
+      case BODY_LABEL_BODY: {
       const snippet = SingleSnippet.createOpen(directive);
       const lang = directive.getAttribute(ATTR_KEY_LANG) ?? '';
       snippet.closeWithBody(lang, directive.body);
       return snippet;
     }
+
+    case BODY_LABEL_BEFORE:
+    case BODY_LABEL_AFTER:
+    case BODY_LABEL_AROUND:
+    case null: {
+      const snippet = SingleSnippet.createOpen(directive);
+      if (directive.bodyLabel !== null) {
+        const lineMod = new LineMod(directive);
+        const each = directive.getAttribute(ATTR_KEY_EACH);
+        if (each) {
+          lineMod.targetLanguage = each;
+          return lineMod;
+        }
+        snippet.lineMod = lineMod;
+      }
+      return snippet;
+    }
+
     default: {
-      return null;
+      throw new InternalError();
     }
   }
 }
