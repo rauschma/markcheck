@@ -8,9 +8,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Config } from './config.js';
-import { ConfigMod, LineMod, Snippet, assembleLines, type MarktestEntity, GlobalSkipMode, SkipMode } from './entities.js';
+import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, type MarktestEntity } from './entities.js';
 import { UserError } from './errors.js';
 import { parseMarkdown } from './parse-markdown.js';
+import { ATTR_KEY_WRITE } from './directive.js';
 
 
 function findMarktestDir(entities: Array<MarktestEntity>): string {
@@ -52,7 +53,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
       if (other) {
         throw new UserError(
           `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
-          {lineNumber: entity.lineNumber}
+          { lineNumber: entity.lineNumber }
         );
       }
       idToSnippet.set(entity.id, entity);
@@ -78,14 +79,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
       }
       lineModArr.push(entity);
     } else if (entity instanceof Snippet) {
-      const lines = assembleLines(idToSnippet, globalLineMods.get(entity.lang), entity);
-
-      if (entity.fileNameToWrite) {
-        // For `write`, the language doesn’t matter
-        if (entity.isActive(globalSkipMode)) {
-          const filePath = path.resolve(marktestDir, entity.fileNameToWrite);
-          fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
-        }
+      if (!entity.isActive(globalSkipMode)) {
         continue;
       }
 
@@ -96,8 +90,25 @@ export function runFile(entities: Array<MarktestEntity>): void {
       if (langDef === 'skip') {
         continue;
       }
-      const filePath = path.resolve(marktestDir, langDef.fileName);
+
+      const fileName = (entity.writeThis ?? langDef.fileName);
+      const filePath = path.resolve(marktestDir, fileName);
+      const lines = assembleLines(idToSnippet, globalLineMods.get(entity.lang), entity);
       fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
+
+      for (const { id, fileName } of entity.writeOthers) {
+        const otherSnippet = idToSnippet.get(id);
+        if (!otherSnippet) {
+          throw new UserError(
+            `Unknown ID ${JSON.stringify(id)} in attribute ${ATTR_KEY_WRITE}`,
+            { lineNumber: entity.lineNumber }
+          );
+        }
+        const filePath = path.resolve(marktestDir, fileName);
+        const lines = assembleLines(idToSnippet, globalLineMods.get(otherSnippet.lang), otherSnippet);
+        fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
+      }
+
       if (entity.isActive(globalSkipMode) && langDef.command.length > 0) {
         const [command, ...args] = langDef.command;
         console.log(langDef.command.join(' '));

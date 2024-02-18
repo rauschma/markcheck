@@ -3,7 +3,7 @@ import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
 import { ConfigModJsonSchema, type ConfigModJson } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, type Directive, type SequenceNumber } from './directive.js';
+import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
 import { InternalError, UserError } from './errors.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
@@ -16,7 +16,8 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     case BODY_LABEL_CONFIG:
       return new ConfigMod(directive);
 
-      case BODY_LABEL_BODY: {
+    case BODY_LABEL_BODY: {
+      // Closed snippet
       const snippet = SingleSnippet.createOpen(directive);
       const lang = directive.getAttribute(ATTR_KEY_LANG) ?? '';
       snippet.closeWithBody(lang, directive.body);
@@ -27,6 +28,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     case BODY_LABEL_AFTER:
     case BODY_LABEL_AROUND:
     case null: {
+      // Either an open snippet or a LineMod
       const snippet = SingleSnippet.createOpen(directive);
       if (directive.bodyLabel !== null) {
         const lineMod = new LineMod(directive);
@@ -79,7 +81,8 @@ export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
   abstract get lang(): string;
-  abstract get fileNameToWrite(): null | string;
+  abstract get writeThis(): null | string;
+  abstract get writeOthers(): Array<WriteSpec>;
   abstract get skipMode(): SkipMode;
 
   abstract isActive(globalSkipMode: GlobalSkipMode): boolean;
@@ -94,7 +97,7 @@ export class SingleSnippet extends Snippet {
 
     const write = directive.getAttribute(ATTR_KEY_WRITE) ?? null;
     if (write) {
-      snippet.fileNameToWrite = write;
+      [snippet.writeThis, snippet.writeOthers] = parseWriteValue(directive.lineNumber, write);
     }
 
     const sequence = directive.getAttribute(ATTR_KEY_SEQUENCE) ?? null;
@@ -126,7 +129,8 @@ export class SingleSnippet extends Snippet {
   lang = '';
   id: null | string = null;
   lineMod: null | LineMod = null;
-  fileNameToWrite: null | string = null;
+  writeThis: null | string = null;
+  writeOthers = new Array<WriteSpec>();
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
   skipMode: SkipMode = SkipMode.Normal;
@@ -143,8 +147,7 @@ export class SingleSnippet extends Snippet {
     // Rules:
     // - An ID means a snippet is inactive.
     //   - Rationale: included somewhere.
-    //   - To still run a snippet with an ID, create an empty body snippet
-    //     and include the snippet.
+    //   - To still run a snippet with an ID, use `neverSkip`.
     // - Attributes: only, skip, neverSkip
     if (this.id) {
       return false;
@@ -282,8 +285,11 @@ export class SequenceSnippet extends Snippet {
   override get lang(): string {
     return this.firstElement.lang;
   }
-  override get fileNameToWrite(): string | null {
-    return this.firstElement.fileNameToWrite;
+  override get writeThis(): string | null {
+    return this.firstElement.writeThis;
+  }
+  override get writeOthers(): Array<WriteSpec> {
+    return this.firstElement.writeOthers;
   }
   override get skipMode(): SkipMode {
     return this.firstElement.skipMode;

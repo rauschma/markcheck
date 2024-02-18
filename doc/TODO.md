@@ -1,14 +1,19 @@
 # Todo
 
+* At most one LineMod per language
+  * Clear via – e.g.:
+    ```
+    <!--each="js"-->
+    <!--each="js" clear-->
+    ```
 * Attributes: `stdout="id"`, `stderr="id"`
   * Consequence of latter: existence of stderr content does not lead to failure
-* Support reordering of writing (`javascript.md`):
-  ```js
-  import { NAME } from './other.mjs';
-  ```
 * Built-in support for:
   * Babel: support redefining `js`
   * JSON
+* Verbose mode:
+  * Log commands
+  * Log files that are written?
 
 
 ```rust
@@ -43,7 +48,8 @@
 
 ## Tests
 
-* Assemble lines with multiple global LineMods
-  * ❌ Tricky: `after` is applied in reverse order
-  * Should the first `around` be applied first? Then its before lines would come last.
+* Assemble lines with a global LineMod
+* Assemble a sequence
+* Assemble multiple includes (out of sequence)
+* Test attribute `write` with multiple IDs
 * Directive parsing, especially key-only attributes

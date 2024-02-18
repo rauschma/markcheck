@@ -1,5 +1,13 @@
-import { assertTrue } from "@rauschma/helpers/ts/type.js";
-import { InternalError, UserError, type LineNumber } from "./errors.js";
+import { re } from '@rauschma/helpers/js/re-template-tag.js';
+import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import { InternalError, UserError, type LineNumber } from './errors.js';
+
+//========== Various constants ==========
+
+const RE_LABEL = /[A-Za-z0-9\-_]/u;
+const RE_TOKEN = re`/[ \t]+((?<bodyLabel>${RE_LABEL}:)|(?<key>${RE_LABEL})([ \t]*=[ \t]*"(?<value>[^"]*)")?)/uy`;
+
+const MARKTEST_MARKER = 'marktest';
 
 //========== Attribute keys ==========
 
@@ -7,12 +15,37 @@ import { InternalError, UserError, type LineNumber } from "./errors.js";
 export const ATTR_KEY_ID = 'id';
 export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
+/** `write="file0.js, id1>file1.js, id2>file2.js"` */
+export const ATTR_KEY_WRITE = 'write';
 
-//----- How is snippet used? -----
+export type WriteSpec = { id: string, fileName: string };
+const RE_WRITE_PART = re`/^((?<id>${RE_LABEL}) *> *)?(?<fileName>[^>]+)$/u`;
+export function parseWriteValue(lineNumber: number, str: string): [null | string, Array<WriteSpec>] {
+  let selfFileName: null | string = null;
+  const others = new Array<WriteSpec>();
+
+  const parts = str.split(/ *, */);
+  for (const part of parts) {
+    const match = RE_WRITE_PART.exec(part);
+    if (!match || !match.groups || !match.groups.fileName) {
+      throw new UserError(
+        `Could not parse value of attribute ${ATTR_KEY_WRITE}: ${JSON.stringify(str)}`,
+        {lineNumber}
+      );
+    }
+    if (match.groups.id) {
+      others.push({id: match.groups.id, fileName: match.groups.fileName});
+    } else {
+      selfFileName = match.groups.fileName;
+    }
+  }
+  return [selfFileName, others];
+}
+
+//----- Is a snippet active? -----
 export const ATTR_KEY_ONLY = 'only';
 export const ATTR_KEY_SKIP = 'skip';
 export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
-export const ATTR_KEY_WRITE = 'write';
 
 //----- For transformations -----
 export const ATTR_KEY_EACH = 'each';
@@ -30,12 +63,6 @@ export const BODY_LABEL_BODY = 'body:';
 export const BODY_LABEL_BEFORE = 'before:';
 export const BODY_LABEL_AFTER = 'after:';
 export const BODY_LABEL_AROUND = 'around:';
-
-//========== Other constants ==========
-
-const RE_TOKEN = /[ \t]+((?<bodyLabel>[A-Za-z0-9\-_]+:)|(?<key>[A-Za-z0-9\-_]+)([ \t]*=[ \t]*"(?<value>[^"]*)")?)/uy;
-
-const MARKTEST_MARKER = 'marktest';
 
 //========== Sequence numbers ==========
 
