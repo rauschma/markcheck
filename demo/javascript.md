@@ -18,3 +18,11 @@ export const NAME = 'user';
 ```
 Hello user!
 ```
+
+```js
+import assert from 'node:assert/strict';
+assert.equal(
+  'abc' + 'abc',
+  'abcabc'
+);
+```

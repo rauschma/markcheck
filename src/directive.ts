@@ -1,10 +1,10 @@
 import { re } from '@rauschma/helpers/js/re-template-tag.js';
-import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import { InternalError, UserError, type LineNumber } from './errors.js';
 
 //========== Various constants ==========
 
-const RE_LABEL = /[A-Za-z0-9\-_]/u;
+const RE_LABEL = /[A-Za-z0-9\-_]+/u;
 const RE_TOKEN = re`/[ \t]+((?<bodyLabel>${RE_LABEL}:)|(?<key>${RE_LABEL})([ \t]*=[ \t]*"(?<value>[^"]*)")?)/uy`;
 
 const MARKTEST_MARKER = 'marktest';
@@ -18,28 +18,35 @@ export const ATTR_KEY_INCLUDE = 'include';
 /** `write="file0.js, id1>file1.js, id2>file2.js"` */
 export const ATTR_KEY_WRITE = 'write';
 
-export type WriteSpec = { id: string, fileName: string };
-const RE_WRITE_PART = re`/^((?<id>${RE_LABEL}) *> *)?(?<fileName>[^>]+)$/u`;
-export function parseWriteValue(lineNumber: number, str: string): [null | string, Array<WriteSpec>] {
+export type WriteValue = {
+  selfFileName: null | string,
+  writeSpecs: Array<WriteSpec>
+};
+export type WriteSpec = {
+  id: string,
+  fileName: string
+};
+const RE_WRITE_SPEC = re`/^((?<id>${RE_LABEL}) *> *)?(?<fileName>[^>]+)$/u`;
+export function parseWriteValue(lineNumber: number, str: string): WriteValue {
   let selfFileName: null | string = null;
-  const others = new Array<WriteSpec>();
+  const writeSpecs = new Array<WriteSpec>();
 
   const parts = str.split(/ *, */);
   for (const part of parts) {
-    const match = RE_WRITE_PART.exec(part);
+    const match = RE_WRITE_SPEC.exec(part);
     if (!match || !match.groups || !match.groups.fileName) {
       throw new UserError(
-        `Could not parse value of attribute ${ATTR_KEY_WRITE}: ${JSON.stringify(str)}`,
-        {lineNumber}
+        `Could not parse value of attribute ${ATTR_KEY_WRITE}: ${JSON.stringify(part)}`,
+        { lineNumber }
       );
     }
     if (match.groups.id) {
-      others.push({id: match.groups.id, fileName: match.groups.fileName});
+      writeSpecs.push({ id: match.groups.id, fileName: match.groups.fileName });
     } else {
       selfFileName = match.groups.fileName;
     }
   }
-  return [selfFileName, others];
+  return { selfFileName, writeSpecs };
 }
 
 //----- Is a snippet active? -----
@@ -47,7 +54,11 @@ export const ATTR_KEY_ONLY = 'only';
 export const ATTR_KEY_SKIP = 'skip';
 export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
 
-//----- For transformations -----
+//----- Checking output -----
+export const ATTR_KEY_STDOUT = 'stdout';
+export const ATTR_KEY_STDERR = 'stderr';
+
+//----- Global line mods -----
 export const ATTR_KEY_EACH = 'each';
 
 //----- `body:` directive -----
@@ -59,7 +70,7 @@ export const ATTR_KEY_LANG = 'lang';
 export const BODY_LABEL_CONFIG = 'config:';
 export const BODY_LABEL_BODY = 'body:';
 
-//----- Transformations -----
+//----- Line mods -----
 export const BODY_LABEL_BEFORE = 'before:';
 export const BODY_LABEL_AFTER = 'after:';
 export const BODY_LABEL_AROUND = 'around:';

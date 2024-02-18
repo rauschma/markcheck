@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync } from '@rauschma/helpers/nodejs/file.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
@@ -8,11 +9,18 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Config } from './config.js';
-import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, type MarktestEntity } from './entities.js';
+import { isOutputEqual, logDiff } from './diffing.js';
+import { ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE } from './directive.js';
+import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { UserError } from './errors.js';
 import { parseMarkdown } from './parse-markdown.js';
-import { ATTR_KEY_WRITE } from './directive.js';
 
+enum LogLevel {
+  Verbose,
+  Normal,
+}
+
+const LOG_LEVEL: LogLevel = LogLevel.Normal;
 
 function findMarktestDir(entities: Array<MarktestEntity>): string {
   const firstConfigMod = entities.find((entity) => entity instanceof ConfigMod);
@@ -91,38 +99,109 @@ export function runFile(entities: Array<MarktestEntity>): void {
         continue;
       }
 
-      const fileName = (entity.writeThis ?? langDef.fileName);
+      const fileName = (entity.fileName ?? langDef.fileName);
       const filePath = path.resolve(marktestDir, fileName);
-      const lines = assembleLines(idToSnippet, globalLineMods.get(entity.lang), entity);
+      const lines = assembleLines(idToSnippet, globalLineMods, entity);
+      if (LOG_LEVEL === LogLevel.Verbose) {
+        console.log('Wrote ' + filePath);
+      }
       fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
 
-      for (const { id, fileName } of entity.writeOthers) {
-        const otherSnippet = idToSnippet.get(id);
-        if (!otherSnippet) {
-          throw new UserError(
-            `Unknown ID ${JSON.stringify(id)} in attribute ${ATTR_KEY_WRITE}`,
-            { lineNumber: entity.lineNumber }
-          );
-        }
+      for (const { id, fileName } of entity.writeSpecs) {
+        const lines = assembleLinesForId(idToSnippet, globalLineMods, entity.lineNumber, id, `attribute ${ATTR_KEY_WRITE}`);
         const filePath = path.resolve(marktestDir, fileName);
-        const lines = assembleLines(idToSnippet, globalLineMods.get(otherSnippet.lang), otherSnippet);
         fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
+        if (LOG_LEVEL === LogLevel.Verbose) {
+          console.log('Wrote ' + filePath);
+        }
       }
 
       if (entity.isActive(globalSkipMode) && langDef.command.length > 0) {
         const [command, ...args] = langDef.command;
-        console.log(langDef.command.join(' '));
+        if (LOG_LEVEL === LogLevel.Verbose) {
+          console.log(langDef.command.join(' '));
+        }
+        process.stdout.write(`L${entity.lineNumber} (${entity.lang})`);
         const result = child_process.spawnSync(command, args, {
           shell: true,
           cwd: marktestDir,
           encoding: 'utf-8',
         });
-        console.log(result.stdout);
-        console.log(result.stderr);
+        if (result.error) {
+          // Spawning didn’t work
+          throw result.error;
+        }
+        const stderrLines = splitLinesExclEol(result.stderr);
+        if (result.status !== null && result.status !== 0) {
+          console.log(' ❌');
+          console.log(`Snippet exited with non-zero code ${result.status}`);
+          logStderr(stderrLines);
+          continue;
+        }
+        if (result.signal !== null) {
+          console.log(' ❌');
+          console.log(`Snippet was terminated by signal ${result.signal}`);
+          logStderr(stderrLines);
+          continue;
+        }
+        if (result.stderr.length > 0) {
+          if (entity.stderrId) {
+            // We expected stderr output
+            const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, entity.lineNumber, entity.stderrId, `attribute ${ATTR_KEY_STDERR}`);
+            if (!isOutputEqual(expectedLines, stderrLines)) {
+              console.log(' ❌');
+              console.log('stderr was not as expected');
+              logStderr(stderrLines, expectedLines);
+              continue;
+            }
+          } else {
+            console.log(' ❌');
+            console.log('There was unexpected stderr output');
+            logStderr(stderrLines);
+            continue;
+          }
+        }
+        if (entity.stdoutId) {
+          // Normally stdout is ignored. But in this case, we examine it.
+          const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, entity.lineNumber, entity.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
+          const stdoutLines = splitLinesExclEol(result.stdout);
+          if (!isOutputEqual(stdoutLines, expectedLines)) {
+            console.log(' ❌');
+            console.log('stdout was not as expected');
+            logStdout(stdoutLines, expectedLines);
+            continue
+          }
+        }
+        console.log(' ✅');
       }
     } else {
       throw new UnsupportedValueError(entity);
     }
+  }
+
+  function logStdout(stdoutLines: Array<string>, expectedLines?: Array<string>) {
+    console.log('----- stdout -----');
+    logAll(stdoutLines);
+    console.log('------------------');
+    if (expectedLines) {
+      logDiff(expectedLines, stdoutLines);
+      console.log('------------------');
+    }
+  }
+  function logStderr(stderrLines: Array<string>, expectedLines?: Array<string>) {
+    console.log('----- stderr -----');
+    logAll(stderrLines);
+    console.log('------------------');
+    if (expectedLines) {
+      logDiff(expectedLines, stderrLines);
+      console.log('------------------');
+    }
+  }
+}
+
+function logAll(lines: Array<string>) {
+  for (const line of lines) {
+    console.log(line);
   }
 }
 

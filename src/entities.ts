@@ -3,7 +3,7 @@ import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
 import { ConfigModJsonSchema, type ConfigModJson } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
+import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
 import { InternalError, UserError } from './errors.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
@@ -48,17 +48,29 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
   }
 }
 
-export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods: undefined | Array<LineMod>, snippet: Snippet): Array<string> {
+export function assembleLinesForId(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, sourceLineNumber: number, targetId: string, context: string): Array<string> {
+  const targetSnippet = idToSnippet.get(targetId);
+  if (!targetSnippet) {
+    throw new UserError(
+      `Unknown ID ${JSON.stringify(targetId)} (${context})`,
+      { lineNumber: sourceLineNumber }
+    );
+  }
+  return assembleLines(idToSnippet, globalLineMods, targetSnippet);
+}
+
+export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet) {
   const lines = new Array<string>();
-  if (globalLineMods) {
-    for (let i = 0; i < globalLineMods.length; i++) {
-      globalLineMods[i].pushBeforeLines(lines);
+  const glm = globalLineMods.get(snippet.lang);
+  if (glm) {
+    for (let i = 0; i < glm.length; i++) {
+      glm[i].pushBeforeLines(lines);
     }
   }
   snippet.assembleLines(idToSnippet, lines, new Set());
-  if (globalLineMods) {
-    for (let i = globalLineMods.length - 1; i >= 0; i--) {
-      globalLineMods[i].pushAfterLines(lines);
+  if (glm) {
+    for (let i = glm.length - 1; i >= 0; i--) {
+      glm[i].pushAfterLines(lines);
     }
   }
   return lines;
@@ -81,9 +93,11 @@ export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
   abstract get lang(): string;
-  abstract get writeThis(): null | string;
-  abstract get writeOthers(): Array<WriteSpec>;
+  abstract get fileName(): null | string;
+  abstract get writeSpecs(): Array<WriteSpec>;
   abstract get skipMode(): SkipMode;
+  abstract get stdoutId(): null | string;
+  abstract get stderrId(): null | string;
 
   abstract isActive(globalSkipMode: GlobalSkipMode): boolean;
   abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
@@ -97,7 +111,9 @@ export class SingleSnippet extends Snippet {
 
     const write = directive.getAttribute(ATTR_KEY_WRITE) ?? null;
     if (write) {
-      [snippet.writeThis, snippet.writeOthers] = parseWriteValue(directive.lineNumber, write);
+      const { selfFileName, writeSpecs } = parseWriteValue(directive.lineNumber, write);
+      snippet.fileName = selfFileName;
+      snippet.writeSpecs = writeSpecs;
     }
 
     const sequence = directive.getAttribute(ATTR_KEY_SEQUENCE) ?? null;
@@ -120,6 +136,9 @@ export class SingleSnippet extends Snippet {
       snippet.skipMode = SkipMode.NeverSkip;
     }
 
+    snippet.stdoutId = directive.getAttribute(ATTR_KEY_STDOUT) ?? null;
+    snippet.stderrId = directive.getAttribute(ATTR_KEY_STDERR) ?? null;
+
     return snippet;
   }
   static createFromCodeBlock(lineNumber: number, lang: string, lines: Array<string>): SingleSnippet {
@@ -129,11 +148,13 @@ export class SingleSnippet extends Snippet {
   lang = '';
   id: null | string = null;
   lineMod: null | LineMod = null;
-  writeThis: null | string = null;
-  writeOthers = new Array<WriteSpec>();
+  fileName: null | string = null;
+  writeSpecs = new Array<WriteSpec>();
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
   skipMode: SkipMode = SkipMode.Normal;
+  stdoutId: null | string = null;
+  stderrId: null | string = null;
 
   isClosed = false;
   body = new Array<string>();
@@ -285,14 +306,20 @@ export class SequenceSnippet extends Snippet {
   override get lang(): string {
     return this.firstElement.lang;
   }
-  override get writeThis(): string | null {
-    return this.firstElement.writeThis;
+  override get fileName(): string | null {
+    return this.firstElement.fileName;
   }
-  override get writeOthers(): Array<WriteSpec> {
-    return this.firstElement.writeOthers;
+  override get writeSpecs(): Array<WriteSpec> {
+    return this.firstElement.writeSpecs;
   }
   override get skipMode(): SkipMode {
     return this.firstElement.skipMode;
+  }
+  override get stdoutId(): null | string {
+    return this.firstElement.stdoutId;
+  }
+  override get stderrId(): null | string {
+    return this.firstElement.stderrId;
   }
 
   override isActive(globalSkipMode: GlobalSkipMode): boolean {

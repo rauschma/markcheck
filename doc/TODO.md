@@ -1,19 +1,18 @@
 # Todo
 
+* Support `marktest.config.jsonc`
+* Count numbers of successes & failures
+* Trim stdout/stderr lines
 * At most one LineMod per language
   * Clear via – e.g.:
     ```
     <!--each="js"-->
     <!--each="js" clear-->
     ```
-* Attributes: `stdout="id"`, `stderr="id"`
-  * Consequence of latter: existence of stderr content does not lead to failure
-* Built-in support for:
+* Languages – built-in support for:
   * Babel: support redefining `js`
+  * TypeScript
   * JSON
-* Verbose mode:
-  * Log commands
-  * Log files that are written?
 
 
 ```rust
@@ -48,6 +47,7 @@
 
 ## Tests
 
+* Test line numbers of parsed entities
 * Assemble lines with a global LineMod
 * Assemble a sequence
 * Assemble multiple includes (out of sequence)
