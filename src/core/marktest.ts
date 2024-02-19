@@ -9,10 +9,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, Config, fillInCommands } from './config.js';
-import { isOutputEqual, logDiff } from './diffing.js';
+import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE } from './directive.js';
 import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
-import { UserError } from './errors.js';
+import { UserError } from '../util/errors.js';
 import { parseMarkdown } from './parse-markdown.js';
 
 enum LogLevel {

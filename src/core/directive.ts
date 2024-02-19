@@ -1,6 +1,6 @@
 import { re } from '@rauschma/helpers/js/re-template-tag.js';
 import { assertTrue } from '@rauschma/helpers/ts/type.js';
-import { InternalError, UserError, type LineNumber } from './errors.js';
+import { InternalError, UserError, type LineNumber } from '../util/errors.js';
 
 //========== Various constants ==========
 

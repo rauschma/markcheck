@@ -3,7 +3,7 @@ import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import markdownit from 'markdown-it';
 import { Directive } from './directive.js';
 import { ConfigMod, LineMod, SingleSnippet, directiveToEntity, type MarktestEntity, SequenceSnippet } from './entities.js';
-import { UserError } from './errors.js';
+import { UserError } from '../util/errors.js';
 
 const COMMENT_START = '<!--';
 const COMMENT_END = '-->';

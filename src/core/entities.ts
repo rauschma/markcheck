@@ -4,7 +4,7 @@ import json5 from 'json5';
 import * as os from 'node:os';
 import { ConfigModJsonSchema, type ConfigModJson, type LangDef } from './config.js';
 import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL_FILES, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
-import { InternalError, UserError } from './errors.js';
+import { InternalError, UserError } from '../util/errors.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
 

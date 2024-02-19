@@ -6,13 +6,13 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "marktest": "./dist/src/marktest.js"
+    "marktest": "./dist/src/core/marktest.js"
   },
   "scripts": {
     "build": "npm run clean && tsc && npm run chmod",
     "watch": "tsc --watch",
     "clean": "shx rm -rf ./dist/*",
-    "chmod": "chmod u+x ./dist/src/marktest.js",
+    "chmod": "chmod u+x ./dist/src/core/marktest.js",
     "test": "node --test --enable-source-maps",
     "testall": "node --test --enable-source-maps \"./dist/**/*_test.js\""
   },
