@@ -2,8 +2,8 @@ import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
-import { ConfigModJsonSchema, type ConfigModJson } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
+import { ConfigModJsonSchema, type ConfigModJson, type LangDef } from './config.js';
+import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL_FILES, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
 import { InternalError, UserError } from './errors.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
@@ -93,14 +93,15 @@ export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
   abstract get lang(): string;
-  abstract get fileName(): null | string;
   abstract get writeSpecs(): Array<WriteSpec>;
   abstract get skipMode(): SkipMode;
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
+  abstract getFileName(langDef: LangDef): string;
   abstract isActive(globalSkipMode: GlobalSkipMode): boolean;
   abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
+  abstract getAllFileNames(langDef: LangDef): Array<string>;
 }
 export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
@@ -109,21 +110,26 @@ export class SingleSnippet extends Snippet {
 
     snippet.id = directive.getAttribute(ATTR_KEY_ID) ?? null;
 
-    const write = directive.getAttribute(ATTR_KEY_WRITE) ?? null;
-    if (write) {
-      const { selfFileName, writeSpecs } = parseWriteValue(directive.lineNumber, write);
-      snippet.fileName = selfFileName;
-      snippet.writeSpecs = writeSpecs;
-    }
-
-    const sequence = directive.getAttribute(ATTR_KEY_SEQUENCE) ?? null;
+    const sequence = directive.getAttribute(ATTR_KEY_SEQUENCE);
     if (sequence) {
       snippet.sequenceNumber = parseSequenceNumber(sequence);
     }
 
-    const include = directive.getAttribute(ATTR_KEY_INCLUDE) ?? null;
+    const include = directive.getAttribute(ATTR_KEY_INCLUDE);
     if (include) {
       snippet.includeIds = include.split(/ *, */);
+    }
+
+    const write = directive.getAttribute(ATTR_KEY_WRITE);
+    if (write) {
+      const { selfFileName, writeSpecs } = parseWriteValue(directive.lineNumber, write);
+      snippet.#fileName = selfFileName;
+      snippet.writeSpecs = writeSpecs;
+    }
+
+    const externalFiles = directive.getAttribute(ATTR_KEY_EXTERNAL_FILES);
+    if (externalFiles) {
+      snippet.externalFiles = externalFiles.split(/ *, */);
     }
 
     if (directive.hasAttribute(ATTR_KEY_ONLY)) {
@@ -148,10 +154,11 @@ export class SingleSnippet extends Snippet {
   lang = '';
   id: null | string = null;
   lineMod: null | LineMod = null;
-  fileName: null | string = null;
-  writeSpecs = new Array<WriteSpec>();
+  #fileName: null | string = null;
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
+  writeSpecs = new Array<WriteSpec>();
+  externalFiles = new Array<string>();
   skipMode: SkipMode = SkipMode.Normal;
   stdoutId: null | string = null;
   stderrId: null | string = null;
@@ -162,6 +169,10 @@ export class SingleSnippet extends Snippet {
   private constructor(lineNumber: number) {
     super();
     this.lineNumber = lineNumber;
+  }
+
+  override getFileName(langDef: LangDef): string {
+    return this.#fileName ?? langDef.defaultFileName;
   }
 
   override isActive(globalSkipMode: GlobalSkipMode): boolean {
@@ -199,7 +210,6 @@ export class SingleSnippet extends Snippet {
       default:
         throw new UnsupportedValueError(globalSkipMode);
     }
-    return true;
   }
 
   closeWithBody(lang: string, lines: Array<string>): this {
@@ -209,6 +219,7 @@ export class SingleSnippet extends Snippet {
     this.isClosed = true;
     return this;
   }
+
 
   override assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     for (const includeId of this.includeIds) {
@@ -234,6 +245,13 @@ export class SingleSnippet extends Snippet {
     if (this.lineMod) {
       this.lineMod.pushAfterLines(lines);
     }
+  }
+  override getAllFileNames(langDef: LangDef): Array<string> {
+    return [
+      this.getFileName(langDef),
+      ...this.writeSpecs.map(ws => ws.fileName),
+      ...this.externalFiles,
+    ];
   }
 }
 
@@ -306,9 +324,6 @@ export class SequenceSnippet extends Snippet {
   override get lang(): string {
     return this.firstElement.lang;
   }
-  override get fileName(): string | null {
-    return this.firstElement.fileName;
-  }
   override get writeSpecs(): Array<WriteSpec> {
     return this.firstElement.writeSpecs;
   }
@@ -322,8 +337,15 @@ export class SequenceSnippet extends Snippet {
     return this.firstElement.stderrId;
   }
 
+  override getFileName(langDef: LangDef): string {
+    return this.firstElement.getFileName(langDef);
+  }
+
   override isActive(globalSkipMode: GlobalSkipMode): boolean {
     return this.firstElement.isActive(globalSkipMode);
+  }
+  override getAllFileNames(langDef: LangDef): Array<string> {
+    return this.firstElement.getAllFileNames(langDef);
   }
 }
 

@@ -5,7 +5,7 @@
     "outDir": "dist",
     "target": "es2022",
     "lib": [
-      "es2022", "DOM"
+      "es2023", "DOM"
     ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",

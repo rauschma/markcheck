@@ -17,6 +17,7 @@ export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
 /** `write="file0.js, id1>file1.js, id2>file2.js"` */
 export const ATTR_KEY_WRITE = 'write';
+export const ATTR_KEY_EXTERNAL_FILES = 'externalFiles';
 
 export type WriteValue = {
   selfFileName: null | string,

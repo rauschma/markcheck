@@ -1,14 +1,12 @@
 # Todo
 
-* Support `marktest.config.jsonc`
+* `marktest.config.jsonc`:
+  * Sits next to `marktest` directory.
+  * Overrides the defaults.
+* Remove ⎡half-brackets⎤
 * Count numbers of successes & failures
 * Trim stdout/stderr lines
 * At most one LineMod per language
-  * Clear via – e.g.:
-    ```
-    <!--each="js"-->
-    <!--each="js" clear-->
-    ```
 * Languages – built-in support for:
   * Babel: support redefining `js`
   * TypeScript

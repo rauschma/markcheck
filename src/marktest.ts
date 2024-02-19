@@ -8,7 +8,7 @@ import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Config } from './config.js';
+import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, Config, fillInCommands } from './config.js';
 import { isOutputEqual, logDiff } from './diffing.js';
 import { ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE } from './directive.js';
 import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
@@ -99,7 +99,7 @@ export function runFile(entities: Array<MarktestEntity>): void {
         continue;
       }
 
-      const fileName = (entity.fileName ?? langDef.fileName);
+      const fileName = entity.getFileName(langDef);
       const filePath = path.resolve(marktestDir, fileName);
       const lines = assembleLines(idToSnippet, globalLineMods, entity);
       if (LOG_LEVEL === LogLevel.Verbose) {
@@ -116,67 +116,84 @@ export function runFile(entities: Array<MarktestEntity>): void {
         }
       }
 
-      if (entity.isActive(globalSkipMode) && langDef.command.length > 0) {
-        const [command, ...args] = langDef.command;
-        if (LOG_LEVEL === LogLevel.Verbose) {
-          console.log(langDef.command.join(' '));
-        }
+      if (entity.isActive(globalSkipMode) && langDef.commands.length > 0) {
         process.stdout.write(`L${entity.lineNumber} (${entity.lang})`);
-        const result = child_process.spawnSync(command, args, {
-          shell: true,
-          cwd: marktestDir,
-          encoding: 'utf-8',
+        const commands: Array<Array<string>> = fillInCommands(langDef, {
+          [CMD_VAR_FILE_NAME]: [entity.getFileName(langDef)],
+          [CMD_VAR_ALL_FILE_NAMES]: entity.getAllFileNames(langDef),
         });
-        if (result.error) {
-          // Spawning didn’t work
-          throw result.error;
-        }
-        const stderrLines = splitLinesExclEol(result.stderr);
-        if (result.status !== null && result.status !== 0) {
-          console.log(' ❌');
-          console.log(`Snippet exited with non-zero code ${result.status}`);
-          logStderr(stderrLines);
-          continue;
-        }
-        if (result.signal !== null) {
-          console.log(' ❌');
-          console.log(`Snippet was terminated by signal ${result.signal}`);
-          logStderr(stderrLines);
-          continue;
-        }
-        if (result.stderr.length > 0) {
-          if (entity.stderrId) {
-            // We expected stderr output
-            const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, entity.lineNumber, entity.stderrId, `attribute ${ATTR_KEY_STDERR}`);
-            if (!isOutputEqual(expectedLines, stderrLines)) {
-              console.log(' ❌');
-              console.log('stderr was not as expected');
-              logStderr(stderrLines, expectedLines);
-              continue;
+        commandLoop: {
+          for (const commandParts of commands) {
+            if (LOG_LEVEL === LogLevel.Verbose) {
+              console.log(commandParts.join(' '));
             }
-          } else {
-            console.log(' ❌');
-            console.log('There was unexpected stderr output');
-            logStderr(stderrLines);
-            continue;
+            const [command, ...args] = commandParts;
+            const result = child_process.spawnSync(command, args, {
+              shell: true,
+              cwd: marktestDir,
+              encoding: 'utf-8',
+            });
+            const status = checkResult(entity, result);
+            if (status === 'failure') {
+              break commandLoop;
+            }
           }
+          // Success only if all commands succeeded
+          console.log(' ✅');
         }
-        if (entity.stdoutId) {
-          // Normally stdout is ignored. But in this case, we examine it.
-          const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, entity.lineNumber, entity.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
-          const stdoutLines = splitLinesExclEol(result.stdout);
-          if (!isOutputEqual(stdoutLines, expectedLines)) {
-            console.log(' ❌');
-            console.log('stdout was not as expected');
-            logStdout(stdoutLines, expectedLines);
-            continue
-          }
-        }
-        console.log(' ✅');
       }
     } else {
       throw new UnsupportedValueError(entity);
     }
+  }
+
+  function checkResult(snippet: Snippet, result: child_process.SpawnSyncReturns<string>): 'success' | 'failure' {
+    if (result.error) {
+      // Spawning didn’t work
+      throw result.error;
+    }
+    const stderrLines = splitLinesExclEol(result.stderr);
+    if (result.status !== null && result.status !== 0) {
+      console.log(' ❌');
+      console.log(`Snippet exited with non-zero code ${result.status}`);
+      logStderr(stderrLines);
+      return 'failure';
+    }
+    if (result.signal !== null) {
+      console.log(' ❌');
+      console.log(`Snippet was terminated by signal ${result.signal}`);
+      logStderr(stderrLines);
+      return 'failure';
+    }
+    if (result.stderr.length > 0) {
+      if (snippet.stderrId) {
+        // We expected stderr output
+        const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
+        if (!isOutputEqual(expectedLines, stderrLines)) {
+          console.log(' ❌');
+          console.log('stderr was not as expected');
+          logStderr(stderrLines, expectedLines);
+          return 'failure';
+        }
+      } else {
+        console.log(' ❌');
+        console.log('There was unexpected stderr output');
+        logStderr(stderrLines);
+        return 'failure';
+      }
+    }
+    if (snippet.stdoutId) {
+      // Normally stdout is ignored. But in this case, we examine it.
+      const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
+      const stdoutLines = splitLinesExclEol(result.stdout);
+      if (!isOutputEqual(stdoutLines, expectedLines)) {
+        console.log(' ❌');
+        console.log('stdout was not as expected');
+        logStdout(stdoutLines, expectedLines);
+        return 'failure';
+      }
+    }
+    return 'success';
   }
 
   function logStdout(stdoutLines: Array<string>, expectedLines?: Array<string>) {

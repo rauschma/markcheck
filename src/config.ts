@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
+export const CMD_VAR_FILE_NAME = '$FILE_NAME';
+export const CMD_VAR_ALL_FILE_NAMES = '$ALL_FILE_NAMES';
+
 export type LangDef = {
-  fileName: string,
-  command: Array<string>,
+  defaultFileName: string,
+  commands: Array<Array<string>>,
 };
 export class Config {
   lang = new Map<string, LangDef | 'skip'>();
@@ -11,15 +14,19 @@ export class Config {
     this.lang.set(
       "js",
       {
-        fileName: 'main.mjs',
-        command: ["node", "main.mjs"],
+        defaultFileName: 'main.mjs',
+        commands: [
+          ["node", CMD_VAR_FILE_NAME]
+        ],
       }
     );
     this.lang.set(
       "babel",
       {
-        fileName: 'main.mjs',
-        command: ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", "main.mjs"],
+        defaultFileName: 'main.mjs',
+        commands: [
+          ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", CMD_VAR_FILE_NAME]
+        ],
       }
     );
   }
@@ -32,6 +39,18 @@ export class Config {
   }
 }
 
+export function fillInCommands(langDef: LangDef, vars: Record<string, Array<string>>): Array<Array<string>> {
+  return langDef.commands.map(cmdParts => cmdParts.flatMap(
+    (part) => {
+      if (Object.hasOwn(vars, part)) {
+        return vars[part];
+      } else {
+        return [part];
+      }
+    }
+  ));
+}
+
 //#################### ConfigModJson ####################
 
 export type ConfigModJson = {
@@ -42,8 +61,8 @@ export type ConfigModJson = {
 //#################### ConfigModJsonSchema ####################
 
 export const LangDefSchema = z.object({
-  fileName: z.string(),
-  command: z.array(z.string()),
+  defaultFileName: z.string(),
+  commands: z.array(z.array(z.string())),
 });
 
 export const ConfigModJsonSchema = z.object({
