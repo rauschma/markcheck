@@ -15,6 +15,9 @@ import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, a
 import { UserError } from '../util/errors.js';
 import { parseMarkdown } from './parse-markdown.js';
 
+const MARKTEST_DIR_NAME = 'marktest';
+const {stringify} = JSON;
+
 enum LogLevel {
   Verbose,
   Normal,
@@ -22,7 +25,7 @@ enum LogLevel {
 
 const LOG_LEVEL: LogLevel = LogLevel.Normal;
 
-function findMarktestDir(entities: Array<MarktestEntity>): string {
+function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): string {
   const firstConfigMod = entities.find((entity) => entity instanceof ConfigMod);
   if (firstConfigMod instanceof ConfigMod) {
     const dir = firstConfigMod.configModJson.marktestDirectory;
@@ -31,10 +34,10 @@ function findMarktestDir(entities: Array<MarktestEntity>): string {
     }
   }
 
-  const startDir = process.cwd();
+  const startDir = absFilePath;
   let parentDir = startDir;
   while (true) {
-    const mtd = path.resolve(parentDir, 'marktest');
+    const mtd = path.resolve(parentDir, MARKTEST_DIR_NAME);
     if (fs.existsSync(mtd)) {
       return mtd;
     }
@@ -45,12 +48,12 @@ function findMarktestDir(entities: Array<MarktestEntity>): string {
     parentDir = nextParentDir;
   }
   throw new UserError(
-    'Could not find a "marktest" directory neither configured not in the following directory or its ancestors: ' + JSON.stringify(parentDir)
+    `Could not find a ${stringify(MARKTEST_DIR_NAME)} directory neither configured not in the following directory or its ancestors: ${stringify(parentDir)}`
   );
 }
 
-export function runFile(entities: Array<MarktestEntity>): void {
-  const marktestDir = findMarktestDir(entities);
+export function runFile(absFilePath: string, entities: Array<MarktestEntity>): void {
+  const marktestDir = findMarktestDir(absFilePath, entities);
   console.log('Marktest directory: ' + marktestDir);
   clearDirectorySync(marktestDir);
 
@@ -225,10 +228,11 @@ function logAll(lines: Array<string>) {
 function main() {
   const args = process.argv.slice(2);
   for (const filePath of args) {
-    console.log('RUN: ' + JSON.stringify(filePath));
-    const text = fs.readFileSync(filePath, 'utf-8');
+    const absFilePath = path.resolve(filePath);
+    console.log('RUN: ' + JSON.stringify(absFilePath));
+    const text = fs.readFileSync(absFilePath, 'utf-8');
     const entities = parseMarkdown(text);
-    runFile(entities);
+    runFile(absFilePath, entities);
   }
 }
 
