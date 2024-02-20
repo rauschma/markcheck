@@ -7,4 +7,7 @@
 
 ## Directives
 
+* Attributes + body labels
+* IDs
+
 ## Configuration

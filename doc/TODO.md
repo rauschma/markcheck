@@ -1,5 +1,7 @@
 # Todo
 
+* Catch and report UserErrors?
+* Set up `PATH` to include various `node_modules/.bin/` directories?
 * `marktest.config.jsonc`:
   * Sits next to `marktest` directory.
   * Overrides the defaults.
@@ -11,6 +13,7 @@
   * Babel: support redefining `js`
   * TypeScript
   * JSON
+* Directive `lang` overrides code block lang?
 
 
 ```rust
