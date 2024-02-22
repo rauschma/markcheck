@@ -53,7 +53,7 @@ export function parseMarkdown(text: string): Array<MarktestEntity> {
         openSequence = pushSingleSnippet(openSequence, openSingleSnippet.closeWithBody(lang, lines));
         openSingleSnippet = null;
       } else {
-        openSequence = pushSingleSnippet(openSequence, SingleSnippet.createFromCodeBlock(lineNumber, lang, lines));
+        openSequence = pushSingleSnippet(openSequence, SingleSnippet.createClosedFromCodeBlock(lineNumber, lang, lines));
       }
     }
   }

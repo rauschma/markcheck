@@ -4,7 +4,7 @@ import json5 from 'json5';
 import * as os from 'node:os';
 import { InternalError, UserError } from '../util/errors.js';
 import { ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL_FILES, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_VALUE_LANG_EMPTY, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
+import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, ATTR_VALUE_LANG_EMPTY, ATTR_VALUE_LANG_NEVER_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
 
@@ -17,11 +17,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
       return new ConfigMod(directive);
 
     case BODY_LABEL_BODY: {
-      // Closed snippet
-      const snippet = SingleSnippet.createOpen(directive);
-      const lang = directive.getAttribute(ATTR_KEY_LANG) ?? '';
-      snippet.closeWithBody(lang, directive.body);
-      return snippet;
+      return SingleSnippet.createClosedFromBodyDirective(directive);
     }
 
     case BODY_LABEL_BEFORE:
@@ -78,13 +74,13 @@ export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods:
 
 //#################### Snippet ####################
 
-export enum SkipMode {
+export enum VisitationMode {
   Normal = 'Normal',
   Only = 'Only',
   Skip = 'Skip',
   NeverSkip = 'NeverSkip',
 }
-export enum GlobalSkipMode {
+export enum GlobalVisitationMode {
   Normal = 'Normal',
   Only = 'Only',
 }
@@ -93,22 +89,43 @@ export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
   abstract get lang(): string;
-  abstract get writeSpecs(): Array<WriteSpec>;
-  abstract get skipMode(): SkipMode;
+  abstract get externalSpecs(): Array<ExternalSpec>;
+  abstract get visitationMode(): VisitationMode;
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
   abstract getFileName(langDef: LangDef): string;
-  abstract isActive(globalSkipMode: GlobalSkipMode): boolean;
+  abstract isVisited(globalVisitationMode: GlobalVisitationMode): boolean;
   abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
   abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
 }
 export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
-    // Attributes: id, sequence, include, write, only, skip, neverSkip
     const snippet = new SingleSnippet(directive.lineNumber);
 
     snippet.id = directive.getAttribute(ATTR_KEY_ID) ?? null;
+
+    { // fileName
+      const write = directive.getAttribute(ATTR_KEY_WRITE);
+      if (write) {
+        snippet.#fileName = write;
+      }
+      const writeAndRun = directive.getAttribute(ATTR_KEY_WRITE_AND_RUN);
+      if (writeAndRun) {
+        snippet.#fileName = writeAndRun;
+      }
+    }
+
+    { // lang
+      if (directive.hasAttribute(ATTR_KEY_WRITE)) {
+        // Default value if attribute `write` exists
+        snippet.#lang = ATTR_VALUE_LANG_NEVER_RUN;
+      }
+      const lang = directive.getAttribute(ATTR_KEY_LANG);
+      if (lang) {
+        snippet.#lang = lang;
+      }
+    }
 
     const sequence = directive.getAttribute(ATTR_KEY_SEQUENCE);
     if (sequence) {
@@ -120,26 +137,28 @@ export class SingleSnippet extends Snippet {
       snippet.includeIds = include.split(/ *, */);
     }
 
-    const write = directive.getAttribute(ATTR_KEY_WRITE);
-    if (write) {
-      const { selfFileName, writeSpecs } = parseWriteValue(directive.lineNumber, write);
-      snippet.#fileName = selfFileName;
-      snippet.writeSpecs = writeSpecs;
+    const external = directive.getAttribute(ATTR_KEY_EXTERNAL);
+    if (external) {
+      snippet.externalSpecs = parseExternalSpecs(directive.lineNumber, external);
     }
 
-    const externalFiles = directive.getAttribute(ATTR_KEY_EXTERNAL_FILES);
-    if (externalFiles) {
-      snippet.externalFiles = externalFiles.split(/ *, */);
-    }
-
-    if (directive.hasAttribute(ATTR_KEY_ONLY)) {
-      snippet.skipMode = SkipMode.Only;
-    }
-    if (directive.hasAttribute(ATTR_KEY_SKIP)) {
-      snippet.skipMode = SkipMode.Skip;
-    }
-    if (directive.hasAttribute(ATTR_KEY_NEVER_SKIP)) {
-      snippet.skipMode = SkipMode.NeverSkip;
+    { // visitationMode
+      if (directive.hasAttribute(ATTR_KEY_ID)) {
+        // Initial default value:
+        // - By default, snippets with IDs are not visited.
+        //   - Rationale: included somewhere and visited there.
+        // - To still visit a snippet with an ID, use `only` or `neverSkip`.
+        snippet.visitationMode = VisitationMode.Skip;
+      }
+      if (directive.hasAttribute(ATTR_KEY_ONLY)) {
+        snippet.visitationMode = VisitationMode.Only;
+      }
+      if (directive.hasAttribute(ATTR_KEY_SKIP)) {
+        snippet.visitationMode = VisitationMode.Skip;
+      }
+      if (directive.hasAttribute(ATTR_KEY_NEVER_SKIP)) {
+        snippet.visitationMode = VisitationMode.NeverSkip;
+      }
     }
 
     snippet.stdoutId = directive.getAttribute(ATTR_KEY_STDOUT) ?? null;
@@ -147,19 +166,29 @@ export class SingleSnippet extends Snippet {
 
     return snippet;
   }
-  static createFromCodeBlock(lineNumber: number, lang: string, lines: Array<string>): SingleSnippet {
+  static createClosedFromBodyDirective(directive: Directive): SingleSnippet {
+    const openSnippet = SingleSnippet.createOpen(directive);
+    const lang = openSnippet.#lang;
+    if (lang === null) {
+      throw new UserError(
+        `Body directive must have either attribute ${ATTR_KEY_LANG} or attribute ${ATTR_KEY_WRITE}`,
+        { lineNumber: directive.lineNumber }
+      );
+    }
+    return openSnippet.closeWithBody(lang, directive.body);
+  }
+  static createClosedFromCodeBlock(lineNumber: number, lang: string, lines: Array<string>): SingleSnippet {
     return new SingleSnippet(lineNumber).closeWithBody(lang, lines);
   }
   lineNumber: number;
-  lang = '';
+  #lang: null | string = null;
   id: null | string = null;
   lineMod: null | LineMod = null;
   #fileName: null | string = null;
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
-  writeSpecs = new Array<WriteSpec>();
-  externalFiles = new Array<string>();
-  skipMode: SkipMode = SkipMode.Normal;
+  externalSpecs = new Array<ExternalSpec>();
+  visitationMode: VisitationMode = VisitationMode.Normal;
   stdoutId: null | string = null;
   stderrId: null | string = null;
 
@@ -171,6 +200,11 @@ export class SingleSnippet extends Snippet {
     this.lineNumber = lineNumber;
   }
 
+  override get lang(): string {
+    assertNonNullable(this.#lang);
+    return this.#lang;
+  }
+
   override getFileName(langDef: LangDef): string {
     if (this.#fileName) return this.#fileName;
     if (langDef.kind === 'LangDefCommand') {
@@ -179,51 +213,47 @@ export class SingleSnippet extends Snippet {
     return ATTR_VALUE_LANG_EMPTY;
   }
 
-  override isActive(globalSkipMode: GlobalSkipMode): boolean {
-    // Rules:
-    // - An ID means a snippet is inactive.
-    //   - Rationale: included somewhere.
-    //   - To still run a snippet with an ID, use `neverSkip`.
-    // - Attributes: only, skip, neverSkip
-    if (this.id) {
-      return false;
-    }
-    switch (globalSkipMode) {
-      case GlobalSkipMode.Normal:
-        switch (this.skipMode) {
-          case SkipMode.Normal:
-          case SkipMode.Only:
-          case SkipMode.NeverSkip:
+  override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
+    switch (globalVisitationMode) {
+      case GlobalVisitationMode.Normal:
+        switch (this.visitationMode) {
+          case VisitationMode.Normal:
+          case VisitationMode.Only:
+          case VisitationMode.NeverSkip:
             return true;
-          case SkipMode.Skip:
+          case VisitationMode.Skip:
             return false;
           default:
-            throw new UnsupportedValueError(this.skipMode);
+            throw new UnsupportedValueError(this.visitationMode);
         }
-      case GlobalSkipMode.Only:
-        switch (this.skipMode) {
-          case SkipMode.Only:
-          case SkipMode.NeverSkip:
+      case GlobalVisitationMode.Only:
+        switch (this.visitationMode) {
+          case VisitationMode.Only:
+          case VisitationMode.NeverSkip:
             return true;
-          case SkipMode.Normal:
-          case SkipMode.Skip:
+          case VisitationMode.Normal:
+          case VisitationMode.Skip:
             return false;
           default:
-            throw new UnsupportedValueError(this.skipMode);
+            throw new UnsupportedValueError(this.visitationMode);
         }
       default:
-        throw new UnsupportedValueError(globalSkipMode);
+        throw new UnsupportedValueError(globalVisitationMode);
     }
   }
 
   closeWithBody(lang: string, lines: Array<string>): this {
     assertTrue(!this.isClosed);
-    this.lang = lang;
+    // If .#lang is non-null, then it was set by the directive – which
+    // overrides the language of the code block.
+    if (this.#lang === null) {
+      this.#lang = lang;
+    }
+    assertTrue(this.#lang !== null);
     this.body.push(...lines);
     this.isClosed = true;
     return this;
   }
-
 
   override assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     for (const includeId of this.includeIds) {
@@ -253,8 +283,7 @@ export class SingleSnippet extends Snippet {
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return [
       this.getFileName(langDef),
-      ...this.writeSpecs.map(ws => ws.fileName),
-      ...this.externalFiles,
+      ...this.externalSpecs.map(es => es.fileName),
     ];
   }
 }
@@ -328,11 +357,11 @@ export class SequenceSnippet extends Snippet {
   override get lang(): string {
     return this.firstElement.lang;
   }
-  override get writeSpecs(): Array<WriteSpec> {
-    return this.firstElement.writeSpecs;
+  override get externalSpecs(): Array<ExternalSpec> {
+    return this.firstElement.externalSpecs;
   }
-  override get skipMode(): SkipMode {
-    return this.firstElement.skipMode;
+  override get visitationMode(): VisitationMode {
+    return this.firstElement.visitationMode;
   }
   override get stdoutId(): null | string {
     return this.firstElement.stdoutId;
@@ -345,8 +374,8 @@ export class SequenceSnippet extends Snippet {
     return this.firstElement.getFileName(langDef);
   }
 
-  override isActive(globalSkipMode: GlobalSkipMode): boolean {
-    return this.firstElement.isActive(globalSkipMode);
+  override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
+    return this.firstElement.isVisited(globalVisitationMode);
   }
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return this.firstElement.getAllFileNames(langDef);

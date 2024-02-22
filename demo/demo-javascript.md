@@ -1,6 +1,6 @@
 # Demo document
 
-<!--marktest stdout="output" write="other>other.mjs"-->
+<!--marktest stdout="output" external="other>other.mjs"-->
 ```js
 // main.mjs
 import { NAME } from './other.mjs';

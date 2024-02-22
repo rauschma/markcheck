@@ -13,58 +13,65 @@ const MARKTEST_MARKER = 'marktest';
 
 //========== Attribute keys ==========
 
-//----- How is snippet assembled? -----
+//----- Assembling lines -----
+
 export const ATTR_KEY_ID = 'id';
 export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
-/** `write="file0.js, id1>file1.js, id2>file2.js"` */
-export const ATTR_KEY_WRITE = 'write';
-export const ATTR_KEY_EXTERNAL_FILES = 'externalFiles';
 
-export type WriteValue = {
-  selfFileName: null | string,
-  writeSpecs: Array<WriteSpec>
-};
-export type WriteSpec = {
-  id: string,
+//----- Writing and referring to files -----
+
+export const ATTR_KEY_WRITE = 'write';
+export const ATTR_KEY_WRITE_AND_RUN = 'writeAndRun';
+
+/**
+ * ```
+ * external="id1>lib1.js, id2>lib2.js, id3>lib3.js"
+ * external="lib1.ts, lib2.ts, lib3.ts"
+ * ```
+ */
+export const ATTR_KEY_EXTERNAL = 'external';
+
+export type ExternalSpec = {
+  id: null | string,
   fileName: string
 };
-const RE_WRITE_SPEC = re`/^((?<id>${RE_LABEL}) *> *)?(?<fileName>[^>]+)$/u`;
-export function parseWriteValue(lineNumber: number, str: string): WriteValue {
-  let selfFileName: null | string = null;
-  const writeSpecs = new Array<WriteSpec>();
+const RE_EXTERNAL_SPEC = re`/^((?<id>${RE_LABEL}) *> *)?(?<fileName>[^>]+)$/u`;
+export function parseExternalSpecs(lineNumber: number, str: string): Array<ExternalSpec> {
+  const specs = new Array<ExternalSpec>();
 
   const parts = str.split(/ *, */);
   for (const part of parts) {
-    const match = RE_WRITE_SPEC.exec(part);
+    const match = RE_EXTERNAL_SPEC.exec(part);
     if (!match || !match.groups || !match.groups.fileName) {
       throw new UserError(
-        `Could not parse value of attribute ${ATTR_KEY_WRITE}: ${JSON.stringify(part)}`,
+        `Could not parse value of attribute ${ATTR_KEY_EXTERNAL}: ${JSON.stringify(part)}`,
         { lineNumber }
       );
     }
-    if (match.groups.id) {
-      writeSpecs.push({ id: match.groups.id, fileName: match.groups.fileName });
-    } else {
-      selfFileName = match.groups.fileName;
-    }
+    const id = match.groups.id ?? null;
+    specs.push({ id, fileName: match.groups.fileName });
   }
-  return { selfFileName, writeSpecs };
+  return specs;
 }
 
-//----- Is a snippet active? -----
+//----- Visitation mode -----
+
 export const ATTR_KEY_ONLY = 'only';
 export const ATTR_KEY_SKIP = 'skip';
 export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
 
 //----- Checking output -----
+
 export const ATTR_KEY_STDOUT = 'stdout';
 export const ATTR_KEY_STDERR = 'stderr';
 
 //----- Global line mods -----
+
 export const ATTR_KEY_EACH = 'each';
 
 //----- Only for `body:` directive -----
+
 export const ATTR_KEY_LANG = 'lang';
 
 //========== Body labels ==========

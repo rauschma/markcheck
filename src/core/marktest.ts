@@ -12,8 +12,8 @@ import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError } from '../util/errors.js';
 import { pruneTrailingEmptyLines } from '../util/string.js';
 import { Config, fillInCommands, type LangDef, type LangDefCommand } from './config.js';
-import { ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_VALUE_LANG_NEVER_RUN, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
+import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
+import { ConfigMod, GlobalVisitationMode, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
 
 const MARKTEST_DIR_NAME = 'marktest';
@@ -27,23 +27,29 @@ enum LogLevel {
 
 const LOG_LEVEL: LogLevel = LogLevel.Normal;
 
-//#################### runShellCommands() ####################
+//#################### runFile() ####################
 
 export function runFile(absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): void {
   const marktestDir = findMarktestDir(absFilePath, entities);
   console.log('Marktest directory: ' + marktestDir);
+  
   const tmpDir = path.resolve(marktestDir, MARKTEST_TMP_DIR_NAME);
-  clearDirectorySync(tmpDir);
+  // `marktest/` must exist, `marktest/tmp/` may not exist
+  if (fs.existsSync(tmpDir)) {
+    clearDirectorySync(tmpDir);
+  } else {
+    fs.mkdirSync(tmpDir);
+  }
 
-  let globalSkipMode = GlobalSkipMode.Normal;
-  if (entities.some((e) => e instanceof Snippet && e.skipMode === SkipMode.Only)) {
-    globalSkipMode = GlobalSkipMode.Only;
+  let globalVisitationMode = GlobalVisitationMode.Normal;
+  if (entities.some((e) => e instanceof Snippet && e.visitationMode === VisitationMode.Only)) {
+    globalVisitationMode = GlobalVisitationMode.Only;
   }
 
   const config = new Config();
   const globalLineMods = new Map<string, Array<LineMod>>();
   for (const entity of entities) {
-    handleOneEntity(tmpDir, idToSnippet, globalLineMods, globalSkipMode, config, entity);
+    handleOneEntity(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, entity);
   }
 }
 
@@ -74,7 +80,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
   );
 }
 
-function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalSkipMode: GlobalSkipMode, config: Config, entity: MarktestEntity) {
+function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, entity: MarktestEntity) {
   if (entity instanceof ConfigMod) {
     config.applyMod(entity.configModJson);
   } else if (entity instanceof LineMod) {
@@ -86,49 +92,45 @@ function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, glob
     }
     lineModArr.push(entity);
   } else if (entity instanceof Snippet) {
-    handleSnippet(tmpDir, idToSnippet, globalLineMods, globalSkipMode, config, entity);
+    handleSnippet(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, entity);
   } else {
     throw new UnsupportedValueError(entity);
   }
 }
 
-function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalSkipMode: GlobalSkipMode, config: Config, snippet: Snippet) {
-  if (!snippet.isActive(globalSkipMode)) {
+function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, snippet: Snippet) {
+  if (!snippet.isVisited(globalVisitationMode)) {
     return;
   }
 
-  const langDef: undefined | LangDef = (
-    snippet.lang === ATTR_VALUE_LANG_NEVER_RUN
-    ? {kind: 'LangDefNeverRun'}
-    : config.lang.get(snippet.lang)
-  );
-
+  const langDef = config.getLang(snippet.lang);
   if (langDef === undefined) {
     throw new UserError(`Unknown language: ${JSON.stringify(snippet.lang)}`);
   }
 
-  writeFiles(langDef);
+  writeFiles(tmpDir, idToSnippet, globalLineMods, snippet, langDef);
 
   if (langDef.kind === 'LangDefCommand' && langDef.commands.length > 0) {
     runShellCommands(idToSnippet, globalLineMods, snippet, langDef, tmpDir);
   }
+}
 
-  function writeFiles(langDef: LangDef) {
-    const fileName = snippet.getFileName(langDef);
+function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef) {
+  const fileName = snippet.getFileName(langDef);
+  const filePath = path.resolve(tmpDir, fileName);
+  const lines = assembleLines(idToSnippet, globalLineMods, snippet);
+  if (LOG_LEVEL === LogLevel.Verbose) {
+    console.log('Wrote ' + filePath);
+  }
+  fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
+
+  for (const { id, fileName } of snippet.externalSpecs) {
+    if (!id) continue;
+    const lines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
     const filePath = path.resolve(tmpDir, fileName);
-    const lines = assembleLines(idToSnippet, globalLineMods, snippet);
+    fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
     if (LOG_LEVEL === LogLevel.Verbose) {
       console.log('Wrote ' + filePath);
-    }
-    fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
-
-    for (const { id, fileName } of snippet.writeSpecs) {
-      const lines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_WRITE}`);
-      const filePath = path.resolve(tmpDir, fileName);
-      fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
-      if (LOG_LEVEL === LogLevel.Verbose) {
-        console.log('Wrote ' + filePath);
-      }
     }
   }
 }

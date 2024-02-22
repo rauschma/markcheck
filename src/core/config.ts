@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CMD_VAR_FILE_NAME, LANG_DEF_NEVER_RUN } from './directive.js';
+import { ATTR_VALUE_LANG_NEVER_RUN, CMD_VAR_FILE_NAME, LANG_DEF_NEVER_RUN } from './directive.js';
 
 export type LangDef = LangDefCommand | LangDefNeverRun;
 export type LangDefCommand = {
@@ -11,10 +11,10 @@ export type LangDefNeverRun = {
   kind: 'LangDefNeverRun',
 };
 export class Config {
-  lang = new Map<string, LangDef>();
+  #lang = new Map<string, LangDef>();
   constructor() {
-    this.lang.set('', { kind: 'LangDefNeverRun' });
-    this.lang.set(
+    this.#lang.set('', { kind: 'LangDefNeverRun' });
+    this.#lang.set(
       "js",
       {
         kind: 'LangDefCommand',
@@ -24,7 +24,7 @@ export class Config {
         ],
       }
     );
-    this.lang.set(
+    this.#lang.set(
       "babel",
       {
         kind: 'LangDefCommand',
@@ -38,9 +38,16 @@ export class Config {
   applyMod(mod: ConfigModJson): void {
     if (mod.lang) {
       for (const [key, langDefJson] of Object.entries(mod.lang)) {
-        this.lang.set(key, langDefFromJson(langDefJson));
+        this.#lang.set(key, langDefFromJson(langDefJson));
       }
     }
+  }
+  getLang(langKey: string): undefined | LangDef {
+    return (
+      langKey === ATTR_VALUE_LANG_NEVER_RUN
+        ? { kind: 'LangDefNeverRun' }
+        : this.#lang.get(langKey)
+    );
   }
 }
 

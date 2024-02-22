@@ -2,7 +2,7 @@
 
 * Syntax:
   * Directive: a comment that starts with `marktest`
-    * Solo directive
+    * Solo directive (self-contained)
       * Config directive: body label `config:`
       * Body directive: body label `body:`
     * Code block directive: must be followed by a code block
@@ -18,22 +18,22 @@
 Override default fileName
 <!--marktest writeAndRun="main.js"-->
 
-External file (written, not run)
+External file (written, not run, override via `lang` or use `writeAndRun`)
 <!--marktest write="lib.js"-->
 
 Config file
 <!--marktest write="config.json" neverSkip-->
 
 Write external files
-<!--marktest external="id1>file1.js, id2>file2.js, id3>file3.js"-->
+<!--marktest external="id1>lib1.js, id2>lib2.js, id3>lib3.js"-->
 
 List external files (needed for some tools)
-<!--marktest external="file1.ts, file2.ts, file3.ts"-->
+<!--marktest external="lib1.ts, lib2.ts, lib3.ts"-->
 ```
 
 ## Marktest modes
 
-* Visitation: skip, neverSkip, only, normal
-    * id => don’t visit
-* Running
-    * write => don’t run
+* Visitation: `skip`, `neverSkip`, `only`, `normal`
+  * If there is an `id`, the default is to `skip`. That default can be overridden.
+* Preventing running: `lang="[neverRun]"`
+  * Attribute `write` prevents running by default. That default can be overridden.
