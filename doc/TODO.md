@@ -11,6 +11,7 @@
   ```
 * `--print-config`: show defaults
 * CLI option for log level (to show shell commands)
+  * Make sure that logging doesn’t interfere with status emoji (which are appended to an unterminated line).
 * Remove ⎡half-brackets⎤
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?

@@ -1,9 +1,9 @@
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
+import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
 import { InternalError, UserError } from '../util/errors.js';
-import type { JsonValue } from '../util/json.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, ATTR_VALUE_LANG_NEVER_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
@@ -249,7 +249,7 @@ export class SingleSnippet extends Snippet {
     }
     assertTrue(this.#lang !== null);
     const len = getEndTrimmedLength(lines);
-    for (let i=0; i<len; i++) {
+    for (let i = 0; i < len; i++) {
       this.body.push(lines[i]);
     }
     this.isClosed = true;
@@ -282,8 +282,9 @@ export class SingleSnippet extends Snippet {
     }
   }
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
+    const fileName = this.getFileName(langDef);
     return [
-      ...this.getFileName(langDef) ?? [],
+      ...(fileName ? [fileName] : []),
       ...this.externalSpecs.map(es => es.fileName),
     ];
   }
@@ -500,7 +501,7 @@ export class ConfigMod {
 //#################### Heading ####################
 
 export class Heading {
-  constructor(public content: string) {}
+  constructor(public content: string) { }
   toJson(): JsonValue {
     return {
       content: this.content,

@@ -2,6 +2,7 @@
 
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync } from '@rauschma/helpers/nodejs/file.js';
+import { ink } from '@rauschma/helpers/nodejs/text-ink.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
 import * as child_process from 'node:child_process';
@@ -11,7 +12,6 @@ import * as path from 'node:path';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
-import { ink } from '../util/text-ink.js';
 import { Config, fillInCommands, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
@@ -49,8 +49,12 @@ export function runFile(absFilePath: string, entities: Array<MarktestEntity>, id
 
   const config = new Config();
   const globalLineMods = new Map<string, Array<LineMod>>();
+  // A heading is only shown if it directly precedes a snippet that is run
+  // (and therefore shows up in the UI output).
+  let prevHeading: null | Heading = null;
   for (const entity of entities) {
-    handleOneEntity(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, entity);
+    handleOneEntity(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, prevHeading, entity);
+    prevHeading = entity instanceof Heading ? entity : null;
   }
 }
 
@@ -81,7 +85,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
   );
 }
 
-function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, entity: MarktestEntity) {
+function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, prevHeading: null | Heading, entity: MarktestEntity): void {
   if (entity instanceof ConfigMod) {
     config.applyMod(entity.configModJson);
   } else if (entity instanceof LineMod) {
@@ -93,15 +97,15 @@ function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, glob
     }
     lineModArr.push(entity);
   } else if (entity instanceof Snippet) {
-    handleSnippet(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, entity);
+    handleSnippet(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, prevHeading, entity);
   } else if (entity instanceof Heading) {
-    console.log(ink.Bold(entity.content));
+    // Ignore
   } else {
     throw new UnsupportedValueError(entity);
   }
 }
 
-function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, snippet: Snippet) {
+function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, prevHeading: null | Heading, snippet: Snippet): void {
   if (!snippet.isVisited(globalVisitationMode)) {
     return;
   }
@@ -114,11 +118,14 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
   writeFiles(tmpDir, idToSnippet, globalLineMods, snippet, langDef);
 
   if (langDef.kind === 'LangDefCommand' && langDef.commands.length > 0) {
+    if (prevHeading) {
+      console.log(ink.Bold(prevHeading.content));
+    }
     runShellCommands(idToSnippet, globalLineMods, snippet, langDef, tmpDir);
   }
 }
 
-function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef) {
+function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef): void {
   const fileName = snippet.getFileName(langDef);
   if (fileName) {
     const filePath = path.resolve(tmpDir, fileName);
@@ -142,7 +149,7 @@ function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLin
 
 //#################### runShellCommands() ####################
 
-function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string) {
+function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string): void {
   process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
   const fileName = snippet.getFileName(langDef);
   assertNonNullable(fileName);
