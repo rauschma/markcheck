@@ -2,9 +2,9 @@ import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
-import { ConfigModJsonSchema, type ConfigModJson, type LangDef } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL_FILES, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
 import { InternalError, UserError } from '../util/errors.js';
+import { ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
+import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL_FILES, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_VALUE_LANG_EMPTY, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseSequenceNumber, parseWriteValue, type Directive, type SequenceNumber, type WriteSpec } from './directive.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod;
 
@@ -101,7 +101,7 @@ export abstract class Snippet {
   abstract getFileName(langDef: LangDef): string;
   abstract isActive(globalSkipMode: GlobalSkipMode): boolean;
   abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
-  abstract getAllFileNames(langDef: LangDef): Array<string>;
+  abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
 }
 export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
@@ -172,7 +172,11 @@ export class SingleSnippet extends Snippet {
   }
 
   override getFileName(langDef: LangDef): string {
-    return this.#fileName ?? langDef.defaultFileName;
+    if (this.#fileName) return this.#fileName;
+    if (langDef.kind === 'LangDefCommand') {
+      return langDef.defaultFileName;
+    }
+    return ATTR_VALUE_LANG_EMPTY;
   }
 
   override isActive(globalSkipMode: GlobalSkipMode): boolean {
@@ -246,7 +250,7 @@ export class SingleSnippet extends Snippet {
       this.lineMod.pushAfterLines(lines);
     }
   }
-  override getAllFileNames(langDef: LangDef): Array<string> {
+  override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return [
       this.getFileName(langDef),
       ...this.writeSpecs.map(ws => ws.fileName),
@@ -344,7 +348,7 @@ export class SequenceSnippet extends Snippet {
   override isActive(globalSkipMode: GlobalSkipMode): boolean {
     return this.firstElement.isActive(globalSkipMode);
   }
-  override getAllFileNames(langDef: LangDef): Array<string> {
+  override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return this.firstElement.getAllFileNames(langDef);
   }
 }

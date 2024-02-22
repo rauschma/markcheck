@@ -2,6 +2,8 @@ import { re } from '@rauschma/helpers/js/re-template-tag.js';
 import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import { InternalError, UserError, type LineNumber } from '../util/errors.js';
 
+//#################### Constants ####################
+
 //========== Various constants ==========
 
 const RE_LABEL = /[A-Za-z0-9\-_]+/u;
@@ -62,7 +64,7 @@ export const ATTR_KEY_STDERR = 'stderr';
 //----- Global line mods -----
 export const ATTR_KEY_EACH = 'each';
 
-//----- `body:` directive -----
+//----- Only for `body:` directive -----
 export const ATTR_KEY_LANG = 'lang';
 
 //========== Body labels ==========
@@ -75,6 +77,22 @@ export const BODY_LABEL_BODY = 'body:';
 export const BODY_LABEL_BEFORE = 'before:';
 export const BODY_LABEL_AFTER = 'after:';
 export const BODY_LABEL_AROUND = 'around:';
+
+//========== Command variables ==========
+
+export const CMD_VAR_FILE_NAME = '$FILE_NAME';
+export const CMD_VAR_ALL_FILE_NAMES = '$ALL_FILE_NAMES';
+
+//========== Language constants ==========
+
+/** Value of attribute `lang` */
+export const ATTR_VALUE_LANG_NEVER_RUN = '[neverRun]';
+/** Value of attribute `lang` */
+export const ATTR_VALUE_LANG_EMPTY = '';
+/** Value for a language definition */
+export const LANG_DEF_NEVER_RUN = '[neverRun]';
+
+//#################### Code ####################
 
 //========== Sequence numbers ==========
 

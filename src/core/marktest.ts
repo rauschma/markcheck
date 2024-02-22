@@ -10,12 +10,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError } from '../util/errors.js';
-import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, Config, fillInCommands, type LangDef } from './config.js';
-import { ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE } from './directive.js';
+import { pruneTrailingEmptyLines } from '../util/string.js';
+import { Config, fillInCommands, type LangDef, type LangDefCommand } from './config.js';
+import { ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_VALUE_LANG_NEVER_RUN, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, GlobalSkipMode, LineMod, SkipMode, Snippet, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
 
 const MARKTEST_DIR_NAME = 'marktest';
+const MARKTEST_TMP_DIR_NAME = 'tmp';
 const { stringify } = JSON;
 
 enum LogLevel {
@@ -30,7 +32,8 @@ const LOG_LEVEL: LogLevel = LogLevel.Normal;
 export function runFile(absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): void {
   const marktestDir = findMarktestDir(absFilePath, entities);
   console.log('Marktest directory: ' + marktestDir);
-  clearDirectorySync(marktestDir);
+  const tmpDir = path.resolve(marktestDir, MARKTEST_TMP_DIR_NAME);
+  clearDirectorySync(tmpDir);
 
   let globalSkipMode = GlobalSkipMode.Normal;
   if (entities.some((e) => e instanceof Snippet && e.skipMode === SkipMode.Only)) {
@@ -40,7 +43,7 @@ export function runFile(absFilePath: string, entities: Array<MarktestEntity>, id
   const config = new Config();
   const globalLineMods = new Map<string, Array<LineMod>>();
   for (const entity of entities) {
-    handleOneEntity(marktestDir, idToSnippet, globalLineMods, globalSkipMode, config, entity);
+    handleOneEntity(tmpDir, idToSnippet, globalLineMods, globalSkipMode, config, entity);
   }
 }
 
@@ -71,7 +74,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
   );
 }
 
-function handleOneEntity(marktestDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalSkipMode: GlobalSkipMode, config: Config, entity: MarktestEntity) {
+function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalSkipMode: GlobalSkipMode, config: Config, entity: MarktestEntity) {
   if (entity instanceof ConfigMod) {
     config.applyMod(entity.configModJson);
   } else if (entity instanceof LineMod) {
@@ -83,34 +86,36 @@ function handleOneEntity(marktestDir: string, idToSnippet: Map<string, Snippet>,
     }
     lineModArr.push(entity);
   } else if (entity instanceof Snippet) {
-    handleSnippet(marktestDir, idToSnippet, globalLineMods, globalSkipMode, config, entity);
+    handleSnippet(tmpDir, idToSnippet, globalLineMods, globalSkipMode, config, entity);
   } else {
     throw new UnsupportedValueError(entity);
   }
 }
 
-function handleSnippet(marktestDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalSkipMode: GlobalSkipMode, config: Config, snippet: Snippet) {
+function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalSkipMode: GlobalSkipMode, config: Config, snippet: Snippet) {
   if (!snippet.isActive(globalSkipMode)) {
     return;
   }
 
-  const langDef = config.lang.get(snippet.lang);
-  if (!langDef) {
+  const langDef: undefined | LangDef = (
+    snippet.lang === ATTR_VALUE_LANG_NEVER_RUN
+    ? {kind: 'LangDefNeverRun'}
+    : config.lang.get(snippet.lang)
+  );
+
+  if (langDef === undefined) {
     throw new UserError(`Unknown language: ${JSON.stringify(snippet.lang)}`);
-  }
-  if (langDef === 'skip') {
-    return;
   }
 
   writeFiles(langDef);
 
-  if (snippet.isActive(globalSkipMode) && langDef.commands.length > 0) {
-    runShellCommands(idToSnippet, globalLineMods, snippet, langDef, marktestDir);
+  if (langDef.kind === 'LangDefCommand' && langDef.commands.length > 0) {
+    runShellCommands(idToSnippet, globalLineMods, snippet, langDef, tmpDir);
   }
 
   function writeFiles(langDef: LangDef) {
     const fileName = snippet.getFileName(langDef);
-    const filePath = path.resolve(marktestDir, fileName);
+    const filePath = path.resolve(tmpDir, fileName);
     const lines = assembleLines(idToSnippet, globalLineMods, snippet);
     if (LOG_LEVEL === LogLevel.Verbose) {
       console.log('Wrote ' + filePath);
@@ -119,7 +124,7 @@ function handleSnippet(marktestDir: string, idToSnippet: Map<string, Snippet>, g
 
     for (const { id, fileName } of snippet.writeSpecs) {
       const lines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_WRITE}`);
-      const filePath = path.resolve(marktestDir, fileName);
+      const filePath = path.resolve(tmpDir, fileName);
       fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
       if (LOG_LEVEL === LogLevel.Verbose) {
         console.log('Wrote ' + filePath);
@@ -130,7 +135,7 @@ function handleSnippet(marktestDir: string, idToSnippet: Map<string, Snippet>, g
 
 //#################### runShellCommands() ####################
 
-function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef, marktestDir: string) {
+function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string) {
   process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
   const commands: Array<Array<string>> = fillInCommands(langDef, {
     [CMD_VAR_FILE_NAME]: [snippet.getFileName(langDef)],
@@ -144,7 +149,7 @@ function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map
       const [command, ...args] = commandParts;
       const result = child_process.spawnSync(command, args, {
         shell: true,
-        cwd: marktestDir,
+        cwd: tmpDir,
         encoding: 'utf-8',
       });
       const status = checkShellCommandResult(idToSnippet, globalLineMods, snippet, result);
@@ -162,16 +167,23 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
     // Spawning didn’t work
     throw result.error;
   }
+
+  const stdoutLines = splitLinesExclEol(result.stdout);
+  pruneTrailingEmptyLines(stdoutLines);
   const stderrLines = splitLinesExclEol(result.stderr);
+  pruneTrailingEmptyLines(stderrLines);
+
   if (result.status !== null && result.status !== 0) {
     console.log(' ❌');
     console.log(`Snippet exited with non-zero code ${result.status}`);
+    logStdout(stdoutLines);
     logStderr(stderrLines);
     return 'failure';
   }
   if (result.signal !== null) {
     console.log(' ❌');
     console.log(`Snippet was terminated by signal ${result.signal}`);
+    logStdout(stdoutLines);
     logStderr(stderrLines);
     return 'failure';
   }
@@ -179,6 +191,7 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
     if (snippet.stderrId) {
       // We expected stderr output
       const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
+      pruneTrailingEmptyLines(expectedLines);
       if (!isOutputEqual(expectedLines, stderrLines)) {
         console.log(' ❌');
         console.log('stderr was not as expected');
@@ -195,7 +208,7 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
   if (snippet.stdoutId) {
     // Normally stdout is ignored. But in this case, we examine it.
     const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
-    const stdoutLines = splitLinesExclEol(result.stdout);
+    pruneTrailingEmptyLines(expectedLines);
     if (!isOutputEqual(stdoutLines, expectedLines)) {
       console.log(' ❌');
       console.log('stdout was not as expected');
@@ -207,6 +220,9 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
 }
 
 function logStdout(stdoutLines: Array<string>, expectedLines?: Array<string>) {
+  if (expectedLines === undefined && stdoutLines.length === 0) {
+    return;
+  }
   console.log('----- stdout -----');
   logAll(stdoutLines);
   console.log('------------------');
@@ -216,6 +232,9 @@ function logStdout(stdoutLines: Array<string>, expectedLines?: Array<string>) {
   }
 }
 function logStderr(stderrLines: Array<string>, expectedLines?: Array<string>) {
+  if (expectedLines === undefined && stderrLines.length === 0) {
+    return;
+  }
   console.log('----- stderr -----');
   logAll(stderrLines);
   console.log('------------------');

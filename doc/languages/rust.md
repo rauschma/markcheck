@@ -1,5 +1,10 @@
 # Marktesting Rust code
 
+```js
+// Command
+["cargo-play", "--quiet", "*.rs"]
+```
+
 ## Running code
 
 * Run Rust source code like a script: https://www.reddit.com/r/rust/comments/monzuc/run_rust_source_code_like_a_script_linux/

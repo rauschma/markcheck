@@ -1,20 +1,36 @@
 # Todo
 
-* Catch and report UserErrors?
-* Set up `PATH` to include various `node_modules/.bin/` directories?
-* `marktest.config.jsonc`:
-  * Sits next to `marktest` directory.
-  * Overrides the defaults.
-* Remove ⎡half-brackets⎤
-* Count numbers of successes & failures
-* Trim stdout/stderr lines
-* At most one LineMod per language
 * Languages – built-in support for:
-  * Babel: support redefining `js`
+  * Babel
   * TypeScript
   * JSON
-* Directive `lang` overrides code block lang?
+  * Node.js REPL
+* Config:
+  ```json
+  "js": "babel",
+  ```
+* `--print-config`: show defaults
+* Equivalent?
+  ```md
+  <!--marktest write="babel.config.json" lang="[neverRun]" neverSkip body:
+  <!--marktest writeConfig="babel.config.json" body:
+  ```
 
+
+
+* Remove ⎡half-brackets⎤
+* At most one LineMod per language
+* Print separator with shorter file path.
+* Names to show when running tests:
+  * IDs? Separate names via attribute `name`?
+  * First line of code block? Line before code block?
+* Summarize results at the end? Useful if there are multiple files!
+  * Statistics: Successes, failures, unknown languages, skipped
+  * Print warning for `only` mode?
+  * Warnings? Unused IDs? Unknown attributes?
+* Set up `PATH` to include various `node_modules/.bin/` directories?
+  * Or simply use `npx` which can also install on demand?
+* Catch and report UserErrors?
 
 ```rust
 [
@@ -25,32 +41,61 @@
       command: string_vec(["cargo-play", "--quiet", "*.rs"]),
     }
   ),
-  (
-    "js".to_string(),
-    LangDef {
-      filename: "main.mjs".to_string(),
-      command: string_vec(["node", "main.mjs"]),
-    }
-  ),
-  (
-    "ts".to_string(),
-    LangDef {
-      filename: "main.ts".to_string(),
-      // - It’s important that the code is type-checked
-      //   before running it. ts-node-esm (installed via
-      //   package `ts-node`) does a good job here.
-      // - `npx` enables local installation.
-      command: string_vec(["npx", "ts-node-esm", "main.ts"]),
-    }
-  ),
 ]
+```
+
+## Potential features
+
+* `marktest/marktest_config.jsonc`
+  * Overrides defaults.
+* Use JSON schema to validate JSON files
+* TAP as output format?
+* Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
+* Show invisible characters?
+  * Show: https://en.wikipedia.org/wiki/C0_and_C1_control_codes#C0_controls
+  * As: https://en.wikipedia.org/wiki/Unicode_control_characters#Control_pictures
+
+### Wrappers
+
+``````md
+<!--marktest apply="main"-->
+```rust
+println!("Hello");
+```
+
+<!--marktest id="main" lang="rust" around:
+fn main() {
+•••
+}
+-->
+``````
+
+Compare:
+
+```md
+<!--marktest write="babel.config.json" body:
+{
+  "plugins": [
+    ["@babel/plugin-proposal-decorators", {"version": "2022-03"}]
+  ]
+}
+-->
+```
+
+### Including
+
+```md
+<!--marktest include="one_snippet, $self, another_snippet"-->
 ```
 
 ## Tests
 
+* Sequence:
+  * Assemble
+  * Report errors
 * Test line numbers of parsed entities
 * Assemble lines with a global LineMod
-* Assemble a sequence
 * Assemble multiple includes (out of sequence)
 * Test attribute `write` with multiple IDs
 * Directive parsing, especially key-only attributes
+* Test that directive `lang` overrides code block language

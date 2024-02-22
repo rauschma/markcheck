@@ -1,9 +1,9 @@
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import markdownit from 'markdown-it';
-import { Directive } from './directive.js';
-import { ConfigMod, LineMod, SingleSnippet, directiveToEntity, type MarktestEntity, SequenceSnippet } from './entities.js';
 import { UserError } from '../util/errors.js';
+import { Directive } from './directive.js';
+import { ConfigMod, LineMod, SequenceSnippet, SingleSnippet, directiveToEntity, type MarktestEntity } from './entities.js';
 
 const COMMENT_START = '<!--';
 const COMMENT_END = '-->';
@@ -19,8 +19,8 @@ export function parseMarkdown(text: string): Array<MarktestEntity> {
   for (const token of tokens) {
     // Content of tokens (“debug”): https://markdown-it.github.io
     if (token.type === 'inline' && token.content.startsWith(COMMENT_START) && token.content.endsWith(COMMENT_END)) {
-      const lineNumber = token.map?.[0];
-      assertNonNullable(lineNumber);
+      assertNonNullable(token.map);
+      const lineNumber = token.map[0] + 1;
 
       const text = token.content.slice(COMMENT_START.length, -COMMENT_END.length);
       const directive = Directive.parse(lineNumber, splitLinesExclEol(text));
@@ -43,8 +43,9 @@ export function parseMarkdown(text: string): Array<MarktestEntity> {
         openSingleSnippet = entity;
       }
     } else if (token.type === 'fence' && token.tag === 'code' && token.markup.startsWith('```')) {
-      const lineNumber = token.map?.[0];
-      assertNonNullable(lineNumber);
+      assertNonNullable(token.map);
+      const lineNumber = token.map[0] + 1;
+      
       const text = token.content;
       const lines = splitLinesExclEol(text);
       const lang = token.info;

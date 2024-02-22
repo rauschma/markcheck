@@ -13,6 +13,7 @@
     "watch": "tsc --watch",
     "clean": "shx rm -rf ./dist/*",
     "chmod": "chmod u+x ./dist/src/core/marktest.js",
+    "\n========== Testing ==========": "",
     "test": "node --test --enable-source-maps",
     "testall": "node --test --enable-source-maps \"./dist/**/*_test.js\""
   },
