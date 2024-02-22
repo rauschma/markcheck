@@ -8,6 +8,9 @@
   "bin": {
     "marktest": "./dist/src/core/marktest.js"
   },
+  "imports": {
+    "#demo/*": "./demo/*"
+  },
   "scripts": {
     "build": "npm run clean && tsc && npm run chmod",
     "watch": "tsc --watch",

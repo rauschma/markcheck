@@ -3,10 +3,12 @@ import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
 import { InternalError, UserError } from '../util/errors.js';
+import type { JsonValue } from '../util/json.js';
+import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, ATTR_VALUE_LANG_EMPTY, ATTR_VALUE_LANG_NEVER_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, ATTR_VALUE_LANG_NEVER_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
-export type MarktestEntity = ConfigMod | Snippet | LineMod;
+export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
 
 /**
  * @returns A snippet is open or closed
@@ -74,17 +76,6 @@ export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods:
 
 //#################### Snippet ####################
 
-export enum VisitationMode {
-  Normal = 'Normal',
-  Only = 'Only',
-  Skip = 'Skip',
-  NeverSkip = 'NeverSkip',
-}
-export enum GlobalVisitationMode {
-  Normal = 'Normal',
-  Only = 'Only',
-}
-
 export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
@@ -94,11 +85,16 @@ export abstract class Snippet {
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
-  abstract getFileName(langDef: LangDef): string;
+  abstract getFileName(langDef: LangDef): null | string;
   abstract isVisited(globalVisitationMode: GlobalVisitationMode): boolean;
   abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
   abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
+
+  abstract toJson(): JsonValue;
 }
+
+//========== SingleSnippet ==========
+
 export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
     const snippet = new SingleSnippet(directive.lineNumber);
@@ -205,12 +201,14 @@ export class SingleSnippet extends Snippet {
     return this.#lang;
   }
 
-  override getFileName(langDef: LangDef): string {
-    if (this.#fileName) return this.#fileName;
+  override getFileName(langDef: LangDef): null | string {
+    if (this.#fileName) {
+      return this.#fileName;
+    }
     if (langDef.kind === 'LangDefCommand') {
       return langDef.defaultFileName;
     }
-    return ATTR_VALUE_LANG_EMPTY;
+    return null;
   }
 
   override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
@@ -250,7 +248,10 @@ export class SingleSnippet extends Snippet {
       this.#lang = lang;
     }
     assertTrue(this.#lang !== null);
-    this.body.push(...lines);
+    const len = getEndTrimmedLength(lines);
+    for (let i=0; i<len; i++) {
+      this.body.push(lines[i]);
+    }
     this.isClosed = true;
     return this;
   }
@@ -282,11 +283,23 @@ export class SingleSnippet extends Snippet {
   }
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return [
-      this.getFileName(langDef),
+      ...this.getFileName(langDef) ?? [],
       ...this.externalSpecs.map(es => es.fileName),
     ];
   }
+  toJson(): SingleSnippetJson {
+    return {
+      lineNumber: this.lineNumber,
+      lang: this.lang,
+      id: this.id,
+      external: this.externalSpecs,
+      stdout: this.stdoutId,
+      body: this.body,
+    };
+  }
 }
+
+//========== SequenceSnippet ==========
 
 export class SequenceSnippet extends Snippet {
   elements = new Array<SingleSnippet>();
@@ -370,7 +383,7 @@ export class SequenceSnippet extends Snippet {
     return this.firstElement.stderrId;
   }
 
-  override getFileName(langDef: LangDef): string {
+  override getFileName(langDef: LangDef): null | string {
     return this.firstElement.getFileName(langDef);
   }
 
@@ -380,6 +393,43 @@ export class SequenceSnippet extends Snippet {
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return this.firstElement.getAllFileNames(langDef);
   }
+  toJson(): JsonValue {
+    return this.elements.map(e => e.toJson());
+  }
+}
+
+//========== Snippet helper types ==========
+
+export enum VisitationMode {
+  Normal = 'Normal',
+  Only = 'Only',
+  Skip = 'Skip',
+  NeverSkip = 'NeverSkip',
+}
+export enum GlobalVisitationMode {
+  Normal = 'Normal',
+  Only = 'Only',
+}
+
+export type SingleSnippetJson = {
+  lineNumber: number,
+  lang: string,
+  id: null | string,
+  external: Array<ExternalSpec>,
+  stdout: null | string,
+  body: Array<string>,
+};
+
+/** For testing */
+export function snippetJson(partial: Partial<SingleSnippetJson>): SingleSnippetJson {
+  return {
+    lineNumber: partial.lineNumber ?? 0,
+    lang: partial.lang ?? '',
+    id: partial.id ?? null,
+    external: partial.external ?? [],
+    stdout: partial.stdout ?? null,
+    body: partial.body ?? [],
+  };
 }
 
 //#################### LineMod ####################
@@ -422,6 +472,13 @@ export class LineMod {
   pushAfterLines(lines: string[]): void {
     lines.push(...this.#afterLines);
   }
+  toJson(): JsonValue {
+    return {
+      targetLanguage: this.targetLanguage,
+      beforeLines: this.#beforeLines,
+      afterLines: this.#afterLines,
+    };
+  }
 }
 
 //#################### ConfigMod ####################
@@ -432,5 +489,21 @@ export class ConfigMod {
     const text = directive.body.join(os.EOL);
     const json = json5.parse(text);
     this.configModJson = ConfigModJsonSchema.parse(json);
+  }
+  toJson(): JsonValue {
+    return {
+      configModJson: this.configModJson,
+    };
+  }
+}
+
+//#################### Heading ####################
+
+export class Heading {
+  constructor(public content: string) {}
+  toJson(): JsonValue {
+    return {
+      content: this.content,
+    };
   }
 }

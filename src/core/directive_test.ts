@@ -1,22 +1,23 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseWriteValue, type WriteValue } from './directive.js';
+import test from 'node:test';
+import { parseExternalSpecs, type ExternalSpec } from './directive.js';
 
-test('parseWriteValue', () => {
+test('parseExternalSpecs', () => {
   assert.deepEqual(
-    parseWriteValue(1, 'file0.js, id1>file1.js, id2>file2.js'),
-    {
-      selfFileName: 'file0.js',
-      writeSpecs: [
-        {
-          fileName: 'file1.js',
-          id: 'id1',
-        },
-        {
-          fileName: 'file2.js',
-          id: 'id2',
-        },
-      ],
-    } satisfies WriteValue
+    parseExternalSpecs(1, 'file0.js, id1>file1.js, id2>file2.js'),
+    [
+      {
+        id: null,
+        fileName: 'file0.js',
+      },
+      {
+        id: 'id1',
+        fileName: 'file1.js',
+      },
+      {
+        id: 'id2',
+        fileName: 'file2.js',
+      },
+    ] satisfies Array<ExternalSpec>
   );
 });

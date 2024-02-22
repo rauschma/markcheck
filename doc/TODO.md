@@ -19,7 +19,6 @@
 
 ## UI output
 
-* Show heading before snippets
 * Print separator with shorter file path.
 * Summarize results at the end? Useful if there are multiple files!
   * Statistics: Successes, failures, unknown languages, skipped

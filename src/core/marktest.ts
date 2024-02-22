@@ -10,10 +10,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError } from '../util/errors.js';
-import { pruneTrailingEmptyLines } from '../util/string.js';
+import { trimTrailingEmptyLines } from '../util/string.js';
+import { ink } from '../util/text-ink.js';
 import { Config, fillInCommands, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, GlobalVisitationMode, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
+import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
 
 const MARKTEST_DIR_NAME = 'marktest';
@@ -93,6 +94,8 @@ function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, glob
     lineModArr.push(entity);
   } else if (entity instanceof Snippet) {
     handleSnippet(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, entity);
+  } else if (entity instanceof Heading) {
+    console.log(ink.Bold(entity.content));
   } else {
     throw new UnsupportedValueError(entity);
   }
@@ -117,21 +120,23 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
 
 function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef) {
   const fileName = snippet.getFileName(langDef);
-  const filePath = path.resolve(tmpDir, fileName);
-  const lines = assembleLines(idToSnippet, globalLineMods, snippet);
-  if (LOG_LEVEL === LogLevel.Verbose) {
-    console.log('Wrote ' + filePath);
+  if (fileName) {
+    const filePath = path.resolve(tmpDir, fileName);
+    const lines = assembleLines(idToSnippet, globalLineMods, snippet);
+    if (LOG_LEVEL === LogLevel.Verbose) {
+      console.log('Write ' + filePath);
+    }
+    fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
   }
-  fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
     const lines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
     const filePath = path.resolve(tmpDir, fileName);
-    fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
     if (LOG_LEVEL === LogLevel.Verbose) {
-      console.log('Wrote ' + filePath);
+      console.log('Write ' + filePath);
     }
+    fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
   }
 }
 
@@ -139,8 +144,10 @@ function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLin
 
 function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string) {
   process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
+  const fileName = snippet.getFileName(langDef);
+  assertNonNullable(fileName);
   const commands: Array<Array<string>> = fillInCommands(langDef, {
-    [CMD_VAR_FILE_NAME]: [snippet.getFileName(langDef)],
+    [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });
   commandLoop: {
@@ -171,9 +178,9 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
   }
 
   const stdoutLines = splitLinesExclEol(result.stdout);
-  pruneTrailingEmptyLines(stdoutLines);
+  trimTrailingEmptyLines(stdoutLines);
   const stderrLines = splitLinesExclEol(result.stderr);
-  pruneTrailingEmptyLines(stderrLines);
+  trimTrailingEmptyLines(stderrLines);
 
   if (result.status !== null && result.status !== 0) {
     console.log(' ❌');
@@ -193,7 +200,7 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
     if (snippet.stderrId) {
       // We expected stderr output
       const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
-      pruneTrailingEmptyLines(expectedLines);
+      trimTrailingEmptyLines(expectedLines);
       if (!isOutputEqual(expectedLines, stderrLines)) {
         console.log(' ❌');
         console.log('stderr was not as expected');
@@ -210,7 +217,7 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
   if (snippet.stdoutId) {
     // Normally stdout is ignored. But in this case, we examine it.
     const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
-    pruneTrailingEmptyLines(expectedLines);
+    trimTrailingEmptyLines(expectedLines);
     if (!isOutputEqual(stdoutLines, expectedLines)) {
       console.log(' ❌');
       console.log('stdout was not as expected');

@@ -1,10 +1,11 @@
 # Demo document
 
+## Check output
+
 <!--marktest stdout="output" external="other>other.mjs"-->
 ```js
 // main.mjs
 import { NAME } from './other.mjs';
-
 console.log(`Hello ${NAME}!`);
 ```
 
@@ -18,6 +19,8 @@ export const NAME = 'user';
 ```
 Hello user!
 ```
+
+## Assertions
 
 ```js
 import assert from 'node:assert/strict';
