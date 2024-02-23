@@ -2,8 +2,9 @@ import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Config } from './config.js';
-import { SingleSnippet, assembleLines } from './entities.js';
+import { SequenceSnippet, SingleSnippet, assembleLines } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
+import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 
 test('singleSnippet.getAllFileNames', () => {
   const { entities } = parseMarkdown(
@@ -26,20 +27,20 @@ test('singleSnippet.getAllFileNames', () => {
   );
 });
 
-test('assembleLines', () => {
+test('Assemble includes', () => {
   const { entities, idToSnippet } = parseMarkdown(
-    [
-      '<!--marktest include="helper"-->',
-      '```node-repl',
-      '> twice("abc")',
-      '"abcabc"',
-      '```',
-      '',
-      '<!--marktest id="helper"-->',
-      '```js',
-      'function twice(str) { return str + str }',
-      '```',
-    ].join('\n'),
+    outdent`
+      <!--marktest include="helper"-->
+      •••node-repl
+      > twice("abc")
+      "abcabc"
+      •••
+      
+      <!--marktest id="helper"-->
+      •••js
+      function twice(str) { return str + str }
+      •••
+    `.replaceAll('•', '`')
   );
   const snippet = entities[0];
   assertTrue(snippet instanceof SingleSnippet);
@@ -47,12 +48,45 @@ test('assembleLines', () => {
   assert.deepEqual(
     assembleLines(config, idToSnippet, new Map(), snippet),
     [
+      "import assert from 'node:assert/strict';",
       'function twice(str) { return str + str }',
       'assert.deepEqual(',
       'twice("abc")',
       ',',
       '"abcabc"',
       ');',
+    ]
+  );
+});
+
+test('Assemble sequence', () => {
+  const { entities, idToSnippet } = parseMarkdown(
+    outdent`
+      <!--marktest sequence="1/3"-->
+      •••js
+      // Part 1
+      •••
+      
+      <!--marktest sequence="2/3"-->
+      •••js
+      // Part 2
+      •••
+      
+      <!--marktest sequence="3/3"-->
+      •••js
+      // Part 3
+      •••
+    `.replaceAll('•', '`')
+  );
+  const snippet = entities[0];
+  assertTrue(snippet instanceof SequenceSnippet);
+  const config = new Config();
+  assert.deepEqual(
+    assembleLines(config, idToSnippet, new Map(), snippet),
+    [
+      '// Part 1',
+      '// Part 2',
+      '// Part 3',
     ]
   );
 });

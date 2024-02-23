@@ -1,9 +1,5 @@
 # Node.js REPL
 
-<!--marktest each="node-repl" before:
-import assert from 'node:assert/strict';
--->
-
 ## Values
 
 ```node-repl

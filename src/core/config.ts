@@ -62,6 +62,7 @@ export type LangDefErrorIfRun = {
 export type Translator = {
   key: string,
   translate(lineNumber: number, lines: Array<string>): Array<string>,
+  pushBeforeLines(lines: Array<string>): void,
 };
 
 //#################### Config ####################
@@ -212,7 +213,7 @@ export class Config {
 /**
  * We can’t use object spreading because an optional property may exist and
  * have the value `undefined` – in which case it overrides other,
- * potentially non-undefined, values).
+ * potentially non-undefined, values.
  */
 function merge(extending: LangDefCommandPartial, extended: LangDefCommandPartial): LangDefCommandPartial {
   // The properties of `extending` override the properties of `extended`

@@ -16,13 +16,13 @@
 
 ## UI output
 
-* Print separator with shorter file path.
+* Print clearer separator with shorter file path (relative to CWD).
 * Summarize results at the end? Useful if there are multiple files!
   * Statistics: Successes, failures, unknown languages, skipped
 * Warnings (don’t change exit code):
-  * Warn about `only` mode
-  * Unused IDs
-  * Unknown attributes ✅
+  * `only` mode (per file)
+  * Unused IDs (per file)
+  * Unknown attributes (immediately)
 
 ## Wrappers
 
@@ -47,6 +47,9 @@ fn main() {
 
 ## Tests
 
+* Test all .md files in the repo
+  * Where to put a common `marktest` directory for all .md files? Move demo/ files to doc/?
+  * Rename the directory so that it can’t be confused with the repo directory?
 * Sequence:
   * Assemble
   * Report errors

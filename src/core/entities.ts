@@ -5,7 +5,7 @@ import json5 from 'json5';
 import * as os from 'node:os';
 import { InternalError, UserError } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
-import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
+import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
 import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, LANG_NEVER_RUN, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
@@ -65,6 +65,11 @@ export function assembleLines(config: Config, idToSnippet: Map<string, Snippet>,
       glm[i].pushBeforeLines(lines);
     }
   }
+  const translator = snippet.getTranslator(config);
+  if (translator) {
+    // Once per snippet
+    translator.pushBeforeLines(lines);
+  }
   snippet.assembleLines(config, idToSnippet, lines, new Set());
   if (glm) {
     for (let i = glm.length - 1; i >= 0; i--) {
@@ -85,6 +90,7 @@ export abstract class Snippet {
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
+  abstract getTranslator(config: Config): undefined | Translator;
   abstract getFileName(langDef: LangDef): null | string;
   abstract isVisited(globalVisitationMode: GlobalVisitationMode): boolean;
   abstract assembleLines(config: Config, idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
@@ -258,37 +264,63 @@ export class SingleSnippet extends Snippet {
   }
 
   override assembleLines(config: Config, idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+    let includedThis = false;
     for (const includeId of this.includeIds) {
-      if (pathOfIncludeIds.has(includeId)) {
-        const idPath = [...pathOfIncludeIds, includeId];
-        throw new UserError(`Cycle of includedIds ` + JSON.stringify(idPath));
+      if (includeId === '$THIS') {
+        this.#pushThis(config, lines);
+        includedThis = true;
+        continue;
       }
-      const snippet = idToSnippet.get(includeId);
-      if (snippet === undefined) {
-        throw new UserError(
-          `Snippet includes the unknown ID ${JSON.stringify(includeId)}`,
-          { lineNumber: this.lineNumber }
-        );
-      }
-      pathOfIncludeIds.add(includeId);
-      snippet.assembleLines(config, idToSnippet, lines, pathOfIncludeIds);
-      pathOfIncludeIds.delete(includeId);
+      this.#pushOneInclude(config, idToSnippet, lines, pathOfIncludeIds, includeId);
+    } // for
+    if (!includedThis) {
+      // Omitting `$THIS` is the same as putting it last
+      this.#pushThis(config, lines);
     }
+  }
+
+  #pushOneInclude(config: Config, idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
+    if (pathOfIncludeIds.has(includeId)) {
+      const idPath = [...pathOfIncludeIds, includeId];
+      throw new UserError(`Cycle of includedIds ` + JSON.stringify(idPath));
+    }
+    const snippet = idToSnippet.get(includeId);
+    if (snippet === undefined) {
+      throw new UserError(
+        `Snippet includes the unknown ID ${JSON.stringify(includeId)}`,
+        { lineNumber: this.lineNumber }
+      );
+    }
+    pathOfIncludeIds.add(includeId);
+    snippet.assembleLines(config, idToSnippet, lines, pathOfIncludeIds);
+    pathOfIncludeIds.delete(includeId);
+  }
+
+  #pushThis(config: Config, lines: Array<string>) {
     if (this.lineMod) {
       this.lineMod.pushBeforeLines(lines);
     }
     let body = this.body;
-    if (this.#lang) {
-      const lang = config.getLang(this.#lang);
-      if (lang && lang.kind === 'LangDefCommand' && lang.translator) {
-        body = lang.translator.translate(this.lineNumber, body);
-      }
+    const translator = this.getTranslator(config);
+    if (translator) {
+      body = translator.translate(this.lineNumber, body);
     }
     lines.push(...body);
     if (this.lineMod) {
       this.lineMod.pushAfterLines(lines);
     }
   }
+
+  getTranslator(config: Config): undefined | Translator {
+    if (this.#lang) {
+      const lang = config.getLang(this.#lang);
+      if (lang && lang.kind === 'LangDefCommand') {
+        return lang.translator;
+      }
+    }
+    return undefined;
+  }
+
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     const fileName = this.getFileName(langDef);
     return [
@@ -335,7 +367,7 @@ export class SequenceSnippet extends Snippet {
         { lineNumber: singleSnippet.lineNumber }
       );
     }
-    if (num.pos !== this.elements.length) {
+    if (num.pos !== (this.elements.length + 1)) {
       throw new UserError(
         `Expected sequence position ${this.elements.length}, but snippet has: ${num}`,
         { lineNumber: singleSnippet.lineNumber }
@@ -395,7 +427,9 @@ export class SequenceSnippet extends Snippet {
   override getFileName(langDef: LangDef): null | string {
     return this.firstElement.getFileName(langDef);
   }
-
+  override getTranslator(config: Config): undefined | Translator {
+    return this.firstElement.getTranslator(config);
+  }
   override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
     return this.firstElement.isVisited(globalVisitationMode);
   }

@@ -6,6 +6,7 @@ const RE_EXCEPTION = /^([A-Z][A-Za-z0-9_$]+):/;
 
 export const nodeReplToJs = {
   key: 'node-repl-to-js',
+
   translate(lineNumber: number, lines: Array<string>): Array<string> {
     const result = new Array<string>();
     let index = 0;
@@ -65,9 +66,14 @@ export const nodeReplToJs = {
       index = nextInputLineIndex;
     } // while
     return result;
-  }
-};
+  },
 
+  pushBeforeLines(lines: Array<string>): void {
+    lines.push(
+      `import assert from 'node:assert/strict';`
+    );
+  },
+};
 
 function findNextInputLine(lines: Array<string>, start: number): number {
   for (let i = start; i < lines.length; i++) {
