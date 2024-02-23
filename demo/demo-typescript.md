@@ -7,20 +7,6 @@
 * Library:
   * https://github.com/TypeStrong/ts-expect
 
-<!--marktest config:
-{
-  "lang": {
-    "ts": {
-      "defaultFileName": "main.ts",
-      "commands": [
-        ["npx", "ts-expect-error", "$ALL_FILE_NAMES"],
-        ["npx", "tsx", "$FILE_NAME"],
-      ],
-    },
-  },
-}
--->
-
 <!--marktest each="ts" before:
 import { expectType, TypeEqual } from 'ts-expect';
 -->

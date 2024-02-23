@@ -9,6 +9,7 @@
     "marktest": "./dist/src/core/marktest.js"
   },
   "imports": {
+    "#package_json": "./package.json",
     "#demo/*": "./demo/*"
   },
   "scripts": {

@@ -2,11 +2,11 @@ import { isObject } from '@rauschma/helpers/js/object.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { z } from 'zod';
 import { UserError } from '../util/errors.js';
-import { CMD_VAR_FILE_NAME, LANG_ERROR, LANG_ERROR_IF_RUN, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
+import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR, LANG_ERROR_IF_RUN, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
 
 const { stringify } = JSON;
 
-export type LangDef =
+type InternalLangDef =
   | LangDefCommand
   | LangDefUse
   | LangDefNeverRun
@@ -14,6 +14,9 @@ export type LangDef =
   | LangDefError
   | LangDefErrorIfRun
   ;
+/** A concrete language definition that doesn’t reuse another one. */
+export type LangDef = Exclude<InternalLangDef, LangDefUse>;
+
 export type LangDefCommand = {
   kind: 'LangDefCommand',
   defaultFileName: string,
@@ -46,7 +49,7 @@ export type LangDefErrorIfRun = {
 
 
 export class Config {
-  #lang = new Map<string, LangDef>();
+  #lang = new Map<string, InternalLangDef>();
   constructor() {
     this.#lang.set('', { kind: 'LangDefNeverRun' });
     this.#lang.set(
@@ -70,6 +73,29 @@ export class Config {
         ],
       }
     );
+    this.#lang.set(
+      "ts",
+      {
+        kind: 'LangDefCommand',
+        defaultFileName: 'main.ts',
+        commands: [
+          ["npx", "ts-expect-error", CMD_VAR_ALL_FILE_NAMES],
+          ["npx", "tsx", CMD_VAR_FILE_NAME],  
+        ],
+      }
+    );
+  }
+  toJson() {
+    return {
+      "lang": Object.fromEntries(
+        Array.from(
+          this.#lang,
+          ([key, value]) => [
+            key, langDefToJson(value)
+          ]
+        )
+      ),
+    };
   }
   applyMod(mod: ConfigModJson, _lineNumber: number): void {
     if (mod.lang) {
@@ -78,7 +104,7 @@ export class Config {
       }
     }
   }
-  getLang(langKey: string): undefined | Exclude<LangDef, LangDefUse> {
+  getLang(langKey: string): undefined | LangDef {
     switch (langKey) {
       case LANG_NEVER_RUN:
         return { kind: 'LangDefNeverRun' };
@@ -99,7 +125,7 @@ export class Config {
         return langDef;
     }
   }
-  #loopUpLangDefJson(parentKey: string, langDef: LangDefUse, visitedLanguages = new Set<string>): Exclude<LangDef, LangDefUse> {
+  #loopUpLangDefJson(parentKey: string, langDef: LangDefUse, visitedLanguages = new Set<string>): LangDef {
     while (true) {
       if (visitedLanguages.has(langDef.use)) {
         const keyPath = [...visitedLanguages, langDef.use];
@@ -162,7 +188,7 @@ export type LangDefUseJson = {
 };
 const PROP_KEY_USE = 'use';
 
-function langDefFromJson(langDefJson: LangDefJson): LangDef {
+function langDefFromJson(langDefJson: LangDefJson): InternalLangDef {
   if (typeof langDefJson === 'string') {
     switch (langDefJson) {
       case LANG_NEVER_RUN:
@@ -188,6 +214,30 @@ function langDefFromJson(langDefJson: LangDefJson): LangDef {
     defaultFileName: langDefJson.defaultFileName,
     commands: langDefJson.commands,
   };
+}
+
+function langDefToJson(langDef: InternalLangDef): LangDefJson {
+  switch (langDef.kind) {
+    case 'LangDefNeverRun':
+      return LANG_NEVER_RUN;
+    case 'LangDefSkip':
+      return LANG_SKIP;
+    case 'LangDefErrorIfRun':
+      return LANG_ERROR_IF_RUN;
+    case 'LangDefError':
+      return LANG_ERROR;
+    case 'LangDefUse':
+      return {
+        use: langDef.use,
+      };
+    case 'LangDefCommand':
+      return {
+        defaultFileName: langDef.defaultFileName,
+        commands: langDef.commands,
+      };
+    default:
+      throw new UnsupportedValueError(langDef);
+  }
 }
 
 //#################### ConfigModJsonSchema ####################

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --no-warnings=ExperimentalWarning
 
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync } from '@rauschma/helpers/nodejs/file.js';
@@ -9,6 +9,7 @@ import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
@@ -16,6 +17,8 @@ import { Config, fillInCommandVariables, type LangDef, type LangDefCommand } fro
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
+//@ts-expect-error
+import pkg from '#package_json' with { type: "json" };
 
 const MARKTEST_DIR_NAME = 'marktest';
 const MARKTEST_TMP_DIR_NAME = 'tmp';
@@ -290,9 +293,49 @@ function logAll(lines: Array<string>) {
 
 //#################### main() ####################
 
+const BIN_NAME = 'marktest';
+
+const ARG_OPTIONS = {
+  'help': {
+    type: 'boolean',
+    short: 'h',
+  },
+  'version': {
+    type: 'boolean',
+    short: 'v',
+  },
+  'print-config': {
+    type: 'boolean',
+    short: 'c',
+  },
+} satisfies ParseArgsConfig['options'];
+
 function main() {
-  const args = process.argv.slice(2);
-  for (const filePath of args) {
+  const args = parseArgs({ allowPositionals: true, options: ARG_OPTIONS });
+
+  if (args.values.version) {
+    console.log(pkg.version);
+    return;
+  }
+  if (args.values['print-config']) {
+    console.log(JSON.stringify(new Config().toJson(), null, 2));
+    return;
+  }
+  if (args.values.help || args.positionals.length === 0) {
+    const helpLines = [
+      `${BIN_NAME} «file1.md» «file2.md» ...`,
+      '',
+      'More options:',
+      '--help -h: get help',
+      '--version -v: print version',
+      '--print-config -c: print built-in configuration',
+    ];
+    for (const line of helpLines) {
+      console.log(line);
+    }
+    return;
+  }
+  for (const filePath of args.positionals) {
     const absFilePath = path.resolve(filePath);
     console.log('RUN: ' + JSON.stringify(absFilePath));
     const text = fs.readFileSync(absFilePath, 'utf-8');
