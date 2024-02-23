@@ -1,4 +1,4 @@
-# Examples
+# Configuration
 
 ## Custom language definitions
 
