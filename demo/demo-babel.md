@@ -19,11 +19,7 @@
 {
   "lang": {
     "js": {
-      "defaultFileName": "main.mjs",
-      "commands": [
-        ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", "$FILE_NAME"],
-      ],
-      // https://github.com/giltayar/babel-register-esm
+      "use": "babel",
     },
   },
 }

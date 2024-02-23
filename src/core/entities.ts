@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import { InternalError, UserError } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, ATTR_VALUE_LANG_NEVER_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, LANG_NEVER_RUN, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
 
@@ -114,8 +114,9 @@ export class SingleSnippet extends Snippet {
 
     { // lang
       if (directive.hasAttribute(ATTR_KEY_WRITE)) {
-        // Default value if attribute `write` exists
-        snippet.#lang = ATTR_VALUE_LANG_NEVER_RUN;
+        // Default value if attribute `write` exists. Override via
+        // attribute `lang`.
+        snippet.#lang = LANG_NEVER_RUN;
       }
       const lang = directive.getAttribute(ATTR_KEY_LANG);
       if (lang) {
@@ -485,8 +486,10 @@ export class LineMod {
 //#################### ConfigMod ####################
 
 export class ConfigMod {
+  lineNumber: number;
   configModJson: ConfigModJson;
   constructor(directive: Directive) {
+    this.lineNumber = directive.lineNumber;
     const text = directive.body.join(os.EOL);
     const json = json5.parse(text);
     this.configModJson = ConfigModJsonSchema.parse(json);

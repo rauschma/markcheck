@@ -4,7 +4,7 @@ import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync } from '@rauschma/helpers/nodejs/file.js';
 import { ink } from '@rauschma/helpers/nodejs/text-ink.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
+import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
-import { Config, fillInCommands, type LangDef, type LangDefCommand } from './config.js';
+import { Config, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
@@ -33,7 +33,7 @@ const LOG_LEVEL: LogLevel = LogLevel.Normal;
 export function runFile(absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): void {
   const marktestDir = findMarktestDir(absFilePath, entities);
   console.log('Marktest directory: ' + marktestDir);
-  
+
   const tmpDir = path.resolve(marktestDir, MARKTEST_TMP_DIR_NAME);
   // `marktest/` must exist, `marktest/tmp/` may not exist
   if (fs.existsSync(tmpDir)) {
@@ -87,7 +87,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
 
 function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, prevHeading: null | Heading, entity: MarktestEntity): void {
   if (entity instanceof ConfigMod) {
-    config.applyMod(entity.configModJson);
+    config.applyMod(entity.configModJson, entity.lineNumber);
   } else if (entity instanceof LineMod) {
     assertNonNullable(entity.targetLanguage);
     let lineModArr = globalLineMods.get(entity.targetLanguage);
@@ -112,12 +112,34 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
 
   const langDef = config.getLang(snippet.lang);
   if (langDef === undefined) {
-    throw new UserError(`Unknown language: ${JSON.stringify(snippet.lang)}`);
+    throw new UserError(
+      `Unknown language: ${JSON.stringify(snippet.lang)}`,
+      { lineNumber: snippet.lineNumber }
+    );
+  }
+  if (langDef.kind === 'LangDefSkip') {
+    return;
+  }
+  if (langDef.kind === 'LangDefError') {
+    throw new UserError(
+      `Language must be skipped: ${JSON.stringify(snippet.lang)}`,
+      { lineNumber: snippet.lineNumber }
+    );
   }
 
   writeFiles(tmpDir, idToSnippet, globalLineMods, snippet, langDef);
 
-  if (langDef.kind === 'LangDefCommand' && langDef.commands.length > 0) {
+  if (langDef.kind === 'LangDefErrorIfRun') {
+    throw new UserError(
+      `Language can’t be run: ${JSON.stringify(snippet.lang)}`,
+      { lineNumber: snippet.lineNumber }
+    );
+  }
+  if (langDef.kind === 'LangDefNeverRun') {
+    return;
+  }
+  assertTrue(langDef.kind === 'LangDefCommand');
+  if (langDef.commands.length > 0) {
     if (prevHeading) {
       console.log(ink.Bold(prevHeading.content));
     }
@@ -153,7 +175,7 @@ function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map
   process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
   const fileName = snippet.getFileName(langDef);
   assertNonNullable(fileName);
-  const commands: Array<Array<string>> = fillInCommands(langDef, {
+  const commands: Array<Array<string>> = fillInCommandVariables(langDef, {
     [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });

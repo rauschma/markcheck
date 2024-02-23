@@ -33,7 +33,9 @@ List external files (needed for some tools)
 
 ## Marktest modes
 
+* Visitation vs. running
 * Visitation: `skip`, `neverSkip`, `only`, `normal`
   * If there is an `id`, the default is to `skip`. That default can be overridden.
-* Preventing running: `lang="[neverRun]"`
-  * Attribute `write` prevents running by default. That default can be overridden.
+* Special `lang` values (language definition and `lang` attribute)
+  * `[neverRun]`: preventing running
+    * Attribute `write` prevents running by default. That default can be overridden.

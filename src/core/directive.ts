@@ -91,13 +91,17 @@ export const CMD_VAR_FILE_NAME = '$FILE_NAME';
 export const CMD_VAR_ALL_FILE_NAMES = '$ALL_FILE_NAMES';
 
 //========== Language constants ==========
+// - Location 1: values of attribute `lang`
+// - Location 2: In configurations for language definitions (property
+//   values of "lang" object).
 
-/** Value of attribute `lang` */
-export const ATTR_VALUE_LANG_NEVER_RUN = '[neverRun]';
-/** Value of attribute `lang` */
-export const ATTR_VALUE_LANG_EMPTY = '';
-/** Value for a language definition */
-export const LANG_DEF_NEVER_RUN = '[neverRun]';
+/** Only a config property key */
+export const LANG_KEY_EMPTY = '';
+
+export const LANG_NEVER_RUN = '[neverRun]';
+export const LANG_SKIP = '[skip]';
+export const LANG_ERROR_IF_RUN = '[errorIfRun]';
+export const LANG_ERROR = '[error]';
 
 //#################### Code ####################
 

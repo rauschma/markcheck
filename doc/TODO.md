@@ -1,18 +1,17 @@
 # Todo
 
+* Remove ⎡half-brackets⎤
+  * Per language? Globally?
+  * Override or extend?
+
 * Languages – built-in support for:
   * Babel
   * TypeScript
   * JSON
   * Node.js REPL
-* Config:
-  ```json
-  "js": "babel",
-  ```
 * `--print-config`: show defaults
 * CLI option for log level (to show shell commands)
   * Make sure that logging doesn’t interfere with status emoji (which are appended to an unterminated line).
-* Remove ⎡half-brackets⎤
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
@@ -23,8 +22,11 @@
 * Print separator with shorter file path.
 * Summarize results at the end? Useful if there are multiple files!
   * Statistics: Successes, failures, unknown languages, skipped
-  * Print warning for `only` mode?
-  * Warnings? Unused IDs? Unknown attributes?
+* Warnings (don’t change exit code):
+  * Warn about `only` mode
+  * Unused IDs
+  * Unknown attributes ✅
+
 
 ## Potential features
 
@@ -52,22 +54,10 @@ fn main() {
 -->
 ``````
 
-Compare:
+### Including after the current snippet
 
 ```md
-<!--marktest write="babel.config.json" body:
-{
-  "plugins": [
-    ["@babel/plugin-proposal-decorators", {"version": "2022-03"}]
-  ]
-}
--->
-```
-
-### Including
-
-```md
-<!--marktest include="one_snippet, $self, another_snippet"-->
+<!--marktest include="one_snippet, $SELF, another_snippet"-->
 ```
 
 ## Tests
@@ -75,7 +65,6 @@ Compare:
 * Sequence:
   * Assemble
   * Report errors
-* Test line numbers of parsed entities
 * Assemble lines with a global LineMod
 * Assemble multiple includes (out of sequence)
 * Test attribute `write` with multiple IDs
