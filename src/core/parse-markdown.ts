@@ -3,9 +3,9 @@ import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import markdownit from 'markdown-it';
 import { UserError } from '../util/errors.js';
 import { Directive } from './directive.js';
-import { ConfigMod, Heading, LineMod, SequenceSnippet, SingleSnippet, directiveToEntity, type MarktestEntity } from './entities.js';
+import { ConfigMod, Heading, LineMod, SequenceSnippet, SingleSnippet, directiveToEntity, type MarktestEntity, Snippet } from './entities.js';
 
-export function parseMarkdown(text: string): Array<MarktestEntity> {
+export function parseMarkdown(text: string): { entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet> } {
   const md = markdownit({ html: true });
   const result = new Array<MarktestEntity>();
   const tokens = md.parse(text, { html: true });
@@ -87,7 +87,10 @@ export function parseMarkdown(text: string): Array<MarktestEntity> {
       `Sequence was not completed – first element: line ${first.sequenceNumber}, last element: line ${last.sequenceNumber}`
     );
   }
-  return result;
+  return {
+    entities: result,
+    idToSnippet: createIdToSnippet(result),
+  };
 
   function pushSingleSnippet(
     prevHeading: null | string, openSequence: null | SequenceSnippet, snippet: SingleSnippet
@@ -133,4 +136,22 @@ export function extractCommentContent(html: string): null | string {
   const endMatch = RE_COMMENT_END.exec(html);
   if (startMatch === null || endMatch === null) return null;
   return html.slice(startMatch[0].length, endMatch.index);
+}
+
+
+function createIdToSnippet(entities: Array<MarktestEntity>): Map<string, Snippet> {
+  const idToSnippet = new Map<string, Snippet>();
+  for (const entity of entities) {
+    if (entity instanceof Snippet && entity.id) {
+      const other = idToSnippet.get(entity.id);
+      if (other) {
+        throw new UserError(
+          `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
+          { lineNumber: entity.lineNumber }
+        );
+      }
+      idToSnippet.set(entity.id, entity);
+    }
+  }
+  return idToSnippet;
 }

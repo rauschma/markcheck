@@ -3,8 +3,6 @@
 * Remove ⎡half-brackets⎤
   * Per language? Globally?
   * Override or extend?
-* Languages – built-in support for:
-  * Node.js REPL
 
 * CLI option for log level (to show shell commands)
   * Make sure that logging doesn’t interfere with status emoji (which are appended to an unterminated line).
@@ -44,7 +42,7 @@ fn main() {
 ## Including after the current snippet
 
 ```md
-<!--marktest include="one_snippet, $SELF, another_snippet"-->
+<!--marktest include="one_snippet, $THIS, another_snippet"-->
 ```
 
 ## Tests

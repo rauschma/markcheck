@@ -5,7 +5,7 @@ import json5 from 'json5';
 import * as os from 'node:os';
 import { InternalError, UserError } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
-import { ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
+import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, LANG_NEVER_RUN, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
@@ -46,7 +46,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
   }
 }
 
-export function assembleLinesForId(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, sourceLineNumber: number, targetId: string, context: string): Array<string> {
+export function assembleLinesForId(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, sourceLineNumber: number, targetId: string, context: string): Array<string> {
   const targetSnippet = idToSnippet.get(targetId);
   if (!targetSnippet) {
     throw new UserError(
@@ -54,10 +54,10 @@ export function assembleLinesForId(idToSnippet: Map<string, Snippet>, globalLine
       { lineNumber: sourceLineNumber }
     );
   }
-  return assembleLines(idToSnippet, globalLineMods, targetSnippet);
+  return assembleLines(config, idToSnippet, globalLineMods, targetSnippet);
 }
 
-export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet) {
+export function assembleLines(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet) {
   const lines = new Array<string>();
   const glm = globalLineMods.get(snippet.lang);
   if (glm) {
@@ -65,7 +65,7 @@ export function assembleLines(idToSnippet: Map<string, Snippet>, globalLineMods:
       glm[i].pushBeforeLines(lines);
     }
   }
-  snippet.assembleLines(idToSnippet, lines, new Set());
+  snippet.assembleLines(config, idToSnippet, lines, new Set());
   if (glm) {
     for (let i = glm.length - 1; i >= 0; i--) {
       glm[i].pushAfterLines(lines);
@@ -87,7 +87,7 @@ export abstract class Snippet {
 
   abstract getFileName(langDef: LangDef): null | string;
   abstract isVisited(globalVisitationMode: GlobalVisitationMode): boolean;
-  abstract assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
+  abstract assembleLines(config: Config, idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
   abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
 
   abstract toJson(): JsonValue;
@@ -257,7 +257,7 @@ export class SingleSnippet extends Snippet {
     return this;
   }
 
-  override assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+  override assembleLines(config: Config, idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     for (const includeId of this.includeIds) {
       if (pathOfIncludeIds.has(includeId)) {
         const idPath = [...pathOfIncludeIds, includeId];
@@ -271,13 +271,20 @@ export class SingleSnippet extends Snippet {
         );
       }
       pathOfIncludeIds.add(includeId);
-      snippet.assembleLines(idToSnippet, lines, pathOfIncludeIds);
+      snippet.assembleLines(config, idToSnippet, lines, pathOfIncludeIds);
       pathOfIncludeIds.delete(includeId);
     }
     if (this.lineMod) {
       this.lineMod.pushBeforeLines(lines);
     }
-    lines.push(...this.body);
+    let body = this.body;
+    if (this.#lang) {
+      const lang = config.getLang(this.#lang);
+      if (lang && lang.kind === 'LangDefCommand' && lang.translator) {
+        body = lang.translator.translate(this.lineNumber, body);
+      }
+    }
+    lines.push(...body);
     if (this.lineMod) {
       this.lineMod.pushAfterLines(lines);
     }
@@ -347,9 +354,9 @@ export class SequenceSnippet extends Snippet {
     return num.total;
   }
 
-  override assembleLines(idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+  override assembleLines(config: Config, idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     for (const element of this.elements) {
-      element.assembleLines(idToSnippet, lines, pathOfIncludeIds);
+      element.assembleLines(config, idToSnippet, lines, pathOfIncludeIds);
     }
   }
   get firstElement(): SingleSnippet {

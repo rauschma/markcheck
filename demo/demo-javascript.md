@@ -1,4 +1,4 @@
-# Demo document
+# JavaScript
 
 ## Check output
 

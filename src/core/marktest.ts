@@ -90,7 +90,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
 
 function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, prevHeading: null | Heading, entity: MarktestEntity): void {
   if (entity instanceof ConfigMod) {
-    config.applyMod(entity.configModJson, entity.lineNumber);
+    config.applyMod(entity.lineNumber, entity.configModJson);
   } else if (entity instanceof LineMod) {
     assertNonNullable(entity.targetLanguage);
     let lineModArr = globalLineMods.get(entity.targetLanguage);
@@ -130,7 +130,7 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
     );
   }
 
-  writeFiles(tmpDir, idToSnippet, globalLineMods, snippet, langDef);
+  writeFiles(config, tmpDir, idToSnippet, globalLineMods, snippet, langDef);
 
   if (langDef.kind === 'LangDefErrorIfRun') {
     throw new UserError(
@@ -146,15 +146,15 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
     if (prevHeading) {
       console.log(ink.Bold(prevHeading.content));
     }
-    runShellCommands(idToSnippet, globalLineMods, snippet, langDef, tmpDir);
+    runShellCommands(config, idToSnippet, globalLineMods, snippet, langDef, tmpDir);
   }
 }
 
-function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef): void {
+function writeFiles(config: Config, tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef): void {
   const fileName = snippet.getFileName(langDef);
   if (fileName) {
     const filePath = path.resolve(tmpDir, fileName);
-    const lines = assembleLines(idToSnippet, globalLineMods, snippet);
+    const lines = assembleLines(config, idToSnippet, globalLineMods, snippet);
     if (LOG_LEVEL === LogLevel.Verbose) {
       console.log('Write ' + filePath);
     }
@@ -163,7 +163,7 @@ function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLin
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
-    const lines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
+    const lines = assembleLinesForId(config, idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
     const filePath = path.resolve(tmpDir, fileName);
     if (LOG_LEVEL === LogLevel.Verbose) {
       console.log('Write ' + filePath);
@@ -174,7 +174,7 @@ function writeFiles(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLin
 
 //#################### runShellCommands() ####################
 
-function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string): void {
+function runShellCommands(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string): void {
   process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
   const fileName = snippet.getFileName(langDef);
   assertNonNullable(fileName);
@@ -193,7 +193,7 @@ function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map
         cwd: tmpDir,
         encoding: 'utf-8',
       });
-      const status = checkShellCommandResult(idToSnippet, globalLineMods, snippet, result);
+      const status = checkShellCommandResult(config, idToSnippet, globalLineMods, snippet, result);
       if (status === 'failure') {
         break commandLoop;
       }
@@ -203,7 +203,7 @@ function runShellCommands(idToSnippet: Map<string, Snippet>, globalLineMods: Map
   }
 }
 
-function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, result: child_process.SpawnSyncReturns<string>): 'success' | 'failure' {
+function checkShellCommandResult(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, result: child_process.SpawnSyncReturns<string>): 'success' | 'failure' {
   if (result.error) {
     // Spawning didn’t work
     throw result.error;
@@ -231,7 +231,7 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
   if (result.stderr.length > 0) {
     if (snippet.stderrId) {
       // We expected stderr output
-      const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
+      const expectedLines = assembleLinesForId(config, idToSnippet, globalLineMods, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
       trimTrailingEmptyLines(expectedLines);
       if (!isOutputEqual(expectedLines, stderrLines)) {
         console.log(' ❌');
@@ -248,7 +248,7 @@ function checkShellCommandResult(idToSnippet: Map<string, Snippet>, globalLineMo
   }
   if (snippet.stdoutId) {
     // Normally stdout is ignored. But in this case, we examine it.
-    const expectedLines = assembleLinesForId(idToSnippet, globalLineMods, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
+    const expectedLines = assembleLinesForId(config, idToSnippet, globalLineMods, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
     trimTrailingEmptyLines(expectedLines);
     if (!isOutputEqual(stdoutLines, expectedLines)) {
       console.log(' ❌');
@@ -339,27 +339,9 @@ function main() {
     const absFilePath = path.resolve(filePath);
     console.log('RUN: ' + JSON.stringify(absFilePath));
     const text = fs.readFileSync(absFilePath, 'utf-8');
-    const entities = parseMarkdown(text);
-    const idToSnippet = createIdToSnippet(entities);
+    const {entities, idToSnippet} = parseMarkdown(text);
     runFile(absFilePath, entities, idToSnippet);
   }
-}
-
-function createIdToSnippet(entities: Array<MarktestEntity>) {
-  const idToSnippet = new Map<string, Snippet>();
-  for (const entity of entities) {
-    if (entity instanceof Snippet && entity.id) {
-      const other = idToSnippet.get(entity.id);
-      if (other) {
-        throw new UserError(
-          `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
-          { lineNumber: entity.lineNumber }
-        );
-      }
-      idToSnippet.set(entity.id, entity);
-    }
-  }
-  return idToSnippet;
 }
 
 main();

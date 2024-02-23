@@ -12,3 +12,7 @@ export function getEndTrimmedLength(lines: Array<string>): number {
   }
   return 0; // only empty lines
 }
+
+export function normalizeWhitespace(str: string) {
+  return str.replace(/\s+/ug, ' ');
+}

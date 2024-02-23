@@ -1,32 +1,44 @@
-import { isObject } from '@rauschma/helpers/js/object.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { z } from 'zod';
+import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
+import { TRANSLATOR_MAP } from '../translation/translators.js';
 import { UserError } from '../util/errors.js';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR, LANG_ERROR_IF_RUN, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
 
 const { stringify } = JSON;
 
-type InternalLangDef =
-  | LangDefCommand
-  | LangDefUse
+//#################### Types ####################
+
+/**
+ * - We delay assembling the actual language definition (via `.extends`) as
+ *   long as possible so that all pieces can be changed.
+ */
+export type LangDef = LangDefCommand | Exclude<LangDefPartial, LangDefCommandPartial>;
+export type LangDefCommand = {
+  kind: 'LangDefCommand',
+  translator?: Translator,
+  defaultFileName: string,
+  commands: Array<Array<string>>,
+};
+
+type LangDefPartial =
+  | LangDefCommandPartial
   | LangDefNeverRun
   | LangDefSkip
   | LangDefError
   | LangDefErrorIfRun
   ;
-/** A concrete language definition that doesn’t reuse another one. */
-export type LangDef = Exclude<InternalLangDef, LangDefUse>;
+type LangDefCommandPartial = {
+  kind: 'LangDefCommandPartial',
+  extends?: string,
+  translator?: Translator,
+  defaultFileName?: string,
+  commands?: Array<Array<string>>,
+};
+const PROP_KEY_EXTENDS = 'extends';
+const PROP_KEY_DEFAULT_FILE_NAME = 'defaultFileName';
+const PROP_KEY_COMMANDS = 'commands';
 
-export type LangDefCommand = {
-  kind: 'LangDefCommand',
-  defaultFileName: string,
-  commands: Array<Array<string>>,
-};
-/** Main use case: redirecting "js" to "babel" */
-export type LangDefUse = {
-  kind: 'LangDefUse',
-  use: string,
-};
 /**
  * Main use case – the empty language `""` (of “bare” code blocks without
  * language tags):
@@ -47,15 +59,21 @@ export type LangDefErrorIfRun = {
   kind: 'LangDefErrorIfRun',
 };
 
+export type Translator = {
+  key: string,
+  translate(lineNumber: number, lines: Array<string>): Array<string>,
+};
+
+//#################### Config ####################
 
 export class Config {
-  #lang = new Map<string, InternalLangDef>();
+  #lang = new Map<string, LangDefPartial>();
   constructor() {
     this.#lang.set('', { kind: 'LangDefNeverRun' });
     this.#lang.set(
       "js",
       {
-        kind: 'LangDefCommand',
+        kind: 'LangDefCommandPartial',
         defaultFileName: 'main.mjs',
         commands: [
           ["node", CMD_VAR_FILE_NAME],
@@ -63,9 +81,17 @@ export class Config {
       }
     );
     this.#lang.set(
+      "node-repl",
+      {
+        kind: 'LangDefCommandPartial',
+        translator: nodeReplToJs,
+        extends: 'js',
+      }
+    );
+    this.#lang.set(
       "babel",
       {
-        kind: 'LangDefCommand',
+        kind: 'LangDefCommandPartial',
         defaultFileName: 'main.mjs',
         commands: [
           // https://github.com/giltayar/babel-register-esm
@@ -76,11 +102,11 @@ export class Config {
     this.#lang.set(
       "ts",
       {
-        kind: 'LangDefCommand',
+        kind: 'LangDefCommandPartial',
         defaultFileName: 'main.ts',
         commands: [
           ["npx", "ts-expect-error", CMD_VAR_ALL_FILE_NAMES],
-          ["npx", "tsx", CMD_VAR_FILE_NAME],  
+          ["npx", "tsx", CMD_VAR_FILE_NAME],
         ],
       }
     );
@@ -97,10 +123,10 @@ export class Config {
       ),
     };
   }
-  applyMod(mod: ConfigModJson, _lineNumber: number): void {
+  applyMod(lineNumber: number, mod: ConfigModJson): void {
     if (mod.lang) {
       for (const [key, langDefJson] of Object.entries(mod.lang)) {
-        this.#lang.set(key, langDefFromJson(langDefJson));
+        this.#lang.set(key, langDefFromJson(lineNumber, langDefJson));
       }
     }
   }
@@ -119,33 +145,68 @@ export class Config {
         if (langDef === undefined) {
           return langDef;
         }
-        if ('use' in langDef) {
+        if (langDef.kind === 'LangDefCommandPartial') {
           return this.#loopUpLangDefJson(langKey, langDef);
+        } else {
+          return langDef;
         }
-        return langDef;
     }
   }
-  #loopUpLangDefJson(parentKey: string, langDef: LangDefUse, visitedLanguages = new Set<string>): LangDef {
+  #loopUpLangDefJson(parentKey: string, partialCommand: LangDefCommandPartial, visitedLanguages = new Set<string>): LangDef {
+    const origParentKey = parentKey;
+    let result = partialCommand;
     while (true) {
-      if (visitedLanguages.has(langDef.use)) {
-        const keyPath = [...visitedLanguages, langDef.use];
+      if (partialCommand.extends === undefined) {
+        break;
+      }
+      if (visitedLanguages.has(partialCommand.extends)) {
+        const keyPath = [...visitedLanguages, partialCommand.extends];
         throw new UserError(
-          `Cycle in property ${stringify(PROP_KEY_USE)} (${stringify(PROP_KEY_LANG)} object): ${stringify(keyPath)}`
+          `Cycle in property ${stringify(PROP_KEY_EXTENDS)} (object ${stringify(CONFIG_KEY_LANG)}): ${stringify(keyPath)}`
         );
       }
-      visitedLanguages.add(langDef.use);
-      const nextLangDef = this.#lang.get(langDef.use);
+      visitedLanguages.add(partialCommand.extends);
+      const nextLangDef = this.#lang.get(partialCommand.extends);
       if (nextLangDef === undefined) {
         throw new UserError(
-          `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(langDef.use)}`
+          `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(partialCommand.extends)}`
         );
       }
-      if (!(isObject(nextLangDef) && 'use' in nextLangDef)) {
-        return nextLangDef;
+      switch (nextLangDef.kind) {
+        case 'LangDefNeverRun':
+        case 'LangDefSkip':
+        case 'LangDefError':
+        case 'LangDefErrorIfRun':
+          // End of the road
+          return nextLangDef;
+        case 'LangDefCommandPartial':
+          // - Spreading: Later overrides earlier.
+          // - partialCommand extends nextLangDef – the properties of the
+          //   former win.
+          result = {...nextLangDef, ...result};
+          parentKey = partialCommand.extends;
+          partialCommand = nextLangDef;
+          break;
+        default:
+          throw new UnsupportedValueError(nextLangDef);
       }
-      parentKey = langDef.use; // key of langDef
-      langDef = nextLangDef;
+    } // while
+    if (result.defaultFileName === undefined) {
+      throw new UserError(
+        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}`
+      );
     }
+    if (result.commands === undefined) {
+      throw new UserError(
+        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_COMMANDS)}`
+      );
+    }
+    return {
+      kind: 'LangDefCommand',
+      translator: result.translator,
+      defaultFileName: result.defaultFileName,
+      commands: result.commands,
+    };
   }
 }
 
@@ -165,30 +226,27 @@ export function fillInCommandVariables(langDef: LangDefCommand, vars: Record<str
 
 export type ConfigModJson = {
   marktestDirectory?: string,
-  lang?: Record<string, LangDefJson>,
+  lang?: Record<string, LangDefPartialJson>,
 };
-const PROP_KEY_LANG = 'lang';
+const CONFIG_KEY_LANG = 'lang';
 
-export type LangDefJson =
-  | LangDefCommandJson
-  | LangDefUseJson
+export type LangDefPartialJson =
+  | LangDefCommandPartialJson
   | typeof LANG_NEVER_RUN
   | typeof LANG_SKIP
   | typeof LANG_ERROR_IF_RUN
   | typeof LANG_ERROR
   ;
 
-export type LangDefCommandJson = {
-  defaultFileName: string,
-  commands: Array<Array<string>>,
+export type LangDefCommandPartialJson = {
+  extends?: string,
+  translator?: string,
+  defaultFileName?: string,
+  commands?: Array<Array<string>>,
 };
 
-export type LangDefUseJson = {
-  use: string,
-};
-const PROP_KEY_USE = 'use';
 
-function langDefFromJson(langDefJson: LangDefJson): InternalLangDef {
+function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): LangDefPartial {
   if (typeof langDefJson === 'string') {
     switch (langDefJson) {
       case LANG_NEVER_RUN:
@@ -203,20 +261,26 @@ function langDefFromJson(langDefJson: LangDefJson): InternalLangDef {
         throw new UnsupportedValueError(langDefJson);
     }
   }
-  if ('use' in langDefJson) {
-    return {
-      kind: 'LangDefUse',
-      use: langDefJson.use,
-    };
+  let translator: undefined | Translator;
+  if (langDefJson.translator) {
+    translator = TRANSLATOR_MAP.get(langDefJson.translator);
+    if (translator === undefined) {
+      throw new UserError(
+        `Unknown translator: ${stringify(langDefJson.translator)}`,
+        {lineNumber}
+      );
+    }
   }
   return {
-    kind: 'LangDefCommand',
+    kind: 'LangDefCommandPartial',
+    extends: langDefJson.extends,
+    translator,
     defaultFileName: langDefJson.defaultFileName,
     commands: langDefJson.commands,
   };
 }
 
-function langDefToJson(langDef: InternalLangDef): LangDefJson {
+function langDefToJson(langDef: LangDefPartial): LangDefPartialJson {
   switch (langDef.kind) {
     case 'LangDefNeverRun':
       return LANG_NEVER_RUN;
@@ -226,12 +290,9 @@ function langDefToJson(langDef: InternalLangDef): LangDefJson {
       return LANG_ERROR_IF_RUN;
     case 'LangDefError':
       return LANG_ERROR;
-    case 'LangDefUse':
+    case 'LangDefCommandPartial':
       return {
-        use: langDef.use,
-      };
-    case 'LangDefCommand':
-      return {
+        extends: langDef.extends,
         defaultFileName: langDef.defaultFileName,
         commands: langDef.commands,
       };
@@ -242,18 +303,15 @@ function langDefToJson(langDef: InternalLangDef): LangDefJson {
 
 //#################### ConfigModJsonSchema ####################
 
-export const LangDefCommandJsonSchema = z.object({
-  defaultFileName: z.string(),
-  commands: z.array(z.array(z.string())),
+export const LangDefCommandPartialJsonSchema = z.object({
+  extends: z.optional(z.string()),
+  translator: z.optional(z.string()),
+  defaultFileName: z.optional(z.string()),
+  commands: z.optional(z.array(z.array(z.string()))),
 });
 
-export const LangDefUseJsonSchema = z.object({
-  use: z.string(),
-});
-
-export const LangDefJsonSchema = z.union([
-  LangDefCommandJsonSchema,
-  LangDefUseJsonSchema,
+export const LangDefPartialJsonSchema = z.union([
+  LangDefCommandPartialJsonSchema,
   z.literal(LANG_NEVER_RUN),
   z.literal(LANG_SKIP),
   z.literal(LANG_ERROR_IF_RUN),
@@ -264,7 +322,7 @@ export const ConfigModJsonSchema = z.object({
   marktestDirectory: z.optional(z.string()),
   lang: z.optional(
     z.record(
-      LangDefJsonSchema
+      LangDefPartialJsonSchema
     )
   ),
 });
