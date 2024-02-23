@@ -28,12 +28,10 @@ import assert from 'node:assert/strict';
 > 2n + 1
 TypeError: Cannot mix BigInt and other types,
 use explicit conversions
-```
 
-```node-repl
 > const {prop} = undefined
 TypeError: Cannot destructure property 'prop' of 'undefined'
 as it is undefined.
 ```
 
-Note: The input line does not end with a semicolon. A semicolon means that no result (value or exception) is expected.
+Note: The last input line does not end with a semicolon. A semicolon means that no result (value or exception) is expected.

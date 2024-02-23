@@ -146,13 +146,13 @@ export class Config {
           return langDef;
         }
         if (langDef.kind === 'LangDefCommandPartial') {
-          return this.#loopUpLangDefJson(langKey, langDef);
+          return this.#lookUpLangDefJson(langKey, langDef);
         } else {
           return langDef;
         }
     }
   }
-  #loopUpLangDefJson(parentKey: string, partialCommand: LangDefCommandPartial, visitedLanguages = new Set<string>): LangDef {
+  #lookUpLangDefJson(parentKey: string, partialCommand: LangDefCommandPartial, visitedLanguages = new Set<string>): LangDef {
     const origParentKey = parentKey;
     let result = partialCommand;
     while (true) {
@@ -180,10 +180,9 @@ export class Config {
           // End of the road
           return nextLangDef;
         case 'LangDefCommandPartial':
-          // - Spreading: Later overrides earlier.
-          // - partialCommand extends nextLangDef – the properties of the
-          //   former win.
-          result = {...nextLangDef, ...result};
+          // `result` extends `nextLangDef` – the properties of the former
+          // win.
+          result = merge(result, nextLangDef);
           parentKey = partialCommand.extends;
           partialCommand = nextLangDef;
           break;
@@ -208,6 +207,23 @@ export class Config {
       commands: result.commands,
     };
   }
+}
+
+/**
+ * We can’t use object spreading because an optional property may exist and
+ * have the value `undefined` – in which case it overrides other,
+ * potentially non-undefined, values).
+ */
+function merge(extending: LangDefCommandPartial, extended: LangDefCommandPartial): LangDefCommandPartial {
+  // The properties of `extending` override the properties of `extended`
+  // (they win).
+  return {
+    kind: 'LangDefCommandPartial',
+    extends: extending.extends ?? extended.extends,
+    translator: extending.translator ?? extended.translator,
+    defaultFileName: extending.defaultFileName ?? extended.defaultFileName,
+    commands: extending.commands ?? extended.commands,
+  };
 }
 
 export function fillInCommandVariables(langDef: LangDefCommand, vars: Record<string, Array<string>>): Array<Array<string>> {
@@ -267,7 +283,7 @@ function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): L
     if (translator === undefined) {
       throw new UserError(
         `Unknown translator: ${stringify(langDefJson.translator)}`,
-        {lineNumber}
+        { lineNumber }
       );
     }
   }
@@ -290,12 +306,18 @@ function langDefToJson(langDef: LangDefPartial): LangDefPartialJson {
       return LANG_ERROR_IF_RUN;
     case 'LangDefError':
       return LANG_ERROR;
-    case 'LangDefCommandPartial':
+    case 'LangDefCommandPartial': {
       return {
         extends: langDef.extends,
+        ...(
+          langDef.translator
+          ? {translator: langDef.translator.key}
+          : {}
+        ),
         defaultFileName: langDef.defaultFileName,
         commands: langDef.commands,
       };
+    }
     default:
       throw new UnsupportedValueError(langDef);
   }

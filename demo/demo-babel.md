@@ -19,7 +19,7 @@
 {
   "lang": {
     "js": {
-      "use": "babel",
+      "extends": "babel",
     },
   },
 }

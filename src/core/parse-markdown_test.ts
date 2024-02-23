@@ -7,7 +7,7 @@ import { extractCommentContent, parseMarkdown } from './parse-markdown.js';
 test('parseMarkdown', () => {
   const url = new URL(import.meta.resolve('#demo/demo-javascript.md'));
   const md = fs.readFileSync(url, 'utf-8');
-  const entitiesJson = parseMarkdown(md).map(e => e.toJson());
+  const entitiesJson = parseMarkdown(md).entities.map(e => e.toJson());
   // console.dir(entities, { depth: Infinity });
   assert.deepEqual(
     entitiesJson,
