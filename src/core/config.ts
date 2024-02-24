@@ -1,3 +1,4 @@
+import { createSequentialEscaper } from '@rauschma/helpers/js/escaper.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { z } from 'zod';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
@@ -61,8 +62,14 @@ export type Translator = {
 //#################### Config ####################
 
 export class Config {
+  searchAndReplaceFunc: (str: string) => string = (str) => str;
+  #searchAndReplaceData: Record<string, string> = {};
   #lang = new Map<string, LangDef>();
+
   constructor() {
+    this.#setSearchAndReplace({
+      '[⎡⎤]': '',
+    });
     this.#lang.set('', { kind: 'LangDefNeverRun' });
     this.#lang.set(
       "js",
@@ -115,8 +122,9 @@ export class Config {
       }
     );
   }
-  toJson() {
+  toJson(): ConfigModJson {
     return {
+      "searchAndReplace": this.#searchAndReplaceData,
       "lang": Object.fromEntries(
         Array.from(
           this.#lang,
@@ -128,11 +136,18 @@ export class Config {
     };
   }
   applyMod(lineNumber: number, mod: ConfigModJson): void {
+    if (mod.searchAndReplace) {
+      this.#setSearchAndReplace(mod.searchAndReplace);
+    }
     if (mod.lang) {
       for (const [key, langDefJson] of Object.entries(mod.lang)) {
         this.#lang.set(key, langDefFromJson(lineNumber, langDefJson));
       }
     }
+  }
+  #setSearchAndReplace(data: Record<string, string>) {
+    this.searchAndReplaceFunc = createSequentialEscaper(Object.entries(data));
+    this.#searchAndReplaceData = data;
   }
   getLang(langKey: string): undefined | LangDef {
     switch (langKey) {
@@ -241,7 +256,13 @@ export function fillInCommandVariables(commands: Array<Array<string>>, vars: Rec
 //#################### ConfigModJson ####################
 
 export type ConfigModJson = {
+  /**
+   * Ignored by class `Config`. The first ConfigMod in a file can set the
+   * Marktest directory. By including it here, we don’t need an extra
+   * type+schema for parsing in that case.
+   */
   marktestDirectory?: string,
+  searchAndReplace?: Record<string, string>,
   lang?: Record<string, LangDefPartialJson>,
 };
 const CONFIG_KEY_LANG = 'lang';
@@ -261,7 +282,6 @@ export type LangDefCommandPartialJson = {
   defaultFileName?: string,
   commands?: Array<Array<string>>,
 };
-
 
 function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): LangDef {
   if (typeof langDefJson === 'string') {
@@ -346,6 +366,7 @@ export const LangDefPartialJsonSchema = z.union([
 
 export const ConfigModJsonSchema = z.object({
   marktestDirectory: z.optional(z.string()),
+  searchAndReplace: z.optional(z.record(z.string())),
   lang: z.optional(
     z.record(
       LangDefPartialJsonSchema

@@ -1,12 +1,5 @@
 # Todo
 
-`import assert from 'node:assert/strict';`
-
-* Remove ⎡half-brackets⎤
-  * Per language? Globally?
-  * Override or extend?
-* Default overridable(!) global LineMods for: js-repl, ts, js
-
 * CLI option for log level (to show shell commands)
   * Make sure that logging doesn’t interfere with status emoji (which are appended to an unterminated line).
 * At most one LineMod per language

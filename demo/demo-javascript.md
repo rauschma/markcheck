@@ -28,3 +28,25 @@ assert.equal(
   'abcabc'
 );
 ```
+
+## Asynchronous code
+
+This is a quick demo of how `Promise.allSettled()` works:
+
+```js
+await Promise.allSettled([
+  Promise.resolve('a'),
+  Promise.reject('b'),
+])
+.then(
+  (arr) => assert.deepEqual(
+    arr,
+    [
+      { status: 'fulfilled', value:  'a' },
+      { status: 'rejected',  reason: 'b' },
+    ]
+  )
+);
+```
+
+Easy to test, thanks to top-level `await`.

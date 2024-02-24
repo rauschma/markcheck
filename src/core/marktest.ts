@@ -173,23 +173,25 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
 function writeFiles(config: Config, tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef): void {
   const fileName = snippet.getFileName(langDef);
   if (fileName) {
-    const filePath = path.resolve(tmpDir, fileName);
     const lines = assembleLines(config, idToSnippet, globalLineMods, snippet);
-    if (LOG_LEVEL === LogLevel.Verbose) {
-      console.log('Write ' + filePath);
-    }
-    fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
+    writeOneFile(config, tmpDir, fileName, lines);
   }
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
     const lines = assembleLinesForId(config, idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
-    const filePath = path.resolve(tmpDir, fileName);
-    if (LOG_LEVEL === LogLevel.Verbose) {
-      console.log('Write ' + filePath);
-    }
-    fs.writeFileSync(filePath, lines.join(os.EOL), 'utf-8');
+    writeOneFile(config, tmpDir, fileName, lines);
   }
+}
+
+function writeOneFile(config: Config, tmpDir: string, fileName: string, lines: string[]) {
+  const filePath = path.resolve(tmpDir, fileName);
+  if (LOG_LEVEL === LogLevel.Verbose) {
+    console.log('Write ' + filePath);
+  }
+  let content = lines.join(os.EOL);
+  content = config.searchAndReplaceFunc(content);
+  fs.writeFileSync(filePath, content, 'utf-8');
 }
 
 //#################### runShellCommands() ####################
