@@ -39,12 +39,6 @@ More information on Babel configuration files: https://babeljs.io/docs/en/config
 }
 -->
 
-## Code used by all `js` code blocks
-
-<!--marktest each="js" before:
-import assert from 'node:assert/strict';
--->
-
 ## JavaScript code
 
 This code will be transpiled via Babel before it runs:

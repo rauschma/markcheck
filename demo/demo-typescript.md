@@ -7,10 +7,6 @@
 * Library:
   * https://github.com/TypeStrong/ts-expect
 
-<!--marktest each="ts" before:
-import { expectType, TypeEqual } from 'ts-expect';
--->
-
 When it comes to TypeScript examples in documentation, there are three important kinds of static checks that are useful (in addition to running the code as JavaScript to catch runtime errors).
 
 ## Static check: expecting errors

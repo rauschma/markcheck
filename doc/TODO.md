@@ -1,5 +1,7 @@
 # Todo
 
+`import assert from 'node:assert/strict';`
+
 * Remove ⎡half-brackets⎤
   * Per language? Globally?
   * Override or extend?
@@ -14,6 +16,7 @@
 * `marktest/marktest_config.jsonc`
   * Overrides defaults.
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
+* CLI option: stop after first error (so that files can be examined).
 
 ## UI output
 

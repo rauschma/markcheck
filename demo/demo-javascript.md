@@ -23,7 +23,6 @@ Hello user!
 ## Assertions
 
 ```js
-import assert from 'node:assert/strict';
 assert.equal(
   'abc' + 'abc',
   'abcabc'

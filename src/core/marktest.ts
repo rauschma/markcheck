@@ -1,4 +1,5 @@
 #!/usr/bin/env -S node --no-warnings=ExperimentalWarning
+// Importing JSON is experimental
 
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync } from '@rauschma/helpers/nodejs/file.js';
@@ -17,7 +18,7 @@ import { Config, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVar
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
-//@ts-expect-error
+//@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: "json" };
 
 const MARKTEST_DIR_NAME = 'marktest';

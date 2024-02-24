@@ -24,6 +24,7 @@ export type LangDef =
 export type LangDefCommand = {
   kind: 'LangDefCommand',
   extends?: string,
+  beforeLines?: Array<string>,
   translator?: Translator,
   defaultFileName?: string,
   commands?: Array<Array<string>>,
@@ -55,7 +56,6 @@ export type LangDefErrorIfRun = {
 export type Translator = {
   key: string,
   translate(lineNumber: number, lines: Array<string>): Array<string>,
-  pushBeforeLines(lines: Array<string>): void,
 };
 
 //#################### Config ####################
@@ -71,6 +71,9 @@ export class Config {
         defaultFileName: 'main.mjs',
         commands: [
           ["node", CMD_VAR_FILE_NAME],
+        ],
+        beforeLines: [
+          `import assert from 'node:assert/strict';`
         ],
       }
     );
@@ -91,6 +94,9 @@ export class Config {
           // https://github.com/giltayar/babel-register-esm
           ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", CMD_VAR_FILE_NAME],
         ],
+        beforeLines: [
+          `import assert from 'node:assert/strict';`
+        ],
       }
     );
     this.#lang.set(
@@ -99,8 +105,12 @@ export class Config {
         kind: 'LangDefCommand',
         defaultFileName: 'main.ts',
         commands: [
-          ["npx", "ts-expect-error", CMD_VAR_ALL_FILE_NAMES],
+          ["npx", "ts-expect-error", "--report-errors", CMD_VAR_ALL_FILE_NAMES],
           ["npx", "tsx", CMD_VAR_FILE_NAME],
+        ],
+        beforeLines: [
+          `import { expectType, TypeEqual } from 'ts-expect';`,
+          `import assert from 'node:assert/strict';`
         ],
       }
     );
@@ -209,6 +219,7 @@ function merge(extending: LangDefCommand, extended: LangDefCommand): LangDefComm
   return {
     kind: 'LangDefCommand',
     extends: extending.extends ?? extended.extends,
+    beforeLines: extending.beforeLines ?? extended.beforeLines,
     translator: extending.translator ?? extended.translator,
     defaultFileName: extending.defaultFileName ?? extended.defaultFileName,
     commands: extending.commands ?? extended.commands,
@@ -217,7 +228,7 @@ function merge(extending: LangDefCommand, extended: LangDefCommand): LangDefComm
 
 export function fillInCommandVariables(commands: Array<Array<string>>, vars: Record<string, Array<string>>): Array<Array<string>> {
   return commands.map(cmdParts => cmdParts.flatMap(
-    (part) => {
+    (part): Array<string> => {
       if (Object.hasOwn(vars, part)) {
         return vars[part];
       } else {
@@ -245,6 +256,7 @@ export type LangDefPartialJson =
 
 export type LangDefCommandPartialJson = {
   extends?: string,
+  before?: Array<string>,
   translator?: string,
   defaultFileName?: string,
   commands?: Array<Array<string>>,
@@ -279,6 +291,7 @@ function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): L
   return {
     kind: 'LangDefCommand',
     extends: langDefJson.extends,
+    beforeLines: langDefJson.before,
     translator,
     defaultFileName: langDefJson.defaultFileName,
     commands: langDefJson.commands,
@@ -298,6 +311,7 @@ function langDefToJson(langDef: LangDef): LangDefPartialJson {
     case 'LangDefCommand': {
       return {
         extends: langDef.extends,
+        before: langDef.beforeLines,
         ...(
           langDef.translator
           ? {translator: langDef.translator.key}
@@ -316,6 +330,7 @@ function langDefToJson(langDef: LangDef): LangDefPartialJson {
 
 export const LangDefCommandPartialJsonSchema = z.object({
   extends: z.optional(z.string()),
+  before: z.optional(z.array(z.string())),
   translator: z.optional(z.string()),
   defaultFileName: z.optional(z.string()),
   commands: z.optional(z.array(z.array(z.string()))),

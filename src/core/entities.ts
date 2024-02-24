@@ -65,11 +65,8 @@ export function assembleLines(config: Config, idToSnippet: Map<string, Snippet>,
       glm[i].pushBeforeLines(lines);
     }
   }
-  const translator = snippet.getTranslator(config);
-  if (translator) {
-    // Once per snippet
-    translator.pushBeforeLines(lines);
-  }
+  // Once per snippet
+  snippet.pushBeforeLines(config, lines);
   snippet.assembleLines(config, idToSnippet, lines, new Set());
   if (glm) {
     for (let i = glm.length - 1; i >= 0; i--) {
@@ -90,7 +87,7 @@ export abstract class Snippet {
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
-  abstract getTranslator(config: Config): undefined | Translator;
+  abstract pushBeforeLines(config: Config, lines: Array<String>): void;
   abstract getFileName(langDef: LangDef): null | string;
   abstract isVisited(globalVisitationMode: GlobalVisitationMode): boolean;
   abstract assembleLines(config: Config, idToSnippet: Map<string, Snippet>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
@@ -301,7 +298,7 @@ export class SingleSnippet extends Snippet {
       this.lineMod.pushBeforeLines(lines);
     }
     let body = this.body;
-    const translator = this.getTranslator(config);
+    const translator = this.#getXTranslator(config);
     if (translator) {
       body = translator.translate(this.lineNumber, body);
     }
@@ -311,11 +308,21 @@ export class SingleSnippet extends Snippet {
     }
   }
 
-  getTranslator(config: Config): undefined | Translator {
+  #getXTranslator(config: Config): undefined | Translator {
     if (this.#lang) {
       const lang = config.getLang(this.#lang);
       if (lang && lang.kind === 'LangDefCommand') {
         return lang.translator;
+      }
+    }
+    return undefined;
+  }
+
+  pushBeforeLines(config: Config, lines: Array<String>): void {
+    if (this.#lang) {
+      const lang = config.getLang(this.#lang);
+      if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
+        lines.push(...lang.beforeLines);
       }
     }
     return undefined;
@@ -427,8 +434,8 @@ export class SequenceSnippet extends Snippet {
   override getFileName(langDef: LangDef): null | string {
     return this.firstElement.getFileName(langDef);
   }
-  override getTranslator(config: Config): undefined | Translator {
-    return this.firstElement.getTranslator(config);
+  override pushBeforeLines(config: Config, lines: Array<String>): void {
+    this.firstElement.pushBeforeLines(config, lines);
   }
   override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
     return this.firstElement.isVisited(globalVisitationMode);

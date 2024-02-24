@@ -67,12 +67,6 @@ export const nodeReplToJs = {
     } // while
     return result;
   },
-
-  pushBeforeLines(lines: Array<string>): void {
-    lines.push(
-      `import assert from 'node:assert/strict';`
-    );
-  },
 };
 
 function findNextInputLine(lines: Array<string>, start: number): number {
