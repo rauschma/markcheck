@@ -9,35 +9,28 @@ const { stringify } = JSON;
 
 //#################### Types ####################
 
-/**
- * - We delay assembling the actual language definition (via `.extends`) as
- *   long as possible so that all pieces can be changed.
- */
-export type LangDef = LangDefCommand | Exclude<LangDefPartial, LangDefCommandPartial>;
-export type LangDefCommand = {
-  kind: 'LangDefCommand',
-  translator?: Translator,
-  defaultFileName: string,
-  commands: Array<Array<string>>,
-};
-
-type LangDefPartial =
-  | LangDefCommandPartial
+export type LangDef =
+  | LangDefCommand
   | LangDefNeverRun
   | LangDefSkip
   | LangDefError
   | LangDefErrorIfRun
   ;
-type LangDefCommandPartial = {
-  kind: 'LangDefCommandPartial',
+
+  /**
+ * - We delay assembling the actual language definition (via `.extends`) as
+ *   long as possible so that all pieces can be changed.
+ */
+export type LangDefCommand = {
+  kind: 'LangDefCommand',
   extends?: string,
   translator?: Translator,
   defaultFileName?: string,
   commands?: Array<Array<string>>,
 };
 const PROP_KEY_EXTENDS = 'extends';
-const PROP_KEY_DEFAULT_FILE_NAME = 'defaultFileName';
-const PROP_KEY_COMMANDS = 'commands';
+export const PROP_KEY_DEFAULT_FILE_NAME = 'defaultFileName';
+export const PROP_KEY_COMMANDS = 'commands';
 
 /**
  * Main use case – the empty language `""` (of “bare” code blocks without
@@ -68,13 +61,13 @@ export type Translator = {
 //#################### Config ####################
 
 export class Config {
-  #lang = new Map<string, LangDefPartial>();
+  #lang = new Map<string, LangDef>();
   constructor() {
     this.#lang.set('', { kind: 'LangDefNeverRun' });
     this.#lang.set(
       "js",
       {
-        kind: 'LangDefCommandPartial',
+        kind: 'LangDefCommand',
         defaultFileName: 'main.mjs',
         commands: [
           ["node", CMD_VAR_FILE_NAME],
@@ -84,7 +77,7 @@ export class Config {
     this.#lang.set(
       "node-repl",
       {
-        kind: 'LangDefCommandPartial',
+        kind: 'LangDefCommand',
         translator: nodeReplToJs,
         extends: 'js',
       }
@@ -92,7 +85,7 @@ export class Config {
     this.#lang.set(
       "babel",
       {
-        kind: 'LangDefCommandPartial',
+        kind: 'LangDefCommand',
         defaultFileName: 'main.mjs',
         commands: [
           // https://github.com/giltayar/babel-register-esm
@@ -103,7 +96,7 @@ export class Config {
     this.#lang.set(
       "ts",
       {
-        kind: 'LangDefCommandPartial',
+        kind: 'LangDefCommand',
         defaultFileName: 'main.ts',
         commands: [
           ["npx", "ts-expect-error", CMD_VAR_ALL_FILE_NAMES],
@@ -146,14 +139,14 @@ export class Config {
         if (langDef === undefined) {
           return langDef;
         }
-        if (langDef.kind === 'LangDefCommandPartial') {
+        if (langDef.kind === 'LangDefCommand') {
           return this.#lookUpLangDefJson(langKey, langDef);
         } else {
           return langDef;
         }
     }
   }
-  #lookUpLangDefJson(parentKey: string, partialCommand: LangDefCommandPartial, visitedLanguages = new Set<string>): LangDef {
+  #lookUpLangDefJson(parentKey: string, partialCommand: LangDefCommand, visitedLanguages = new Set<string>): LangDef {
     const origParentKey = parentKey;
     let result = partialCommand;
     while (true) {
@@ -180,7 +173,7 @@ export class Config {
         case 'LangDefErrorIfRun':
           // End of the road
           return nextLangDef;
-        case 'LangDefCommandPartial':
+        case 'LangDefCommand':
           // `result` extends `nextLangDef` – the properties of the former
           // win.
           result = merge(result, nextLangDef);
@@ -201,12 +194,7 @@ export class Config {
         `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_COMMANDS)}`
       );
     }
-    return {
-      kind: 'LangDefCommand',
-      translator: result.translator,
-      defaultFileName: result.defaultFileName,
-      commands: result.commands,
-    };
+    return result;
   }
 }
 
@@ -215,11 +203,11 @@ export class Config {
  * have the value `undefined` – in which case it overrides other,
  * potentially non-undefined, values.
  */
-function merge(extending: LangDefCommandPartial, extended: LangDefCommandPartial): LangDefCommandPartial {
+function merge(extending: LangDefCommand, extended: LangDefCommand): LangDefCommand {
   // The properties of `extending` override the properties of `extended`
   // (they win).
   return {
-    kind: 'LangDefCommandPartial',
+    kind: 'LangDefCommand',
     extends: extending.extends ?? extended.extends,
     translator: extending.translator ?? extended.translator,
     defaultFileName: extending.defaultFileName ?? extended.defaultFileName,
@@ -227,8 +215,8 @@ function merge(extending: LangDefCommandPartial, extended: LangDefCommandPartial
   };
 }
 
-export function fillInCommandVariables(langDef: LangDefCommand, vars: Record<string, Array<string>>): Array<Array<string>> {
-  return langDef.commands.map(cmdParts => cmdParts.flatMap(
+export function fillInCommandVariables(commands: Array<Array<string>>, vars: Record<string, Array<string>>): Array<Array<string>> {
+  return commands.map(cmdParts => cmdParts.flatMap(
     (part) => {
       if (Object.hasOwn(vars, part)) {
         return vars[part];
@@ -263,7 +251,7 @@ export type LangDefCommandPartialJson = {
 };
 
 
-function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): LangDefPartial {
+function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): LangDef {
   if (typeof langDefJson === 'string') {
     switch (langDefJson) {
       case LANG_NEVER_RUN:
@@ -289,7 +277,7 @@ function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): L
     }
   }
   return {
-    kind: 'LangDefCommandPartial',
+    kind: 'LangDefCommand',
     extends: langDefJson.extends,
     translator,
     defaultFileName: langDefJson.defaultFileName,
@@ -297,7 +285,7 @@ function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): L
   };
 }
 
-function langDefToJson(langDef: LangDefPartial): LangDefPartialJson {
+function langDefToJson(langDef: LangDef): LangDefPartialJson {
   switch (langDef.kind) {
     case 'LangDefNeverRun':
       return LANG_NEVER_RUN;
@@ -307,7 +295,7 @@ function langDefToJson(langDef: LangDefPartial): LangDefPartialJson {
       return LANG_ERROR_IF_RUN;
     case 'LangDefError':
       return LANG_ERROR;
-    case 'LangDefCommandPartial': {
+    case 'LangDefCommand': {
       return {
         extends: langDef.extends,
         ...(

@@ -13,7 +13,7 @@ import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
-import { Config, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
+import { Config, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
@@ -142,11 +142,30 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
     return;
   }
   assertTrue(langDef.kind === 'LangDefCommand');
+  const fileName = snippet.getFileName(langDef);
+  if (fileName === null) {
+    throw new UserError(
+      `Snippet is runnable but its language does not have a ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} nor does it override the default with its own filename`,
+      { lineNumber: snippet.lineNumber }
+    );
+  }
+  if (fileName === null) {
+    throw new UserError(
+      `Snippet is runnable but its language does not have a ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} nor does it override the default with its own filename.`,
+      { lineNumber: snippet.lineNumber }
+    );
+  }
+  if (!langDef.commands) {
+    throw new UserError(
+      `Snippet is runnable but its language does not have ${stringify(PROP_KEY_COMMANDS)}.`,
+      { lineNumber: snippet.lineNumber }
+    );
+  }
   if (langDef.commands.length > 0) {
     if (prevHeading) {
       console.log(ink.Bold(prevHeading.content));
     }
-    runShellCommands(config, idToSnippet, globalLineMods, snippet, langDef, tmpDir);
+    runShellCommands(config, idToSnippet, globalLineMods, snippet, langDef, tmpDir, fileName, langDef.commands);
   }
 }
 
@@ -174,11 +193,9 @@ function writeFiles(config: Config, tmpDir: string, idToSnippet: Map<string, Sni
 
 //#################### runShellCommands() ####################
 
-function runShellCommands(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string): void {
+function runShellCommands(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string, fileName: string, commandsWithVars: Array<Array<string>>): void {
   process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
-  const fileName = snippet.getFileName(langDef);
-  assertNonNullable(fileName);
-  const commands: Array<Array<string>> = fillInCommandVariables(langDef, {
+  const commands: Array<Array<string>> = fillInCommandVariables(commandsWithVars, {
     [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });
@@ -339,7 +356,7 @@ function main() {
     const absFilePath = path.resolve(filePath);
     console.log('RUN: ' + JSON.stringify(absFilePath));
     const text = fs.readFileSync(absFilePath, 'utf-8');
-    const {entities, idToSnippet} = parseMarkdown(text);
+    const { entities, idToSnippet } = parseMarkdown(text);
     runFile(absFilePath, entities, idToSnippet);
   }
 }

@@ -213,7 +213,7 @@ export class SingleSnippet extends Snippet {
       return this.#fileName;
     }
     if (langDef.kind === 'LangDefCommand') {
-      return langDef.defaultFileName;
+      return langDef.defaultFileName ?? null;
     }
     return null;
   }
