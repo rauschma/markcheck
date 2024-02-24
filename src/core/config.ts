@@ -109,7 +109,7 @@ export class Config {
           ["npx", "tsx", CMD_VAR_FILE_NAME],
         ],
         beforeLines: [
-          `import { expectType, TypeEqual } from 'ts-expect';`,
+          `import { expectType, type TypeEqual } from 'ts-expect';`,
           `import assert from 'node:assert/strict';`
         ],
       }
