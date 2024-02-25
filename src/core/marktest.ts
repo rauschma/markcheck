@@ -21,7 +21,7 @@ import { parseMarkdown } from './parse-markdown.js';
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: "json" };
 
-const MARKTEST_DIR_NAME = 'marktest';
+const MARKTEST_DIR_NAME = 'marktest-data';
 const MARKTEST_TMP_DIR_NAME = 'tmp';
 const { stringify } = JSON;
 
