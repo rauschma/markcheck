@@ -2,7 +2,7 @@
 // Importing JSON is experimental
 
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
-import { clearDirectorySync } from '@rauschma/helpers/nodejs/file.js';
+import { clearDirectorySync, ensureParentDirectory } from '@rauschma/helpers/nodejs/file.js';
 import { ink } from '@rauschma/helpers/nodejs/text-ink.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
@@ -184,13 +184,14 @@ function writeFiles(config: Config, tmpDir: string, idToSnippet: Map<string, Sni
   }
 }
 
-function writeOneFile(config: Config, tmpDir: string, fileName: string, lines: string[]) {
+function writeOneFile(config: Config, tmpDir: string, fileName: string, lines: Array<string>) {
   const filePath = path.resolve(tmpDir, fileName);
   if (LOG_LEVEL === LogLevel.Verbose) {
     console.log('Write ' + filePath);
   }
   let content = lines.join(os.EOL);
   content = config.searchAndReplaceFunc(content);
+  ensureParentDirectory(filePath);
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
