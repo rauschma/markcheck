@@ -6,15 +6,16 @@ import { clearDirectorySync, ensureParentDirectory } from '@rauschma/helpers/nod
 import { ink } from '@rauschma/helpers/nodejs/text-ink.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import json5 from 'json5';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
-import { UserError } from '../util/errors.js';
+import { UserError, contextDescription, contextLineNumber } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
-import { Config, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
+import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
@@ -23,6 +24,7 @@ import pkg from '#package_json' with { type: "json" };
 
 const MARKTEST_DIR_NAME = 'marktest-data';
 const MARKTEST_TMP_DIR_NAME = 'tmp';
+const CONFIG_FILE_NAME = 'marktest-config.jsonc';
 const { stringify } = JSON;
 
 enum LogLevel {
@@ -52,6 +54,16 @@ export function runFile(absFilePath: string, entities: Array<MarktestEntity>, id
   }
 
   const config = new Config();
+  const configFilePath = path.resolve(marktestDir, CONFIG_FILE_NAME);
+  if (fs.existsSync(configFilePath)) {
+    const json = json5.parse(fs.readFileSync(configFilePath, 'utf-8'));
+    const configModJson = ConfigModJsonSchema.parse(json);
+    config.applyMod(
+      contextDescription('Config file ' + stringify(configFilePath)),
+      configModJson
+    );
+  }
+
   const globalLineMods = new Map<string, Array<LineMod>>();
   // A heading is only shown if it directly precedes a snippet that is run
   // (and therefore shows up in the UI output).
@@ -91,7 +103,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
 
 function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, prevHeading: null | Heading, entity: MarktestEntity): void {
   if (entity instanceof ConfigMod) {
-    config.applyMod(entity.lineNumber, entity.configModJson);
+    config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
   } else if (entity instanceof LineMod) {
     assertNonNullable(entity.targetLanguage);
     let lineModArr = globalLineMods.get(entity.targetLanguage);

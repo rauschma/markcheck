@@ -3,7 +3,7 @@ import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { z } from 'zod';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import { TRANSLATOR_MAP } from '../translation/translators.js';
-import { UserError } from '../util/errors.js';
+import { UserError, type UserErrorContext } from '../util/errors.js';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR, LANG_ERROR_IF_RUN, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
 
 const { stringify } = JSON;
@@ -135,13 +135,13 @@ export class Config {
       ),
     };
   }
-  applyMod(lineNumber: number, mod: ConfigModJson): void {
+  applyMod(context: UserErrorContext, mod: ConfigModJson): void {
     if (mod.searchAndReplace) {
       this.#setSearchAndReplace(mod.searchAndReplace);
     }
     if (mod.lang) {
       for (const [key, langDefJson] of Object.entries(mod.lang)) {
-        this.#lang.set(key, langDefFromJson(lineNumber, langDefJson));
+        this.#lang.set(key, langDefFromJson(context, langDefJson));
       }
     }
   }
@@ -283,7 +283,7 @@ export type LangDefCommandPartialJson = {
   commands?: Array<Array<string>>,
 };
 
-function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): LangDef {
+function langDefFromJson(context: UserErrorContext, langDefJson: LangDefPartialJson): LangDef {
   if (typeof langDefJson === 'string') {
     switch (langDefJson) {
       case LANG_NEVER_RUN:
@@ -304,7 +304,7 @@ function langDefFromJson(lineNumber: number, langDefJson: LangDefPartialJson): L
     if (translator === undefined) {
       throw new UserError(
         `Unknown translator: ${stringify(langDefJson.translator)}`,
-        { lineNumber }
+        { context }
       );
     }
   }

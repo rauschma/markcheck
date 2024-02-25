@@ -5,9 +5,7 @@
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
-* Catch and report UserErrors?
-* `marktest/marktest_config.jsonc`
-  * Overrides defaults.
+* Catch and report UserErrors? They have information such as the line number!
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
 * CLI option: stop after first error (so that files can be examined).
 
