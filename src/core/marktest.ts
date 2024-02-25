@@ -17,7 +17,7 @@ import { UserError, contextDescription, contextLineNumber } from '../util/errors
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity } from './entities.js';
+import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity, LogLevel, type CliState } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: "json" };
@@ -27,18 +27,11 @@ const MARKTEST_TMP_DIR_NAME = 'tmp';
 const CONFIG_FILE_NAME = 'marktest-config.jsonc';
 const { stringify } = JSON;
 
-enum LogLevel {
-  Verbose,
-  Normal,
-}
-
-const LOG_LEVEL: LogLevel = LogLevel.Normal;
-
 //#################### runFile() ####################
 
-export function runFile(absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): void {
+export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): void {
   const marktestDir = findMarktestDir(absFilePath, entities);
-  console.log('Marktest directory: ' + marktestDir);
+  console.log('Marktest directory: ' + relPath(marktestDir));
 
   const tmpDir = path.resolve(marktestDir, MARKTEST_TMP_DIR_NAME);
   // `marktest/` must exist, `marktest/tmp/` may not exist
@@ -64,12 +57,20 @@ export function runFile(absFilePath: string, entities: Array<MarktestEntity>, id
     );
   }
 
+  const cliState: CliState = {
+    tmpDir,
+    logLevel,
+    idToSnippet,
+    globalVisitationMode,
+    globalLineMods: new Map(),
+  };
+
   const globalLineMods = new Map<string, Array<LineMod>>();
   // A heading is only shown if it directly precedes a snippet that is run
   // (and therefore shows up in the UI output).
   let prevHeading: null | Heading = null;
   for (const entity of entities) {
-    handleOneEntity(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, prevHeading, entity);
+    handleOneEntity(cliState, config, prevHeading, entity);
     prevHeading = entity instanceof Heading ? entity : null;
   }
 }
@@ -101,19 +102,19 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
   );
 }
 
-function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, prevHeading: null | Heading, entity: MarktestEntity): void {
+function handleOneEntity(cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarktestEntity): void {
   if (entity instanceof ConfigMod) {
     config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
   } else if (entity instanceof LineMod) {
     assertNonNullable(entity.targetLanguage);
-    let lineModArr = globalLineMods.get(entity.targetLanguage);
+    let lineModArr = cliState.globalLineMods.get(entity.targetLanguage);
     if (!lineModArr) {
       lineModArr = [];
-      globalLineMods.set(entity.targetLanguage, lineModArr);
+      cliState.globalLineMods.set(entity.targetLanguage, lineModArr);
     }
     lineModArr.push(entity);
   } else if (entity instanceof Snippet) {
-    handleSnippet(tmpDir, idToSnippet, globalLineMods, globalVisitationMode, config, prevHeading, entity);
+    handleSnippet(cliState, config, prevHeading, entity);
   } else if (entity instanceof Heading) {
     // Ignore
   } else {
@@ -121,8 +122,8 @@ function handleOneEntity(tmpDir: string, idToSnippet: Map<string, Snippet>, glob
   }
 }
 
-function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, globalVisitationMode: GlobalVisitationMode, config: Config, prevHeading: null | Heading, snippet: Snippet): void {
-  if (!snippet.isVisited(globalVisitationMode)) {
+function handleSnippet(cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): void {
+  if (!snippet.isVisited(cliState.globalVisitationMode)) {
     return;
   }
 
@@ -143,7 +144,7 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
     );
   }
 
-  writeFiles(config, tmpDir, idToSnippet, globalLineMods, snippet, langDef);
+  writeFiles(cliState, config, snippet, langDef);
 
   if (langDef.kind === 'LangDefErrorIfRun') {
     throw new UserError(
@@ -178,27 +179,27 @@ function handleSnippet(tmpDir: string, idToSnippet: Map<string, Snippet>, global
     if (prevHeading) {
       console.log(ink.Bold(prevHeading.content));
     }
-    runShellCommands(config, idToSnippet, globalLineMods, snippet, langDef, tmpDir, fileName, langDef.commands);
+    runShellCommands(cliState, config, snippet, langDef, fileName, langDef.commands);
   }
 }
 
-function writeFiles(config: Config, tmpDir: string, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDef): void {
+function writeFiles(cliState: CliState, config: Config, snippet: Snippet, langDef: LangDef): void {
   const fileName = snippet.getFileName(langDef);
   if (fileName) {
-    const lines = assembleLines(config, idToSnippet, globalLineMods, snippet);
-    writeOneFile(config, tmpDir, fileName, lines);
+    const lines = assembleLines(cliState, config, snippet);
+    writeOneFile(cliState, config, fileName, lines);
   }
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
-    const lines = assembleLinesForId(config, idToSnippet, globalLineMods, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
-    writeOneFile(config, tmpDir, fileName, lines);
+    const lines = assembleLinesForId(cliState, config, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
+    writeOneFile(cliState, config, fileName, lines);
   }
 }
 
-function writeOneFile(config: Config, tmpDir: string, fileName: string, lines: Array<string>) {
-  const filePath = path.resolve(tmpDir, fileName);
-  if (LOG_LEVEL === LogLevel.Verbose) {
+function writeOneFile(cliState: CliState, config: Config, fileName: string, lines: Array<string>) {
+  const filePath = path.resolve(cliState.tmpDir, fileName);
+  if (cliState.logLevel === LogLevel.Verbose) {
     console.log('Write ' + filePath);
   }
   let content = lines.join(os.EOL);
@@ -209,7 +210,7 @@ function writeOneFile(config: Config, tmpDir: string, fileName: string, lines: A
 
 //#################### runShellCommands() ####################
 
-function runShellCommands(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, langDef: LangDefCommand, tmpDir: string, fileName: string, commandsWithVars: Array<Array<string>>): void {
+function runShellCommands(cliState: CliState, config: Config, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
   process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
   const commands: Array<Array<string>> = fillInCommandVariables(commandsWithVars, {
     [CMD_VAR_FILE_NAME]: [fileName],
@@ -217,16 +218,16 @@ function runShellCommands(config: Config, idToSnippet: Map<string, Snippet>, glo
   });
   commandLoop: {
     for (const commandParts of commands) {
-      if (LOG_LEVEL === LogLevel.Verbose) {
+      if (cliState.logLevel === LogLevel.Verbose) {
         console.log(commandParts.join(' '));
       }
       const [command, ...args] = commandParts;
       const result = child_process.spawnSync(command, args, {
         shell: true,
-        cwd: tmpDir,
+        cwd: cliState.tmpDir,
         encoding: 'utf-8',
       });
-      const status = checkShellCommandResult(config, idToSnippet, globalLineMods, snippet, result);
+      const status = checkShellCommandResult(cliState, config, snippet, result);
       if (status === 'failure') {
         break commandLoop;
       }
@@ -236,35 +237,35 @@ function runShellCommands(config: Config, idToSnippet: Map<string, Snippet>, glo
   }
 }
 
-function checkShellCommandResult(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet, result: child_process.SpawnSyncReturns<string>): 'success' | 'failure' {
-  if (result.error) {
+function checkShellCommandResult(cliState: CliState, config: Config, snippet: Snippet, commandResult: child_process.SpawnSyncReturns<string>): 'success' | 'failure' {
+  if (commandResult.error) {
     // Spawning didn’t work
-    throw result.error;
+    throw commandResult.error;
   }
 
-  const stdoutLines = splitLinesExclEol(result.stdout);
+  const stdoutLines = splitLinesExclEol(commandResult.stdout);
   trimTrailingEmptyLines(stdoutLines);
-  const stderrLines = splitLinesExclEol(result.stderr);
+  const stderrLines = splitLinesExclEol(commandResult.stderr);
   trimTrailingEmptyLines(stderrLines);
 
-  if (result.status !== null && result.status !== 0) {
+  if (commandResult.status !== null && commandResult.status !== 0) {
     console.log(' ❌');
-    console.log(`Snippet exited with non-zero code ${result.status}`);
+    console.log(`Snippet exited with non-zero code ${commandResult.status}`);
     logStdout(stdoutLines);
     logStderr(stderrLines);
     return 'failure';
   }
-  if (result.signal !== null) {
+  if (commandResult.signal !== null) {
     console.log(' ❌');
-    console.log(`Snippet was terminated by signal ${result.signal}`);
+    console.log(`Snippet was terminated by signal ${commandResult.signal}`);
     logStdout(stdoutLines);
     logStderr(stderrLines);
     return 'failure';
   }
-  if (result.stderr.length > 0) {
+  if (commandResult.stderr.length > 0) {
     if (snippet.stderrId) {
       // We expected stderr output
-      const expectedLines = assembleLinesForId(config, idToSnippet, globalLineMods, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
+      const expectedLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
       trimTrailingEmptyLines(expectedLines);
       if (!isOutputEqual(expectedLines, stderrLines)) {
         console.log(' ❌');
@@ -281,7 +282,7 @@ function checkShellCommandResult(config: Config, idToSnippet: Map<string, Snippe
   }
   if (snippet.stdoutId) {
     // Normally stdout is ignored. But in this case, we examine it.
-    const expectedLines = assembleLinesForId(config, idToSnippet, globalLineMods, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
+    const expectedLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
     trimTrailingEmptyLines(expectedLines);
     if (!isOutputEqual(stdoutLines, expectedLines)) {
       console.log(' ❌');
@@ -335,11 +336,14 @@ const ARG_OPTIONS = {
   },
   'version': {
     type: 'boolean',
-    short: 'v',
   },
   'print-config': {
     type: 'boolean',
     short: 'c',
+  },
+  'verbose': {
+    type: 'boolean',
+    short: 'v',
   },
 } satisfies ParseArgsConfig['options'];
 
@@ -370,11 +374,17 @@ function main() {
   }
   for (const filePath of args.positionals) {
     const absFilePath = path.resolve(filePath);
-    console.log('RUN: ' + JSON.stringify(absFilePath));
+    console.log();
+    console.log('===== ' + relPath(absFilePath));
     const text = fs.readFileSync(absFilePath, 'utf-8');
     const { entities, idToSnippet } = parseMarkdown(text);
-    runFile(absFilePath, entities, idToSnippet);
+    const logLevel = (args.values.verbose ? LogLevel.Verbose : LogLevel.Normal);
+    runFile(logLevel, absFilePath, entities, idToSnippet);
   }
 }
 
 main();
+
+function relPath(absPath: string) {
+  return path.relative(process.cwd(), absPath);
+}

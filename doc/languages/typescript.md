@@ -13,10 +13,13 @@ import { expectType } from 'ts-expect';
 
 expectType<string>('test');
 expectType<number>(123);
-expectType<number>('test'); // Compiler error!
 ```
 
-How to compare types?
+```ts
+import { expectType, type TypeEqual } from 'ts-expect';
+type Pair<T> = [T, T];
+expectType<TypeEqual<Pair<string>, [string,string]>>(true);
+```
 
 ### eslint-plugin-expect-type
 
@@ -38,3 +41,4 @@ const value: string = 9001;
 
 * TypeScript TwoSlash: https://www.npmjs.com/package/@typescript/twoslash
 * tsimp – TypeScript IMPort loader for Node.js: https://github.com/tapjs/tsimp
+* Compare types, check types of values: https://github.com/garronej/tsafe

@@ -1,10 +1,10 @@
+import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Config } from './config.js';
-import { SequenceSnippet, SingleSnippet, assembleLines } from './entities.js';
+import { SequenceSnippet, SingleSnippet, assembleLines, createTestCliState } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
-import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 
 test('singleSnippet.getAllFileNames', () => {
   const { entities } = parseMarkdown(
@@ -44,9 +44,14 @@ test('Assemble includes', () => {
   );
   const snippet = entities[0];
   assertTrue(snippet instanceof SingleSnippet);
+
+  const cliState = {
+    ...createTestCliState(),
+    idToSnippet,
+  };
   const config = new Config();
   assert.deepEqual(
-    assembleLines(config, idToSnippet, new Map(), snippet),
+    assembleLines(cliState, config, snippet),
     [
       "import assert from 'node:assert/strict';",
       'function twice(str) { return str + str }',
@@ -80,9 +85,13 @@ test('Assemble sequence', () => {
   );
   const snippet = entities[0];
   assertTrue(snippet instanceof SequenceSnippet);
+  const cliState = {
+    ...createTestCliState(),
+    idToSnippet,
+  };
   const config = new Config();
   assert.deepEqual(
-    assembleLines(config, idToSnippet, new Map(), snippet),
+    assembleLines(cliState, config, snippet),
     [
       '// Part 1',
       '// Part 2',

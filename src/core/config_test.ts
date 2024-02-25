@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { contextLineNumber } from '../util/errors.js';
 import { Config } from './config.js';
 
 test('config.toJson()', () => {
@@ -56,7 +57,7 @@ test('config.toJson()', () => {
 
 test('config.getLang()', () => {
   const config = new Config();
-  config.applyMod(1, {
+  config.applyMod(contextLineNumber(1), {
     "lang": {
       "js": {
         "extends": "babel",

@@ -10,6 +10,8 @@ import { ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_K
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
 
+//#################### directiveToEntity() ####################
+
 /**
  * @returns A snippet is open or closed
  */
@@ -46,20 +48,22 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
   }
 }
 
-export function assembleLinesForId(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, sourceLineNumber: number, targetId: string, context: string): Array<string> {
-  const targetSnippet = idToSnippet.get(targetId);
+//#################### Assemble lines ####################
+
+export function assembleLinesForId(cliState: CliState, config: Config, sourceLineNumber: number, targetId: string, context: string): Array<string> {
+  const targetSnippet = cliState.idToSnippet.get(targetId);
   if (!targetSnippet) {
     throw new UserError(
       `Unknown ID ${JSON.stringify(targetId)} (${context})`,
       { lineNumber: sourceLineNumber }
     );
   }
-  return assembleLines(config, idToSnippet, globalLineMods, targetSnippet);
+  return assembleLines(cliState, config, targetSnippet);
 }
 
-export function assembleLines(config: Config, idToSnippet: Map<string, Snippet>, globalLineMods: Map<string, Array<LineMod>>, snippet: Snippet) {
+export function assembleLines(cliState: CliState, config: Config, snippet: Snippet) {
   const lines = new Array<string>();
-  const glm = globalLineMods.get(snippet.lang);
+  const glm = cliState.globalLineMods.get(snippet.lang);
   if (glm) {
     for (let i = 0; i < glm.length; i++) {
       glm[i].pushBeforeLines(lines);
@@ -67,13 +71,39 @@ export function assembleLines(config: Config, idToSnippet: Map<string, Snippet>,
   }
   // Once per snippet
   snippet.pushBeforeLines(config, lines);
-  snippet.assembleLines(config, idToSnippet, lines, new Set());
+  snippet.assembleLines(config, cliState.idToSnippet, lines, new Set());
   if (glm) {
     for (let i = glm.length - 1; i >= 0; i--) {
       glm[i].pushAfterLines(lines);
     }
   }
   return lines;
+}
+
+//#################### CliState ####################
+
+export enum LogLevel {
+  Verbose,
+  Normal,
+}
+
+export type CliState = {
+  tmpDir: string,
+  logLevel: LogLevel,
+  idToSnippet: Map<string, Snippet>,
+  globalVisitationMode: GlobalVisitationMode,
+  globalLineMods: Map<string, Array<LineMod>>,
+};
+
+/** Used for testing */
+export function createTestCliState(): CliState {
+  return {
+    tmpDir: '/tmp/marktest',
+    logLevel: LogLevel.Normal,
+    idToSnippet: new Map(),
+    globalVisitationMode: GlobalVisitationMode.Normal,
+    globalLineMods: new Map(),
+  };
 }
 
 //#################### Snippet ####################
