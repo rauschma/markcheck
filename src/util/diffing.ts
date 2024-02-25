@@ -19,7 +19,9 @@ export function logDiff(expectedLines: Array<string>, actualLines: Array<string>
       prefix = '  ';
       style = ink.Normal;
     }
-    console.log(style(prefix + change.value));
+    for (const v of change.value) {
+      console.log(style(prefix + v));
+    }
   }
 }
 

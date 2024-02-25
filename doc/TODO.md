@@ -4,14 +4,13 @@
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
-* Catch and report UserErrors? They have information such as the line number!
+* Catch and report UserErrors per file? They have information such as the line number!
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
 * CLI option: stop after first error (so that files can be examined).
 * Optional: expected stdout/stderr must only be included in actual stdout/stderr.
 
 ## UI output
 
-* Print clearer separator with shorter file path (relative to CWD).
 * Summarize results at the end? Useful if there are multiple files!
   * Statistics: Successes, failures, unknown languages, skipped
   * List files that had issues
@@ -28,18 +27,12 @@
 println!("Hello");
 ```
 
-<!--marktest id="main" lang="rust" around:
+<!--marktest id="main" around:
 fn main() {
 •••
 }
 -->
 ``````
-
-## Including after the current snippet
-
-```md
-<!--marktest include="one_snippet, $THIS, another_snippet"-->
-```
 
 ## Tests
 

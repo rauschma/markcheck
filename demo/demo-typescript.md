@@ -20,11 +20,11 @@ let sym = Symbol() as const;
 ## Static check: types of values
 
 ```ts
-expectType<string>('test');
+expectType<string>('abc');
 expectType<number>(123);
 // @ts-expect-error: Argument of type 'string'
 // is not assignable to parameter of type 'number'.
-expectType<number>('test');
+expectType<number>('abc');
 ```
 
 ## Static check: equality of types

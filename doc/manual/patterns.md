@@ -2,16 +2,28 @@
 
 ## Assembling a sequence of code fragments
 
-<!--marktest sequence="1/3"-->
+<!--marktest sequence="1/3" stdout="sequence-output"-->
 ```js
+console.log("Snippet 1/3");
 ```
 
 <!--marktest sequence="2/3"-->
 ```js
+console.log("Snippet 2/3");
 ```
 
 <!--marktest sequence="3/3"-->
 ```js
+console.log("Snippet 3/3");
+```
+
+Expected output:
+
+<!--marktest id="sequence-output"-->
+```
+Snippet 1/3
+Snippet 2/3
+Snippet 3/3
 ```
 
 ## Assembling code fragments out of order
@@ -26,9 +38,7 @@ assert.deepEqual(
 );
 ```
 
-<!--marktest id="step1" before:
-import assert from 'node:assert/strict';
--->
+<!--marktest id="step1"-->
 ```js
 const steps = [];
 steps.push('Step 1');
