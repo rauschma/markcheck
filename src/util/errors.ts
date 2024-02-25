@@ -31,20 +31,36 @@ export function contextDescription(description: string): UserErrorContextDescrip
 export interface UserErrorOptions {
   context?: UserErrorContext;
   lineNumber?: number;
-  stderr?: string;
+  stdoutLines?: Array<string>;
+  expectedStdoutLines?: Array<string>
+  stderrLines?: Array<string>;
+  expectedStderrLines?: Array<string>
   cause?: any;
 }
 export class UserError extends Error {
   override name = this.constructor.name;
-  context;
-  lineNumber;
-  stderr;
-  constructor(message: string, {context, lineNumber, stderr, cause}: UserErrorOptions = {}) {
-    const options = cause ? {cause} : undefined;
-    super(message, options);
-    this.context = context;
-    this.lineNumber = lineNumber;
-    this.stderr = stderr;
+  context: undefined | UserErrorContext;
+  stdoutLines;
+  expectedStdoutLines;
+  stderrLines;
+  expectedStderrLines;
+  constructor(message: string, opts: UserErrorOptions = {}) {
+    super(
+      message,
+      (opts.cause ? { cause: opts.cause } : undefined)
+    );
+    if (opts.context) {
+      this.context = opts.context;
+    } else if (opts.lineNumber) {
+      this.context = {
+        kind: 'UserErrorContextLineNumber',
+        lineNumber: opts.lineNumber,
+      };
+    }
+    this.stdoutLines = opts.stdoutLines;
+    this.expectedStdoutLines = opts.expectedStdoutLines;
+    this.stderrLines = opts.stderrLines;
+    this.expectedStderrLines = opts.expectedStderrLines;
   }
 }
 
@@ -55,6 +71,6 @@ export function assertionErrorToUserError(lineNumber: LineNumber, callback: () =
     if (!(err instanceof AssertionError)) {
       throw err;
     }
-    throw new UserError(err.message, {lineNumber, cause: err})
+    throw new UserError(err.message, { lineNumber, cause: err })
   }
 }

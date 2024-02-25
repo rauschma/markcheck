@@ -1,21 +1,20 @@
 # Todo
 
-* Always `.startsWith` for error messages?
-
 * Attribute `ignoreLine="1,2"`?
-* Make sure `--verbose` doesn’t interfere with status emoji (which are appended to an unterminated line).
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
 * Catch and report UserErrors? They have information such as the line number!
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
 * CLI option: stop after first error (so that files can be examined).
+* Optional: expected stdout/stderr must only be included in actual stdout/stderr.
 
 ## UI output
 
 * Print clearer separator with shorter file path (relative to CWD).
 * Summarize results at the end? Useful if there are multiple files!
   * Statistics: Successes, failures, unknown languages, skipped
+  * List files that had issues
 * Warnings (don’t change exit code):
   * `only` mode (per file)
   * Unused IDs (per file)

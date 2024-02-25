@@ -17,7 +17,7 @@ import { UserError, contextDescription, contextLineNumber } from '../util/errors
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, GlobalVisitationMode, Heading, LineMod, Snippet, VisitationMode, assembleLines, assembleLinesForId, type MarktestEntity, LogLevel, type CliState } from './entities.js';
+import { ConfigMod, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: "json" };
@@ -27,11 +27,16 @@ const MARKTEST_TMP_DIR_NAME = 'tmp';
 const CONFIG_FILE_NAME = 'marktest-config.jsonc';
 const { stringify } = JSON;
 
+enum EntityKind {
+  Runnable,
+  NonRunnable,
+}
+
 //#################### runFile() ####################
 
 export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): void {
   const marktestDir = findMarktestDir(absFilePath, entities);
-  console.log('Marktest directory: ' + relPath(marktestDir));
+  console.log(ink.FgBrightBlack`Marktest directory: ${relPath(marktestDir)}`);
 
   const tmpDir = path.resolve(marktestDir, MARKTEST_TMP_DIR_NAME);
   // `marktest/` must exist, `marktest/tmp/` may not exist
@@ -65,13 +70,16 @@ export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array
     globalLineMods: new Map(),
   };
 
-  const globalLineMods = new Map<string, Array<LineMod>>();
-  // A heading is only shown if it directly precedes a snippet that is run
-  // (and therefore shows up in the UI output).
   let prevHeading: null | Heading = null;
   for (const entity of entities) {
-    handleOneEntity(cliState, config, prevHeading, entity);
-    prevHeading = entity instanceof Heading ? entity : null;
+    const entityKind = handleOneEntity(cliState, config, prevHeading, entity);
+    if (entity instanceof Heading) {
+      prevHeading = entity; // update
+    } else if (entityKind === EntityKind.Runnable) {
+      // If an entity was run, it printed the most recent heading,
+      // therefore “using it up”.
+      prevHeading = null; // clear
+    }
   }
 }
 
@@ -102,9 +110,10 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
   );
 }
 
-function handleOneEntity(cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarktestEntity): void {
+function handleOneEntity(cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarktestEntity): EntityKind {
   if (entity instanceof ConfigMod) {
     config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
+    return EntityKind.NonRunnable;
   } else if (entity instanceof LineMod) {
     assertNonNullable(entity.targetLanguage);
     let lineModArr = cliState.globalLineMods.get(entity.targetLanguage);
@@ -113,18 +122,20 @@ function handleOneEntity(cliState: CliState, config: Config, prevHeading: null |
       cliState.globalLineMods.set(entity.targetLanguage, lineModArr);
     }
     lineModArr.push(entity);
+    return EntityKind.NonRunnable;
   } else if (entity instanceof Snippet) {
-    handleSnippet(cliState, config, prevHeading, entity);
+    return handleSnippet(cliState, config, prevHeading, entity);
   } else if (entity instanceof Heading) {
     // Ignore
+    return EntityKind.NonRunnable;
   } else {
     throw new UnsupportedValueError(entity);
   }
 }
 
-function handleSnippet(cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): void {
+function handleSnippet(cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): EntityKind {
   if (!snippet.isVisited(cliState.globalVisitationMode)) {
-    return;
+    return EntityKind.NonRunnable;
   }
 
   const langDef = config.getLang(snippet.lang);
@@ -135,7 +146,7 @@ function handleSnippet(cliState: CliState, config: Config, prevHeading: null | H
     );
   }
   if (langDef.kind === 'LangDefSkip') {
-    return;
+    return EntityKind.NonRunnable;
   }
   if (langDef.kind === 'LangDefError') {
     throw new UserError(
@@ -153,8 +164,9 @@ function handleSnippet(cliState: CliState, config: Config, prevHeading: null | H
     );
   }
   if (langDef.kind === 'LangDefNeverRun') {
-    return;
+    return EntityKind.NonRunnable;
   }
+
   assertTrue(langDef.kind === 'LangDefCommand');
   const fileName = snippet.getFileName(langDef);
   if (fileName === null) {
@@ -163,25 +175,20 @@ function handleSnippet(cliState: CliState, config: Config, prevHeading: null | H
       { lineNumber: snippet.lineNumber }
     );
   }
-  if (fileName === null) {
-    throw new UserError(
-      `Snippet is runnable but its language does not have a ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} nor does it override the default with its own filename.`,
-      { lineNumber: snippet.lineNumber }
-    );
-  }
   if (!langDef.commands) {
     throw new UserError(
-      `Snippet is runnable but its language does not have ${stringify(PROP_KEY_COMMANDS)}.`,
+      `Snippet is runnable but its language does not have ${stringify(PROP_KEY_COMMANDS)}`,
       { lineNumber: snippet.lineNumber }
     );
   }
   if (langDef.commands.length > 0) {
-    if (prevHeading) {
-      console.log(ink.Bold(prevHeading.content));
-    }
-    runShellCommands(cliState, config, snippet, langDef, fileName, langDef.commands);
+    handleSnippetWithCommands(config, cliState, prevHeading, snippet, langDef, fileName, langDef.commands);
+    return EntityKind.Runnable;
   }
+  return EntityKind.NonRunnable;
 }
+
+//#################### writeFiles() ####################
 
 function writeFiles(cliState: CliState, config: Config, snippet: Snippet, langDef: LangDef): void {
   const fileName = snippet.getFileName(langDef);
@@ -208,36 +215,62 @@ function writeOneFile(cliState: CliState, config: Config, fileName: string, line
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-//#################### runShellCommands() ####################
+//#################### handleSnippetWithCommands() ####################
+
+function handleSnippetWithCommands(config: Config, cliState: CliState, prevHeading: Heading | null, snippet: Snippet, langDef: LangDefCommand, fileName: string, commands: Array<Array<string>>) {
+  if (prevHeading) {
+    console.log(ink.Bold(prevHeading.content));
+  }
+  // With verbose output, there will be printed text before we could
+  // print the status emoji. That is, it wouldn’t appear in the same line.
+  // That’s why we don’t print it at all in this case.
+  const printStatusEmoji = (cliState.logLevel === LogLevel.Normal);
+  process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
+  if (!printStatusEmoji) {
+    console.log();
+  }
+  try {
+    runShellCommands(cliState, config, snippet, langDef, fileName, commands);
+    if (printStatusEmoji) {
+      console.log(' ✅');
+    }
+  } catch (err) {
+    if (err instanceof UserError) {
+      if (printStatusEmoji) {
+        console.log(' ❌');
+      }
+      if (err.stdoutLines) {
+        logStdout(err.stdoutLines, err.expectedStdoutLines);
+      }
+      if (err.stderrLines) {
+        logStderr(err.stderrLines, err.expectedStderrLines);
+      }
+    } else {
+      throw err;
+    }
+  }
+}
 
 function runShellCommands(cliState: CliState, config: Config, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
-  process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
   const commands: Array<Array<string>> = fillInCommandVariables(commandsWithVars, {
     [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });
-  commandLoop: {
-    for (const commandParts of commands) {
-      if (cliState.logLevel === LogLevel.Verbose) {
-        console.log(commandParts.join(' '));
-      }
-      const [command, ...args] = commandParts;
-      const result = child_process.spawnSync(command, args, {
-        shell: true,
-        cwd: cliState.tmpDir,
-        encoding: 'utf-8',
-      });
-      const status = checkShellCommandResult(cliState, config, snippet, result);
-      if (status === 'failure') {
-        break commandLoop;
-      }
+  for (const commandParts of commands) {
+    if (cliState.logLevel === LogLevel.Verbose) {
+      console.log(commandParts.join(' '));
     }
-    // Success only if all commands succeeded
-    console.log(' ✅');
+    const [command, ...args] = commandParts;
+    const result = child_process.spawnSync(command, args, {
+      shell: true,
+      cwd: cliState.tmpDir,
+      encoding: 'utf-8',
+    });
+    checkShellCommandResult(cliState, config, snippet, result);
   }
 }
 
-function checkShellCommandResult(cliState: CliState, config: Config, snippet: Snippet, commandResult: child_process.SpawnSyncReturns<string>): 'success' | 'failure' {
+function checkShellCommandResult(cliState: CliState, config: Config, snippet: Snippet, commandResult: child_process.SpawnSyncReturns<string>): void {
   if (commandResult.error) {
     // Spawning didn’t work
     throw commandResult.error;
@@ -249,73 +282,81 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
   trimTrailingEmptyLines(stderrLines);
 
   if (commandResult.status !== null && commandResult.status !== 0) {
-    console.log(' ❌');
-    console.log(`Snippet exited with non-zero code ${commandResult.status}`);
-    logStdout(stdoutLines);
-    logStderr(stderrLines);
-    return 'failure';
+    throw new UserError(
+      `Snippet exited with non-zero code ${commandResult.status}`,
+      {
+        stdoutLines,
+        stderrLines,
+      }
+    );
   }
   if (commandResult.signal !== null) {
-    console.log(' ❌');
-    console.log(`Snippet was terminated by signal ${commandResult.signal}`);
-    logStdout(stdoutLines);
-    logStderr(stderrLines);
-    return 'failure';
+    throw new UserError(
+      `Snippet was terminated by signal ${commandResult.signal}`,
+      {
+        stdoutLines,
+        stderrLines,
+      }
+    );
   }
   if (commandResult.stderr.length > 0) {
     if (snippet.stderrId) {
       // We expected stderr output
-      const expectedLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
-      trimTrailingEmptyLines(expectedLines);
-      if (!isOutputEqual(expectedLines, stderrLines)) {
-        console.log(' ❌');
-        console.log('stderr was not as expected');
-        logStderr(stderrLines, expectedLines);
-        return 'failure';
+      const expectedStderrLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
+      trimTrailingEmptyLines(expectedStderrLines);
+      if (!isOutputEqual(expectedStderrLines, stderrLines)) {
+        throw new UserError(
+          'stderr was not as expected',
+          {
+            stderrLines,
+            expectedStderrLines,
+          }
+        );
       }
     } else {
-      console.log(' ❌');
-      console.log('There was unexpected stderr output');
-      logStderr(stderrLines);
-      return 'failure';
+      throw new UserError(
+        'There was unexpected stderr output',
+        {
+          stderrLines,
+        }
+      );
     }
   }
   if (snippet.stdoutId) {
     // Normally stdout is ignored. But in this case, we examine it.
-    const expectedLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
-    trimTrailingEmptyLines(expectedLines);
-    if (!isOutputEqual(stdoutLines, expectedLines)) {
-      console.log(' ❌');
-      console.log('stdout was not as expected');
-      logStdout(stdoutLines, expectedLines);
-      return 'failure';
+    const expectedStdoutLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
+    trimTrailingEmptyLines(expectedStdoutLines);
+    if (!isOutputEqual(stdoutLines, expectedStdoutLines)) {
+      throw new UserError(
+        'stdout was not as expected',
+        {
+          stdoutLines,
+          expectedStdoutLines,
+        }
+      );
     }
   }
-  return 'success';
 }
 
-function logStdout(stdoutLines: Array<string>, expectedLines?: Array<string>) {
-  if (expectedLines === undefined && stdoutLines.length === 0) {
-    return;
-  }
-  console.log('----- stdout -----');
-  logAll(stdoutLines);
-  console.log('------------------');
-  if (expectedLines) {
-    logDiff(expectedLines, stdoutLines);
-    console.log('------------------');
-  }
+//#################### Logging helpers ####################
+
+function logStdout(stdoutLines: Array<string>, expectedLines?: Array<string>): void {
+  logStd('stdout', stdoutLines, expectedLines);
 }
-function logStderr(stderrLines: Array<string>, expectedLines?: Array<string>) {
-  if (expectedLines === undefined && stderrLines.length === 0) {
+function logStderr(stderrLines: Array<string>, expectedLines?: Array<string>): void {
+  logStd('stderr', stderrLines, expectedLines);
+}
+function logStd(name: string, actualLines: Array<string>, expectedLines?: Array<string>): void {
+  if (expectedLines === undefined && actualLines.length === 0) {
     return;
   }
-  console.log('----- stderr -----');
-  logAll(stderrLines);
-  console.log('------------------');
+  const title = `----- ${name} -----`;
+  console.log(title);
+  logAll(actualLines);
+  console.log('-'.repeat(title.length));
   if (expectedLines) {
-    logDiff(expectedLines, stderrLines);
-    console.log('------------------');
+    logDiff(expectedLines, actualLines);
+    console.log('-'.repeat(title.length));
   }
 }
 
@@ -325,6 +366,9 @@ function logAll(lines: Array<string>) {
   }
 }
 
+function relPath(absPath: string) {
+  return path.relative(process.cwd(), absPath);
+}
 //#################### main() ####################
 
 const BIN_NAME = 'marktest';
@@ -375,7 +419,7 @@ function main() {
   for (const filePath of args.positionals) {
     const absFilePath = path.resolve(filePath);
     console.log();
-    console.log('===== ' + relPath(absFilePath));
+    console.log(ink.FgBlue.Bold`===== ${relPath(absFilePath)} =====`);
     const text = fs.readFileSync(absFilePath, 'utf-8');
     const { entities, idToSnippet } = parseMarkdown(text);
     const logLevel = (args.values.verbose ? LogLevel.Verbose : LogLevel.Normal);
@@ -384,7 +428,3 @@ function main() {
 }
 
 main();
-
-function relPath(absPath: string) {
-  return path.relative(process.cwd(), absPath);
-}
