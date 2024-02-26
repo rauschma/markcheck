@@ -94,7 +94,7 @@ Hello!
 ```
 ``````
 
-## Hiding code via `before:`
+### Hiding code via `before:`
 
 ``````md
 <!--marktest before:
