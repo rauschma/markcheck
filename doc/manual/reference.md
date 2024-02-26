@@ -48,7 +48,7 @@ Content of some-file.txt
 
 After `marktest` there are zero or more attributes. The first line ends either with `-->` or with a _body label_ – a name followed by a colon. In the previous example, `before:` and `body:` are body labels.
 
-What kinds of directives are there?
+### Kinds of directives
 
 * A directive without a body label is a _code block directive_ and must be followed by a code block.
 * Body label `body:`: _body directive_. Such a directive is self-contained.
@@ -92,10 +92,36 @@ After directories were paired with code blocks, we get the following entities:
 
 ## Attributes
 
+### Code snippets
 
+* Language: `lang`
+  * For body directives
+  * To override defaults from code blocks and `write`
+  * Values other than names of actual languages (`"js" etc.`) – see section “Configuration”:
+    * `"[neverRun]"`
+    * `"[skip]"`
+    * `"[errorIfRun]"`
+    * `"[errorIfVisited]"`
+* Assembling lines:
+  * `id="my-id"`
+  * `sequence="1/3"`
+  * `include="id1, $THIS, id2"`:
+    * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
+* Writing and referring to files:
+  * `write`
+  * `writeAndRun`
+  * `external="id1>lib1.js, lib2.js"`
+* Visitation mode:
+  * `only`
+  * `skip`
+  * `neverSkip`
+* Checking output:
+  * `stdout="id"`
+  * `stderr="id"`
 
+### Global line mods
 
-
+* `each="lang-name"`
 
 
 
@@ -115,25 +141,62 @@ After directories were paired with code blocks, we get the following entities:
 
 ## Configuration
 
+See all defaults: `marktest --print-config`
+
 ```md
 <!--marktest config:
 {
   "lang": {
-    "ts": {
-      "defaultFileName": "main.ts",
-      "commands": [
-        ["npx", "ts-expect-error", "--report-errors", "$ALL_FILE_NAMES"],
-        ["npx", "tsx", "$FILE_NAME"],
+    "": "[neverRun]",
+    "js": {
+      "before": [
+        "import assert from 'node:assert/strict';"
       ],
+      "defaultFileName": "main.mjs",
+      "commands": [
+        [ "node", "$FILE_NAME" ]
+      ]
     },
   },
 }
 -->
 ```
 
+Variables for `commands`:
+
+* `$FILE_NAME`
+* `$ALL_FILE_NAMES`
+
+Property `"lang"`:
+
+* Empty key `""`: for “bare” code blocks without languages
+* Value `"[neverRun]"`: Don’t run the snippets. The contents can still be written somewhere. That’s why this value is used for bare code blocks: They are often used for language-specific configuration files (e.g. as needed for Babel).
+* Value `"[skip]"`: Never visit the snippets.
+* Value `"[errorIfRun]"`: Snippets must not be run – which can, e.g., be avoided via attribute `write`.
+* Value `"[errorIfVisited]"`: Snippets must be skipped – e.g. via attribute `id` or attribute `skip`.
+
 ## Search and replace
 
+```json
+{
+  "searchAndReplace": {
+    "[⎡⎤]": ""
+  },
+}
+```
+
 ## Translators
+
+```json
+{
+  "lang": {
+    "node-repl": {
+      "extends": "js",
+      "translator": "node-repl-to-js"
+    },
+  }
+}
+```
 
 * Only the core code is translated.
   * Rationale for Node.js REPL: Let users write wrapping code as plain JavaScript.

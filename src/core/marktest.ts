@@ -151,7 +151,7 @@ function handleSnippet(cliState: CliState, config: Config, prevHeading: null | H
   if (langDef.kind === 'LangDefSkip') {
     return EntityKind.NonRunnable;
   }
-  if (langDef.kind === 'LangDefError') {
+  if (langDef.kind === 'LangDefErrorIfVisited') {
     throw new UserError(
       `Language must be skipped: ${JSON.stringify(snippet.lang)}`,
       { lineNumber: snippet.lineNumber }

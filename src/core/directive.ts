@@ -70,9 +70,27 @@ export const ATTR_KEY_STDERR = 'stderr';
 
 export const ATTR_KEY_EACH = 'each';
 
-//----- Only for `body:` directive -----
+//----- Language -----
 
+/**
+ * Can prevent running!
+ * - For body directives
+ * - To override defaults from code blocks and `write`
+ */
 export const ATTR_KEY_LANG = 'lang';
+
+//========== Language constants ==========
+// - Location 1: values of attribute `lang`
+// - Location 2: In configurations for language definitions (property
+//   values of "lang" object).
+
+/** Only a config property key */
+export const LANG_KEY_EMPTY = '';
+
+export const LANG_NEVER_RUN = '[neverRun]';
+export const LANG_SKIP = '[skip]';
+export const LANG_ERROR_IF_RUN = '[errorIfRun]';
+export const LANG_ERROR_IF_VISITED = '[errorIfVisited]';
 
 //========== Body labels ==========
 
@@ -89,19 +107,6 @@ export const BODY_LABEL_AROUND = 'around:';
 
 export const CMD_VAR_FILE_NAME = '$FILE_NAME';
 export const CMD_VAR_ALL_FILE_NAMES = '$ALL_FILE_NAMES';
-
-//========== Language constants ==========
-// - Location 1: values of attribute `lang`
-// - Location 2: In configurations for language definitions (property
-//   values of "lang" object).
-
-/** Only a config property key */
-export const LANG_KEY_EMPTY = '';
-
-export const LANG_NEVER_RUN = '[neverRun]';
-export const LANG_SKIP = '[skip]';
-export const LANG_ERROR_IF_RUN = '[errorIfRun]';
-export const LANG_ERROR = '[error]';
 
 //#################### Code ####################
 

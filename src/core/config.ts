@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import { TRANSLATOR_MAP } from '../translation/translators.js';
 import { UserError, type UserErrorContext } from '../util/errors.js';
-import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR, LANG_ERROR_IF_RUN, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
+import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_VISITED, LANG_ERROR_IF_RUN, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -14,7 +14,7 @@ export type LangDef =
   | LangDefCommand
   | LangDefNeverRun
   | LangDefSkip
-  | LangDefError
+  | LangDefErrorIfVisited
   | LangDefErrorIfRun
   ;
 
@@ -47,8 +47,8 @@ export type LangDefNeverRun = {
 export type LangDefSkip = {
   kind: 'LangDefSkip',
 };
-export type LangDefError = {
-  kind: 'LangDefError',
+export type LangDefErrorIfVisited = {
+  kind: 'LangDefErrorIfVisited',
 };
 export type LangDefErrorIfRun = {
   kind: 'LangDefErrorIfRun',
@@ -157,8 +157,8 @@ export class Config {
         return { kind: 'LangDefSkip' };
       case LANG_ERROR_IF_RUN:
         return { kind: 'LangDefErrorIfRun' };
-      case LANG_ERROR:
-        return { kind: 'LangDefError' };
+      case LANG_ERROR_IF_VISITED:
+        return { kind: 'LangDefErrorIfVisited' };
       default:
         const langDef = this.#lang.get(langKey);
         if (langDef === undefined) {
@@ -194,7 +194,7 @@ export class Config {
       switch (nextLangDef.kind) {
         case 'LangDefNeverRun':
         case 'LangDefSkip':
-        case 'LangDefError':
+        case 'LangDefErrorIfVisited':
         case 'LangDefErrorIfRun':
           // End of the road
           return nextLangDef;
@@ -272,7 +272,7 @@ export type LangDefPartialJson =
   | typeof LANG_NEVER_RUN
   | typeof LANG_SKIP
   | typeof LANG_ERROR_IF_RUN
-  | typeof LANG_ERROR
+  | typeof LANG_ERROR_IF_VISITED
   ;
 
 export type LangDefCommandPartialJson = {
@@ -292,8 +292,8 @@ function langDefFromJson(context: UserErrorContext, langDefJson: LangDefPartialJ
         return { kind: 'LangDefSkip' };
       case LANG_ERROR_IF_RUN:
         return { kind: 'LangDefErrorIfRun' };
-      case LANG_ERROR:
-        return { kind: 'LangDefError' };
+      case LANG_ERROR_IF_VISITED:
+        return { kind: 'LangDefErrorIfVisited' };
       default:
         throw new UnsupportedValueError(langDefJson);
     }
@@ -326,8 +326,8 @@ function langDefToJson(langDef: LangDef): LangDefPartialJson {
       return LANG_SKIP;
     case 'LangDefErrorIfRun':
       return LANG_ERROR_IF_RUN;
-    case 'LangDefError':
-      return LANG_ERROR;
+    case 'LangDefErrorIfVisited':
+      return LANG_ERROR_IF_VISITED;
     case 'LangDefCommand': {
       return {
         extends: langDef.extends,
@@ -361,7 +361,7 @@ export const LangDefPartialJsonSchema = z.union([
   z.literal(LANG_NEVER_RUN),
   z.literal(LANG_SKIP),
   z.literal(LANG_ERROR_IF_RUN),
-  z.literal(LANG_ERROR),
+  z.literal(LANG_ERROR_IF_VISITED),
 ]);
 
 export const ConfigModJsonSchema = z.object({
