@@ -17,7 +17,7 @@ import { UserError, contextDescription, contextLineNumber } from '../util/errors
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity } from './entities.js';
+import { ConfigMod, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity, FileStatus } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: "json" };
@@ -34,7 +34,7 @@ enum EntityKind {
 
 //#################### runFile() ####################
 
-export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): void {
+export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): FileStatus {
   const marktestDir = findMarktestDir(absFilePath, entities);
   console.log(ink.FgBrightBlack`Marktest directory: ${relPath(marktestDir)}`);
 
@@ -68,6 +68,7 @@ export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array
     idToSnippet,
     globalVisitationMode,
     globalLineMods: new Map(),
+    fileStatus: FileStatus.Success,
   };
 
   let prevHeading: null | Heading = null;
@@ -81,6 +82,8 @@ export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array
       prevHeading = null; // clear
     }
   }
+
+  return cliState.fileStatus;
 }
 
 function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): string {
@@ -232,10 +235,11 @@ function handleSnippetWithCommands(config: Config, cliState: CliState, prevHeadi
   try {
     runShellCommands(cliState, config, snippet, langDef, fileName, commands);
     if (printStatusEmoji) {
-      console.log(' ✅');
+      console.log(' ' + ink.FgGreen`✔︎`);
     }
   } catch (err) {
     if (err instanceof UserError) {
+      cliState.fileStatus = FileStatus.Failure;
       if (printStatusEmoji) {
         console.log(' ❌');
       }
@@ -416,6 +420,8 @@ function main() {
     }
     return;
   }
+  assertTrue(args.positionals.length > 0);
+  const failedFiles = new Array<string>();
   for (const filePath of args.positionals) {
     const absFilePath = path.resolve(filePath);
     console.log();
@@ -423,7 +429,28 @@ function main() {
     const text = fs.readFileSync(absFilePath, 'utf-8');
     const { entities, idToSnippet } = parseMarkdown(text);
     const logLevel = (args.values.verbose ? LogLevel.Verbose : LogLevel.Normal);
-    runFile(logLevel, absFilePath, entities, idToSnippet);
+    const fileStatus = runFile(logLevel, absFilePath, entities, idToSnippet);
+    if (fileStatus === FileStatus.Failure) {
+      failedFiles.push(relPath(absFilePath));
+    }
+  }
+
+  const style = (
+    failedFiles.length === 0 ? ink.FgGreen.Bold : ink.FgRed.Bold
+  );
+  console.log();
+  console.log(style`===== SUMMARY =====`);
+  const totalFileCount = args.positionals.length;
+  const totalString = totalFileCount + (
+    totalFileCount === 1 ? ' file' : ' files'
+  );
+  if (failedFiles.length === 0) {
+    console.log(`All succeeded: ${totalString} ✅`);
+  } else {
+    console.log(`Failures: ${failedFiles.length} of ${totalString} ❌`);
+    for (const failedFile of failedFiles) {
+      console.log(`• ${failedFile}`);
+    }
   }
 }
 

@@ -87,12 +87,18 @@ export enum LogLevel {
   Normal,
 }
 
+export enum FileStatus {
+  Failure,
+  Success,
+}
+
 export type CliState = {
   tmpDir: string,
   logLevel: LogLevel,
   idToSnippet: Map<string, Snippet>,
   globalVisitationMode: GlobalVisitationMode,
   globalLineMods: Map<string, Array<LineMod>>,
+  fileStatus: FileStatus,
 };
 
 /** Used for testing */
@@ -103,6 +109,7 @@ export function createTestCliState(): CliState {
     idToSnippet: new Map(),
     globalVisitationMode: GlobalVisitationMode.Normal,
     globalLineMods: new Map(),
+    fileStatus: FileStatus.Success,
   };
 }
 

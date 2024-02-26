@@ -8,16 +8,14 @@
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
 * CLI option: stop after first error (so that files can be examined).
 * Optional: expected stdout/stderr must only be included in actual stdout/stderr.
-
-## UI output
-
-* Summarize results at the end? Useful if there are multiple files!
-  * Statistics: Successes, failures, unknown languages, skipped
-  * List files that had issues
-* Warnings (don’t change exit code):
+* JSON schema for config files
+* Attribute: expect exit code
+* Warnings: Don’t change exit code? Mention in summary?
   * `only` mode (per file)
+  * Skipped snippets
   * Unused IDs (per file)
   * Unknown attributes (immediately)
+  * Unknown languages
 
 ## Wrappers
 
