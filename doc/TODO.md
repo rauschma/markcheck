@@ -1,21 +1,31 @@
 # Todo
 
-* Attribute `ignoreLine="1,2"`?
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
-* Catch and report UserErrors per file? They have information such as the line number!
-* Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
+* Catch and report UserErrors?
+  * There is no need to stop processing at this point!
+  * Per file? Per snippet?
+  * They have information such as the line number!
 * CLI option: stop after first error (so that files can be examined).
 * Optional: expected stdout/stderr must only be included in actual stdout/stderr.
 * JSON schema for config files
+
+## Attributes
+
 * Attribute: expect exit code
-* Warnings: Don’t change exit code? Mention in summary?
-  * `only` mode (per file)
-  * Skipped snippets
-  * Unused IDs (per file)
-  * Unknown attributes (immediately)
-  * Unknown languages
+* Attribute `ignoreLine="1,2"`?
+* Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
+
+## Warnings
+
+Don’t change exit code? Mention in summary?
+
+* `only` mode (per file)
+* Skipped snippets
+* Unused IDs (per file)
+* Unknown attributes (immediately)
+* Unknown languages
 
 ## Wrappers
 
