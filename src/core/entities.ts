@@ -187,14 +187,25 @@ export class SingleSnippet extends Snippet {
         // - To still visit a snippet with an ID, use `only` or `neverSkip`.
         snippet.visitationMode = VisitationMode.Skip;
       }
-      if (directive.hasAttribute(ATTR_KEY_ONLY)) {
-        snippet.visitationMode = VisitationMode.Only;
-      }
+      let visitationAttributes = 0;
       if (directive.hasAttribute(ATTR_KEY_SKIP)) {
         snippet.visitationMode = VisitationMode.Skip;
+        visitationAttributes++;
       }
       if (directive.hasAttribute(ATTR_KEY_NEVER_SKIP)) {
         snippet.visitationMode = VisitationMode.NeverSkip;
+        visitationAttributes++;
+      }
+      if (directive.hasAttribute(ATTR_KEY_ONLY)) {
+        snippet.visitationMode = VisitationMode.Only;
+        visitationAttributes++;
+      }
+      if (visitationAttributes > 1) {
+        const attrs = [ATTR_KEY_SKIP, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY];
+        throw new UserError(
+          `Snippet has more than one of these attributes: ${attrs.join(', ')}`,
+          {lineNumber: directive.lineNumber}
+        );
       }
     }
 
@@ -253,6 +264,8 @@ export class SingleSnippet extends Snippet {
   }
 
   override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
+    // this.visitationMode is set up by factory methods where `id` etc. are
+    // considered.
     switch (globalVisitationMode) {
       case GlobalVisitationMode.Normal:
         switch (this.visitationMode) {

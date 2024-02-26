@@ -1,0 +1,14 @@
+{
+  "private": "true",
+  "type": "module",
+  "// dependencies": {
+    "@babel/plugin-proposal-decorators": "Needed only by demo-babel.md (which demos decorators)",
+    "babel-register-esm": "Needed by Babel code",
+    "ts-expect": "Needed by TypeScript code"
+  },
+  "dependencies": {
+    "@babel/plugin-proposal-decorators": "^7.23.9",
+    "babel-register-esm": "^1.2.5",
+    "ts-expect": "^1.3.0"
+  }
+}

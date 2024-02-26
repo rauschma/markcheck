@@ -410,10 +410,11 @@ function main() {
     const helpLines = [
       `${BIN_NAME} «file1.md» «file2.md» ...`,
       '',
-      'More options:',
+      'Options:',
       '--help -h: get help',
       '--version -v: print version',
-      '--print-config -c: print built-in configuration',
+      '--print-config: print built-in configuration',
+      '--verbose -v: show more information (e.g. which shell commands are run)',
     ];
     for (const line of helpLines) {
       console.log(line);

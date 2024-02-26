@@ -1,5 +1,8 @@
 # Todo
 
+* Line mods:
+  * Local: direct, applied
+  * Assembled lines: global, config
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?

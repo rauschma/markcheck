@@ -30,4 +30,12 @@ TypeError: Cannot destructure property 'prop' of 'undefined'
 as it is undefined.
 ```
 
-Note: The last input line does not end with a semicolon. A semicolon means that no result (value or exception) is expected.
+## Trailing semicolons
+
+The second input line in the previous example does not end with a semicolon. A trailing semicolon means that no result (value or exception) is expected:
+
+```node-repl
+> const myVar = 123;
+> myVar
+123
+```

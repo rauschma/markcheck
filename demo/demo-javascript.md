@@ -9,7 +9,7 @@ assert.equal(
 );
 ```
 
-## Checking output
+### Checking standard output via `stdout`
 
 <!--marktest stdout="output"-->
 ```js
@@ -21,7 +21,7 @@ console.log('Hello!');
 Hello!
 ```
 
-## Hiding code
+## Hiding code via `before:`
 
 <!--marktest before:
 function functionThatShouldThrow() {
@@ -37,7 +37,7 @@ try {
 }
 ```
 
-## Assembling a sequence of code fragments
+### Assembling code fragments sequentially via `sequence`
 
 <!--marktest sequence="1/3" stdout="sequence-output"-->
 ```js
@@ -101,7 +101,7 @@ assert.equal(GRINNING_FACE, '😀');
 export const GRINNING_FACE = '😀';
 ```
 
-## Comment-only (“invisible”) snippets
+### Comment-only (“invisible”) snippets via `body:`
 
 <!--marktest write="some-file.txt" body:
 Content of some-file.txt
@@ -115,7 +115,7 @@ assert.equal(
 );
 ```
 
-## Asynchronous code
+### Asynchronous code and hiding test code via ⎡half-brackets⎤
 
 ```js
 ⎡await ⎤Promise.allSettled([
