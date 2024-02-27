@@ -1,24 +1,23 @@
-#!/usr/bin/env -S node --no-warnings=ExperimentalWarning
-// Importing JSON is experimental
-
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync, ensureParentDirectory } from '@rauschma/helpers/nodejs/file.js';
 import { ink } from '@rauschma/helpers/nodejs/text-ink.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as tty from 'node:tty';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError, contextDescription, contextLineNumber } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity, FileStatus } from './entities.js';
-import { parseMarkdown } from './parse-markdown.js';
+import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity } from './entities.js';
+import { parseMarkdown, type ParseMarkdownResult } from './parse-markdown.js';
+
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: "json" };
 
@@ -32,11 +31,27 @@ enum EntityKind {
   NonRunnable,
 }
 
+export type Output = {
+  write(str: string): void;
+  writeLine(str?: string): void;
+};
+
+export function createOutput(writeStream: tty.WriteStream): Output {
+  return {
+    write(str: string): void {
+      writeStream.write(str);
+    },
+    writeLine(str = ''): void {
+      writeStream.write(str + os.EOL);
+    },
+  };
+}
+
 //#################### runFile() ####################
 
-export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet>): FileStatus {
-  const marktestDir = findMarktestDir(absFilePath, entities);
-  console.log(ink.FgBrightBlack`Marktest directory: ${relPath(marktestDir)}`);
+export function runFile(out: Output, logLevel: LogLevel, absFilePath: string, pmr: ParseMarkdownResult, interceptedShellCommands: null | Array<Array<string>> = null): FileStatus {
+  const marktestDir = findMarktestDir(absFilePath, pmr.entities);
+  out.writeLine(ink.FgBrightBlack`Marktest directory: ${relPath(marktestDir)}`);
 
   const tmpDir = path.resolve(marktestDir, MARKTEST_TMP_DIR_NAME);
   // `marktest/` must exist, `marktest/tmp/` may not exist
@@ -47,7 +62,7 @@ export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array
   }
 
   let globalVisitationMode = GlobalVisitationMode.Normal;
-  if (entities.some((e) => e instanceof Snippet && e.visitationMode === VisitationMode.Only)) {
+  if (pmr.entities.some((e) => e instanceof Snippet && e.visitationMode === VisitationMode.Only)) {
     globalVisitationMode = GlobalVisitationMode.Only;
   }
 
@@ -65,15 +80,17 @@ export function runFile(logLevel: LogLevel, absFilePath: string, entities: Array
   const cliState: CliState = {
     tmpDir,
     logLevel,
-    idToSnippet,
+    idToSnippet: pmr.idToSnippet,
+    idToLineMod: pmr.idToLineMod,
     globalVisitationMode,
     globalLineMods: new Map(),
     fileStatus: FileStatus.Success,
+    interceptedShellCommands,
   };
 
   let prevHeading: null | Heading = null;
-  for (const entity of entities) {
-    const entityKind = handleOneEntity(cliState, config, prevHeading, entity);
+  for (const entity of pmr.entities) {
+    const entityKind = handleOneEntity(out, cliState, config, prevHeading, entity);
     if (entity instanceof Heading) {
       prevHeading = entity; // update
     } else if (entityKind === EntityKind.Runnable) {
@@ -95,7 +112,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
     }
   }
 
-  const startDir = absFilePath;
+  const startDir = path.dirname(absFilePath);
   let parentDir = startDir;
   while (true) {
     const mtd = path.resolve(parentDir, MARKTEST_DIR_NAME);
@@ -109,25 +126,26 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
     parentDir = nextParentDir;
   }
   throw new UserError(
-    `Could not find a ${stringify(MARKTEST_DIR_NAME)} directory neither configured not in the following directory or its ancestors: ${stringify(parentDir)}`
+    `Could not find a ${stringify(MARKTEST_DIR_NAME)} directory neither configured nor in the following directory or its ancestors: ${stringify(startDir)}`
   );
 }
 
-function handleOneEntity(cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarktestEntity): EntityKind {
+function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarktestEntity): EntityKind {
   if (entity instanceof ConfigMod) {
     config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
     return EntityKind.NonRunnable;
   } else if (entity instanceof LineMod) {
-    assertNonNullable(entity.targetLanguage);
-    let lineModArr = cliState.globalLineMods.get(entity.targetLanguage);
-    if (!lineModArr) {
-      lineModArr = [];
-      cliState.globalLineMods.set(entity.targetLanguage, lineModArr);
+    if (entity.targetLanguage !== undefined) {
+      let lineModArr = cliState.globalLineMods.get(entity.targetLanguage);
+      if (!lineModArr) {
+        lineModArr = [];
+        cliState.globalLineMods.set(entity.targetLanguage, lineModArr);
+      }
+      lineModArr.push(entity);
     }
-    lineModArr.push(entity);
     return EntityKind.NonRunnable;
   } else if (entity instanceof Snippet) {
-    return handleSnippet(cliState, config, prevHeading, entity);
+    return handleSnippet(out, cliState, config, prevHeading, entity);
   } else if (entity instanceof Heading) {
     // Ignore
     return EntityKind.NonRunnable;
@@ -136,7 +154,7 @@ function handleOneEntity(cliState: CliState, config: Config, prevHeading: null |
   }
 }
 
-function handleSnippet(cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): EntityKind {
+function handleSnippet(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): EntityKind {
   if (!snippet.isVisited(cliState.globalVisitationMode)) {
     return EntityKind.NonRunnable;
   }
@@ -158,7 +176,7 @@ function handleSnippet(cliState: CliState, config: Config, prevHeading: null | H
     );
   }
 
-  writeFiles(cliState, config, snippet, langDef);
+  writeFiles(out, cliState, config, snippet, langDef);
 
   if (langDef.kind === 'LangDefErrorIfRun') {
     throw new UserError(
@@ -185,7 +203,7 @@ function handleSnippet(cliState: CliState, config: Config, prevHeading: null | H
     );
   }
   if (langDef.commands.length > 0) {
-    handleSnippetWithCommands(config, cliState, prevHeading, snippet, langDef, fileName, langDef.commands);
+    handleSnippetWithCommands(out, config, cliState, prevHeading, snippet, langDef, fileName, langDef.commands);
     return EntityKind.Runnable;
   }
   return EntityKind.NonRunnable;
@@ -193,24 +211,24 @@ function handleSnippet(cliState: CliState, config: Config, prevHeading: null | H
 
 //#################### writeFiles() ####################
 
-function writeFiles(cliState: CliState, config: Config, snippet: Snippet, langDef: LangDef): void {
+function writeFiles(out: Output, cliState: CliState, config: Config, snippet: Snippet, langDef: LangDef): void {
   const fileName = snippet.getFileName(langDef);
   if (fileName) {
     const lines = assembleLines(cliState, config, snippet);
-    writeOneFile(cliState, config, fileName, lines);
+    writeOneFile(out, cliState, config, fileName, lines);
   }
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
     const lines = assembleLinesForId(cliState, config, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
-    writeOneFile(cliState, config, fileName, lines);
+    writeOneFile(out, cliState, config, fileName, lines);
   }
 }
 
-function writeOneFile(cliState: CliState, config: Config, fileName: string, lines: Array<string>) {
+function writeOneFile(out: Output, cliState: CliState, config: Config, fileName: string, lines: Array<string>) {
   const filePath = path.resolve(cliState.tmpDir, fileName);
   if (cliState.logLevel === LogLevel.Verbose) {
-    console.log('Write ' + filePath);
+    out.writeLine('Write ' + filePath);
   }
   let content = lines.join(os.EOL);
   content = config.searchAndReplaceFunc(content);
@@ -220,34 +238,34 @@ function writeOneFile(cliState: CliState, config: Config, fileName: string, line
 
 //#################### handleSnippetWithCommands() ####################
 
-function handleSnippetWithCommands(config: Config, cliState: CliState, prevHeading: Heading | null, snippet: Snippet, langDef: LangDefCommand, fileName: string, commands: Array<Array<string>>) {
+function handleSnippetWithCommands(out: Output, config: Config, cliState: CliState, prevHeading: Heading | null, snippet: Snippet, langDef: LangDefCommand, fileName: string, commands: Array<Array<string>>) {
   if (prevHeading) {
-    console.log(ink.Bold(prevHeading.content));
+    out.writeLine(ink.Bold(prevHeading.content));
   }
   // With verbose output, there will be printed text before we could
   // print the status emoji. That is, it wouldn’t appear in the same line.
   // That’s why we don’t print it at all in this case.
   const printStatusEmoji = (cliState.logLevel === LogLevel.Normal);
-  process.stdout.write(`L${snippet.lineNumber} (${snippet.lang})`);
+  out.write(`L${snippet.lineNumber} (${snippet.lang})`);
   if (!printStatusEmoji) {
-    console.log();
+    out.writeLine();
   }
   try {
-    runShellCommands(cliState, config, snippet, langDef, fileName, commands);
+    runShellCommands(out, cliState, config, snippet, langDef, fileName, commands);
     if (printStatusEmoji) {
-      console.log(' ' + ink.FgGreen`✔︎`);
+      out.writeLine(' ' + ink.FgGreen`✔︎`);
     }
   } catch (err) {
     if (err instanceof UserError) {
       cliState.fileStatus = FileStatus.Failure;
       if (printStatusEmoji) {
-        console.log(' ❌');
+        out.writeLine(' ❌');
       }
       if (err.stdoutLines) {
-        logStdout(err.stdoutLines, err.expectedStdoutLines);
+        logStdout(out, err.stdoutLines, err.expectedStdoutLines);
       }
       if (err.stderrLines) {
-        logStderr(err.stderrLines, err.expectedStderrLines);
+        logStderr(out, err.stderrLines, err.expectedStderrLines);
       }
     } else {
       throw err;
@@ -255,14 +273,20 @@ function handleSnippetWithCommands(config: Config, cliState: CliState, prevHeadi
   }
 }
 
-function runShellCommands(cliState: CliState, config: Config, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
+function runShellCommands(out: Output, cliState: CliState, config: Config, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
   const commands: Array<Array<string>> = fillInCommandVariables(commandsWithVars, {
     [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });
+  if (cliState.interceptedShellCommands) {
+    cliState.interceptedShellCommands.push(
+      commands.map(commandParts => commandParts.join(' '))
+    );
+    return;
+  }
   for (const commandParts of commands) {
     if (cliState.logLevel === LogLevel.Verbose) {
-      console.log(commandParts.join(' '));
+      out.writeLine(commandParts.join(' '));
     }
     const [command, ...args] = commandParts;
     const result = child_process.spawnSync(command, args, {
@@ -344,29 +368,29 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
 
 //#################### Logging helpers ####################
 
-function logStdout(stdoutLines: Array<string>, expectedLines?: Array<string>): void {
-  logStd('stdout', stdoutLines, expectedLines);
+function logStdout(out: Output, stdoutLines: Array<string>, expectedLines?: Array<string>): void {
+  logStd(out, 'stdout', stdoutLines, expectedLines);
 }
-function logStderr(stderrLines: Array<string>, expectedLines?: Array<string>): void {
-  logStd('stderr', stderrLines, expectedLines);
+function logStderr(out: Output, stderrLines: Array<string>, expectedLines?: Array<string>): void {
+  logStd(out, 'stderr', stderrLines, expectedLines);
 }
-function logStd(name: string, actualLines: Array<string>, expectedLines?: Array<string>): void {
+function logStd(out: Output, name: string, actualLines: Array<string>, expectedLines?: Array<string>): void {
   if (expectedLines === undefined && actualLines.length === 0) {
     return;
   }
   const title = `----- ${name} -----`;
-  console.log(title);
-  logAll(actualLines);
-  console.log('-'.repeat(title.length));
+  out.writeLine(title);
+  logAll(out, actualLines);
+  out.writeLine('-'.repeat(title.length));
   if (expectedLines) {
     logDiff(expectedLines, actualLines);
-    console.log('-'.repeat(title.length));
+    out.writeLine('-'.repeat(title.length));
   }
 }
 
-function logAll(lines: Array<string>) {
+function logAll(out: Output, lines: Array<string>) {
   for (const line of lines) {
-    console.log(line);
+    out.writeLine(line);
   }
 }
 
@@ -395,7 +419,7 @@ const ARG_OPTIONS = {
   },
 } satisfies ParseArgsConfig['options'];
 
-function main() {
+export function cliEntry() {
   const args = parseArgs({ allowPositionals: true, options: ARG_OPTIONS });
 
   if (args.values.version) {
@@ -428,9 +452,10 @@ function main() {
     console.log();
     console.log(ink.FgBlue.Bold`===== ${relPath(absFilePath)} =====`);
     const text = fs.readFileSync(absFilePath, 'utf-8');
-    const { entities, idToSnippet } = parseMarkdown(text);
+    const pmr = parseMarkdown(text);
     const logLevel = (args.values.verbose ? LogLevel.Verbose : LogLevel.Normal);
-    const fileStatus = runFile(logLevel, absFilePath, entities, idToSnippet);
+    const out = createOutput(process.stdout);
+    const fileStatus = runFile(out, logLevel, absFilePath, pmr);
     if (fileStatus === FileStatus.Failure) {
       failedFiles.push(relPath(absFilePath));
     }
@@ -454,5 +479,3 @@ function main() {
     }
   }
 }
-
-main();

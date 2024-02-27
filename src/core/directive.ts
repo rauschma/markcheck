@@ -1,6 +1,9 @@
 import { re } from '@rauschma/helpers/js/re-template-tag.js';
+import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import { InternalError, UserError, type LineNumber } from '../util/errors.js';
+
+const { stringify } = JSON;
 
 //#################### Constants ####################
 
@@ -18,6 +21,8 @@ const MARKTEST_MARKER = 'marktest';
 export const ATTR_KEY_ID = 'id';
 export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
+export const ATTR_KEY_APPLY_INNER = 'applyInner';
+export const ATTR_KEY_APPLY_OUTER = 'applyOuter';
 
 //----- Writing and referring to files -----
 
@@ -66,9 +71,12 @@ export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
 export const ATTR_KEY_STDOUT = 'stdout';
 export const ATTR_KEY_STDERR = 'stderr';
 
-//----- Global line mods -----
+//----- Line mods -----
 
+// Global line mods
 export const ATTR_KEY_EACH = 'each';
+
+// Applicable line mods have the attribute `id`
 
 //----- Language -----
 
@@ -84,13 +92,13 @@ export const ATTR_KEY_LANG = 'lang';
 // - Location 2: In configurations for language definitions (property
 //   values of "lang" object).
 
-/** Only a config property key */
 export const LANG_KEY_EMPTY = '';
-
 export const LANG_NEVER_RUN = '[neverRun]';
 export const LANG_SKIP = '[skip]';
 export const LANG_ERROR_IF_RUN = '[errorIfRun]';
 export const LANG_ERROR_IF_VISITED = '[errorIfVisited]';
+
+export const RE_LANG_VALUE = /^((?!\[).*|\[neverRun\]|\[skip\]|\[errorIfRun\]|\[errorIfVisited\])$/;
 
 //========== Body labels ==========
 
@@ -108,33 +116,49 @@ export const BODY_LABEL_AROUND = 'around:';
 export const CMD_VAR_FILE_NAME = '$FILE_NAME';
 export const CMD_VAR_ALL_FILE_NAMES = '$ALL_FILE_NAMES';
 
+//#################### Expected attribute values ####################
+
+export const Valueless = Symbol('Valueless');
+
+export enum AttrValue {
+  Valueless, String
+}
+
+export type ExpectedAttributeValues = Map<string, AttrValue | RegExp>;
+
+export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
+  [ATTR_KEY_ID, AttrValue.String],
+  [ATTR_KEY_SEQUENCE, AttrValue.String],
+  [ATTR_KEY_INCLUDE, AttrValue.String],
+  [ATTR_KEY_APPLY_INNER, AttrValue.String],
+  [ATTR_KEY_APPLY_OUTER, AttrValue.String],
+  //
+  [ATTR_KEY_WRITE, AttrValue.String],
+  [ATTR_KEY_WRITE_AND_RUN, AttrValue.String],
+  [ATTR_KEY_EXTERNAL, AttrValue.String],
+  //
+  [ATTR_KEY_ONLY, AttrValue.Valueless],
+  [ATTR_KEY_SKIP, AttrValue.Valueless],
+  [ATTR_KEY_NEVER_SKIP, AttrValue.Valueless],
+  //
+  [ATTR_KEY_STDOUT, AttrValue.String],
+  [ATTR_KEY_STDERR, AttrValue.String],
+  //
+  [ATTR_KEY_LANG, RE_LANG_VALUE],
+]);
+
+export const GLOBAL_LINE_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
+  [ATTR_KEY_EACH, AttrValue.String],
+]);
+
+export const APPLICABLE_LINE_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
+  [ATTR_KEY_ID, AttrValue.String],
+]);
+
+export const CONFIG_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
+]);
+
 //#################### Code ####################
-
-//========== Sequence numbers ==========
-
-export class SequenceNumber {
-  pos: number;
-  total: number;
-  constructor(pos: number, total: number) {
-    this.pos = pos;
-    this.total = total;
-  }
-  toString() {
-    return this.pos + '/' + this.total;
-  }
-}
-
-const RE_SEQUENCE_NUMBER = /^ *([0-9]+) *\/ *([0-9]+) *$/u;
-export function parseSequenceNumber(str: string): null | SequenceNumber {
-  const match = RE_SEQUENCE_NUMBER.exec(str);
-  if (!match) return null;
-  const pos = Number(match[1]);
-  const total = Number(match[2]);
-  if (Number.isNaN(pos) || Number.isNaN(total)) {
-    return null;
-  }
-  return new SequenceNumber(pos, total);
-}
 
 //========== Directive ==========
 
@@ -171,19 +195,89 @@ export class Directive {
   }
   lineNumber: LineNumber;
   body: Array<string>;
-  #attributes = new Map<string, string>();
+  #attributes = new Map<string, typeof Valueless | string>();
   bodyLabel: null | string = null;
   private constructor(lineNumber: LineNumber, body: Array<string>) {
     this.lineNumber = lineNumber;
     this.body = body;
   }
-  setAttribute(key: string, value: string): void {
+  setAttribute(key: string, value: typeof Valueless | string): void {
     this.#attributes.set(key, value);
   }
-  getAttribute(key: string): undefined | string {
+  getAttribute(key: string): undefined | typeof Valueless | string {
     return this.#attributes.get(key);
+  }
+  getString(key: string): undefined | string {
+    const value = this.getAttribute(key);
+    if (value === Valueless) {
+      throw new UserError(
+        `Attribute ${stringify(key)}: expected no key or a string value, but it was valueless`
+      );
+    }
+    return value;
   }
   hasAttribute(key: string): boolean {
     return this.#attributes.has(key);
   }
+  checkAttributes(expectedAttributes: ExpectedAttributeValues): void {
+    for (const [k, v] of this.#attributes) {
+      const expectedValue = expectedAttributes.get(k);
+      if (expectedValue === undefined) {
+        throw new UserError(
+          `directive has unknown attribute key ${stringify(k)}`,
+          { lineNumber: this.lineNumber }
+        );
+      }
+      if (expectedValue === AttrValue.Valueless) {
+        if (v !== Valueless) {
+          throw new UserError(
+            `Attribute ${stringify(k)} of directive must be valueless`,
+            { lineNumber: this.lineNumber }
+          );
+        }
+      } else if (expectedValue === AttrValue.String) {
+        if (typeof v !== 'string') {
+          throw new UserError(
+            `Attribute ${stringify(k)} of directive must have a string value`,
+            { lineNumber: this.lineNumber }
+          );
+        }
+      } else if (expectedValue instanceof RegExp) {
+        if (typeof v !== 'string' || !expectedValue.test(v)) {
+          throw new UserError(
+            `Attribute ${stringify(k)} has an illegal value (must be string and match ${expectedValue})`,
+            { lineNumber: this.lineNumber }
+          );
+        }
+      } else {
+        throw new UnsupportedValueError(expectedValue)
+      }
+    }
+  }
+}
+
+//========== Sequence numbers ==========
+
+export class SequenceNumber {
+  pos: number;
+  total: number;
+  constructor(pos: number, total: number) {
+    this.pos = pos;
+    this.total = total;
+  }
+  toString() {
+    return this.pos + '/' + this.total;
+  }
+}
+
+const RE_SEQUENCE_NUMBER = /^ *([0-9]+) *\/ *([0-9]+) *$/u;
+export function parseSequenceNumber(str: string): null | SequenceNumber {
+  const match = RE_SEQUENCE_NUMBER.exec(str);
+  if (!match) return null;
+  const pos = Number(match[1]);
+  const total = Number(match[2]);
+  if (Number.isNaN(pos) || Number.isNaN(total)) {
+    return null;
+  }
+  return new SequenceNumber(pos, total);
 }

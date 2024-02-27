@@ -55,7 +55,7 @@ After `marktest` there are zero or more attributes. The first line ends either w
 * Body label `config:`: _config directive_. Such a directive is self-contained.
 * Body label `before:`, `after:`, `around:`: A _line mod_ directive. Such a directive is used in three ways:
   * Attribute `each="some-lang"`: The modifications are applied to all code blocks with the specified language.
-  * Attribute `id="some-id"`: A code block directive can apply the line mod to its code via `apply="some-id"`.
+  * Attribute `id="some-id"`: A code block directive can apply the line mod to its code via `applyInner="some-id"` and  `applyOuter="some-id"`.
   * Various attributes other that `each` and `id`: The directive is a code block directive, the changes are applied to its code.
 
 ## Entities
@@ -70,25 +70,42 @@ After directories were paired with code blocks, we get the following entities:
   * Change the configuration data (which commands to run for a given language, etc.).
 * Line mods:
   * Created by line mod directives that are not also code block directives.
-  * Can be activated globally (attribute `each`) or applied by snippets (attribute `id`).
+  * Kinds of line mods:
+    * Global line mod (attribute `each`): Can be activated globally.
+    * Applicable line mod (attribute `id`): Can be applied by snippets via the attributes `applyInner` and `applyOuter`.
 
 ## Snippet modes: What can be done with snippets?
 
-* Visitation:
-  * The following key-only attributes control whether a snippet is considered or ignored: `skip`, `neverSkip`, `only`. The visitation mode `normal` is active if none of the previous attributes are present.
-  * Snippets with the attribute `skip` are never considered.
-  * Snippets with the attribute `neverSkip` are always considered.
-  * If one snippet in a file has the attribute `only`, only snippets with the attributes `only` and `neverSkip` are considered. Other files are not affected.
-* The phases of visitation are:
-  * Assembling lines (considering sequences, includes, line mods, etc.)
-  * Writing to disk (current snippet and external snippets it references)
-  * Running shell commands
-* Effects of other attributes:
-  * Attribute `id` skips by default. Such snippets are virtually always included by other snippets and do not have to be considered themselves. The default can be overridden via `neverSkip` or `only`.
-  * Attribute `lang` overrides the language specified by the code block. It can be set to `"[neverRun]"` – which prevents running.
-  * Attribute `write` sets `lang` to `"[neverRun]"`.
-    * Override by setting `lang` to something else.
-    * Or use attribute `writeAndRun`.
+Visitation:
+
+* The following key-only attributes control whether a snippet is considered or ignored: `skip`, `neverSkip`, `only`. The visitation mode `normal` is active if none of the previous attributes are present.
+* Snippets with the attribute `skip` are never considered.
+* Snippets with the attribute `neverSkip` are always considered.
+* If one snippet in a file has the attribute `only`, only snippets with the attributes `only` and `neverSkip` are considered. Other files are not affected.
+
+The phases of visitation are:
+
+* Assembling lines (considering sequences, includes, line mods, etc.)
+* Writing to disk (current snippet and external snippets it references)
+* Running shell commands
+
+These attributes also affect visitation:
+
+* `id` skips by default. Such snippets are virtually always included by other snippets and do not have to be considered themselves. The default can be overridden via `neverSkip` or `only`.
+* `lang` overrides the language specified by the code block. It can be set to `"[neverRun]"` – which prevents running.
+* `write` sets `lang` to `"[neverRun]"`.
+  * Override by setting `lang` to something else.
+  * Or use attribute `writeAndRun`.
+
+### How lines are assembled
+
+* Once per file (“before” in this order, “after” in reverse):
+  * Configuration `before` lines
+  * Global line mod
+  * Outer applicable line mod
+* Once per snippet (in sequences and includes):
+  * Inner applicable line mod
+  * Local line mod
 
 ## Attributes
 
@@ -107,6 +124,8 @@ After directories were paired with code blocks, we get the following entities:
   * `sequence="1/3"`
   * `include="id1, $THIS, id2"`:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
+  * `applyInner="id"`: applies an applicable line mod to the core snippet (vs. included snippets or other sequence members)
+  * `applyOuter="id"`: applies an applicable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
 * Writing and referring to files:
   * `write`
   * `writeAndRun`

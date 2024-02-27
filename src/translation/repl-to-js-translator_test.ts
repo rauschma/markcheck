@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import { nodeReplToJs } from './repl-to-js-translator.js';
 
 test('nodeReplToJs.translate', () => {

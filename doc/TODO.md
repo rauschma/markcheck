@@ -1,8 +1,5 @@
 # Todo
 
-* Line mods:
-  * Local: direct, applied
-  * Assembled lines: global, config
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
@@ -11,7 +8,6 @@
   * Per file? Per snippet?
   * They have information such as the line number!
 * CLI option: stop after first error (so that files can be examined).
-* Optional: expected stdout/stderr must only be included in actual stdout/stderr.
 * JSON schema for config files
 
 ## Attributes
@@ -19,6 +15,7 @@
 * Attribute: expect exit code
 * Attribute `ignoreLine="1,2"`?
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
+* How to check only part of stdout/stderr?
 
 ## Warnings
 
@@ -30,32 +27,11 @@ Don’t change exit code? Mention in summary?
 * Unknown attributes (immediately)
 * Unknown languages
 
-## Wrappers
-
-``````md
-<!--marktest apply="main"-->
-```rust
-println!("Hello");
-```
-
-<!--marktest id="main" around:
-fn main() {
-•••
-}
--->
-``````
-
 ## Tests
 
-* Test all .md files in the repo
-  * Where to put a common `marktest` directory for all .md files? Move demo/ files to doc/?
-  * Rename the directory so that it can’t be confused with the repo directory?
-* Sequence:
-  * Assemble
-  * Report errors
-* Assemble lines with a global LineMod
-* Assemble multiple includes (out of sequence)
-* Test attribute `write` with multiple IDs
+* Run all .md files in the repo?
+* Sequence: report errors 
+* Test attribute `external` with multiple IDs
 * Directive parsing, especially key-only attributes
 * Test that directive `lang` overrides code block language
 

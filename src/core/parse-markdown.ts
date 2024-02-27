@@ -5,7 +5,12 @@ import { UserError } from '../util/errors.js';
 import { Directive } from './directive.js';
 import { ConfigMod, Heading, LineMod, SequenceSnippet, SingleSnippet, directiveToEntity, type MarktestEntity, Snippet } from './entities.js';
 
-export function parseMarkdown(text: string): { entities: Array<MarktestEntity>, idToSnippet: Map<string, Snippet> } {
+export type ParseMarkdownResult = {
+  entities: Array<MarktestEntity>,
+  idToSnippet: Map<string, Snippet>,
+  idToLineMod: Map<string, LineMod>,
+};
+export function parseMarkdown(text: string): ParseMarkdownResult {
   const md = markdownit({ html: true });
   const result = new Array<MarktestEntity>();
   const tokens = md.parse(text, { html: true });
@@ -90,6 +95,7 @@ export function parseMarkdown(text: string): { entities: Array<MarktestEntity>, 
   return {
     entities: result,
     idToSnippet: createIdToSnippet(result),
+    idToLineMod: createIdToLineMod(result),
   };
 
   function pushSingleSnippet(
@@ -138,7 +144,6 @@ export function extractCommentContent(html: string): null | string {
   return html.slice(startMatch[0].length, endMatch.index);
 }
 
-
 function createIdToSnippet(entities: Array<MarktestEntity>): Map<string, Snippet> {
   const idToSnippet = new Map<string, Snippet>();
   for (const entity of entities) {
@@ -154,4 +159,21 @@ function createIdToSnippet(entities: Array<MarktestEntity>): Map<string, Snippet
     }
   }
   return idToSnippet;
+}
+
+function createIdToLineMod(entities: Array<MarktestEntity>): Map<string, LineMod> {
+  const idToLineMod = new Map<string, LineMod>();
+  for (const entity of entities) {
+    if (entity instanceof LineMod && entity.id) {
+      const other = idToLineMod.get(entity.id);
+      if (other) {
+        throw new UserError(
+          `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
+          { lineNumber: entity.lineNumber }
+        );
+      }
+      idToLineMod.set(entity.id, entity);
+    }
+  }
+  return idToLineMod;
 }

@@ -1,7 +1,8 @@
 import { isEmptyLine } from '@rauschma/helpers/js/string.js';
 
-export function trimTrailingEmptyLines(lines: Array<string>): void {
+export function trimTrailingEmptyLines(lines: Array<string>): Array<string> {
   lines.length = getEndTrimmedLength(lines);
+  return lines;
 }
 
 export function getEndTrimmedLength(lines: Array<string>): number {

@@ -1,7 +1,6 @@
 import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import { Config } from './config.js';
 import { SequenceSnippet, SingleSnippet, assembleLines, createTestCliState } from './entities.js';
 import { parseMarkdown } from './parse-markdown.js';
@@ -28,30 +27,22 @@ test('singleSnippet.getAllFileNames', () => {
 });
 
 test('Assemble includes', () => {
-  const { entities, idToSnippet } = parseMarkdown(
+  const lines = assembleLinesForFirstSnippet(
     outdent`
       <!--marktest include="helper"-->
-      •••node-repl
+      ◆◆◆node-repl
       > twice("abc")
       "abcabc"
-      •••
+      ◆◆◆
       
       <!--marktest id="helper"-->
-      •••js
+      ◆◆◆js
       function twice(str) { return str + str }
-      •••
-    `.replaceAll('•', '`')
+      ◆◆◆
+    `.replaceAll('◆', '`')
   );
-  const snippet = entities[0];
-  assertTrue(snippet instanceof SingleSnippet);
-
-  const cliState = {
-    ...createTestCliState(),
-    idToSnippet,
-  };
-  const config = new Config();
   assert.deepEqual(
-    assembleLines(cliState, config, snippet),
+    lines,
     [
       "import assert from 'node:assert/strict';",
       'function twice(str) { return str + str }',
@@ -65,37 +56,44 @@ test('Assemble includes', () => {
 });
 
 test('Assemble sequence', () => {
-  const { entities, idToSnippet } = parseMarkdown(
+  const lines = assembleLinesForFirstSnippet(
     outdent`
       <!--marktest sequence="1/3"-->
-      •••js
+      ◆◆◆js
       // Part 1
-      •••
+      ◆◆◆
       
       <!--marktest sequence="2/3"-->
-      •••js
+      ◆◆◆js
       // Part 2
-      •••
+      ◆◆◆
       
       <!--marktest sequence="3/3"-->
-      •••js
+      ◆◆◆js
       // Part 3
-      •••
-    `.replaceAll('•', '`')
+      ◆◆◆
+    `.replaceAll('◆', '`')
   );
-  const snippet = entities[0];
-  assertTrue(snippet instanceof SequenceSnippet);
-  const cliState = {
-    ...createTestCliState(),
-    idToSnippet,
-  };
-  const config = new Config();
   assert.deepEqual(
-    assembleLines(cliState, config, snippet),
+    lines,
     [
+      "import assert from 'node:assert/strict';",
       '// Part 1',
       '// Part 2',
       '// Part 3',
     ]
   );
 });
+
+function assembleLinesForFirstSnippet(md: string): Array<string> {
+  const { entities, idToSnippet, idToLineMod } = parseMarkdown(md);
+  const snippet = entities[0];
+  assertTrue(snippet instanceof SequenceSnippet);
+  const cliState = {
+    ...createTestCliState(),
+    idToSnippet,
+    idToLineMod,
+  };
+  const config = new Config();
+  return assembleLines(cliState, config, snippet);
+}

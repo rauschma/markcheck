@@ -6,7 +6,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "marktest": "./dist/src/core/marktest.js"
+    "marktest": "./dist/src/marktest.js"
   },
   "imports": {
     "#package_json": "./package.json",
@@ -16,10 +16,10 @@
     "build": "npm run clean && tsc && npm run chmod",
     "watch": "tsc --watch",
     "clean": "shx rm -rf ./dist/*",
-    "chmod": "chmod u+x ./dist/src/core/marktest.js",
+    "chmod": "chmod u+x ./dist/src/marktest.js",
     "\n========== Testing ==========": "",
-    "test": "node --test --enable-source-maps",
-    "testall": "node --test --enable-source-maps \"./dist/**/*_test.js\"",
+    "test": "mocha --enable-source-maps --ui qunit",
+    "testall": "mocha --enable-source-maps --ui qunit \"./dist/**/*_test.js\"",
     "circular": "npx madge --circular src/core/marktest.ts"
   },
   "dependencies": {
@@ -27,12 +27,14 @@
     "diff": "^5.2.0",
     "json5": "^2.2.3",
     "markdown-it": "^14.0.0",
+    "mocha": "^10.3.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/diff": "^5.0.9",
     "@types/json5": "^2.2.0",
     "@types/markdown-it": "^13.0.7",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^20.11.19",
     "shx": "^0.3.4"
   }

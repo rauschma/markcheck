@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import { contextLineNumber } from '../util/errors.js';
 import { Config } from './config.js';
 

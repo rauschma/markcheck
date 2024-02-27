@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import { parseExternalSpecs, type ExternalSpec } from './directive.js';
 
 test('parseExternalSpecs', () => {
