@@ -184,6 +184,10 @@ export const GRINNING_FACE = '😀';
 
 ### Comment-only (“invisible”) snippets via `body:`
 
+Sometimes readers should not see how a file is set up or that the output is checked.
+
+Setting up an external file:
+
 ``````md
 <!--marktest write="some-file.txt" body:
 Content of some-file.txt
@@ -196,6 +200,19 @@ assert.equal(
   'Content of some-file.txt'
 );
 ```
+``````
+
+Checking output:
+
+``````md
+<!--marktest stdout="output-how-are-you"-->
+```js
+console.log('How are you?');
+```
+
+<!--marktest id="output-how-are-you" body:
+How are you?
+-->
 ``````
 
 ### Asynchronous code and hiding test code via ⎡half-brackets⎤

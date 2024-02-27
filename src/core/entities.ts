@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import { InternalError, UserError, type LineNumber } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -265,12 +265,11 @@ export class SingleSnippet extends Snippet {
   }
   static createClosedFromBodyDirective(directive: Directive): SingleSnippet {
     const openSnippet = SingleSnippet.createOpen(directive);
-    const lang = openSnippet.#lang;
+    let lang = openSnippet.#lang;
     if (lang === null) {
-      throw new UserError(
-        `Body directive must have either attribute ${ATTR_KEY_LANG} or attribute ${ATTR_KEY_WRITE}`,
-        { lineNumber: directive.lineNumber }
-      );
+      // Body directive has neither attribute `lang` nor attribute `write`.
+      // Assign a default. Use case: Checking stdout or stderr.
+      lang = LANG_KEY_EMPTY;
     }
     return openSnippet.closeWithBody(lang, directive.body);
   }

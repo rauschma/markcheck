@@ -11,12 +11,12 @@ assert.equal(
 
 ### Checking standard output via `stdout`
 
-<!--marktest stdout="output"-->
+<!--marktest stdout="output-hello"-->
 ```js
 console.log('Hello!');
 ```
 
-<!--marktest id="output"-->
+<!--marktest id="output-hello"-->
 ```
 Hello!
 ```
@@ -103,6 +103,8 @@ export const GRINNING_FACE = '😀';
 
 ### Comment-only (“invisible”) snippets via `body:`
 
+Setting up an external file:
+
 <!--marktest write="some-file.txt" body:
 Content of some-file.txt
 -->
@@ -114,6 +116,17 @@ assert.equal(
   'Content of some-file.txt'
 );
 ```
+
+Checking output:
+
+<!--marktest stdout="output-how-are-you"-->
+```js
+console.log('How are you?');
+```
+
+<!--marktest id="output-how-are-you" body:
+How are you?
+-->
 
 ### Asynchronous code and hiding test code via ⎡half-brackets⎤
 
