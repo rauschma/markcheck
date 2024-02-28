@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import { InternalError, UserError, type LineNumber } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -31,11 +31,13 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     case BODY_LABEL_AFTER:
     case BODY_LABEL_AROUND:
     case null: {
-      // Either an open snippet or a LineMod
-      const snippet = SingleSnippet.createOpen(directive);
       if (directive.bodyLabel !== null) {
+        // Either:
+        // - LineMod (global or applicable)
+        // - Open snippet with local LineMod
         const each = directive.getString(ATTR_KEY_EACH);
         if (each) {
+          // Global LineMod
           directive.checkAttributes(GLOBAL_LINE_MOD_ATTRIBUTES);
           return new LineMod(directive, {
             tag: 'LineModKindGlobal',
@@ -44,18 +46,25 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         }
         const id = directive.getString(ATTR_KEY_ID);
         if (id) {
+          // Applicable LineMod
           directive.checkAttributes(APPLICABLE_LINE_MOD_ATTRIBUTES);
           return new LineMod(directive, {
             tag: 'LineModKindApplicable',
             id,
           });
         }
+        // Open snippet with local LineMod
         directive.checkAttributes(SNIPPET_ATTRIBUTES);
+        const snippet = SingleSnippet.createOpen(directive);
         snippet.lineMod = new LineMod(directive, {
           tag: 'LineModKindLocal',
         });
+        return snippet;
+      } else {
+        // Open snippet
+        directive.checkAttributes(SNIPPET_ATTRIBUTES);
+        return SingleSnippet.createOpen(directive);
       }
-      return snippet;
     }
 
     default: {
@@ -189,6 +198,10 @@ export class SingleSnippet extends Snippet {
     snippet.id = directive.getString(ATTR_KEY_ID) ?? null;
     snippet.#applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER) ?? null;
     snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER) ?? null;
+    const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
+    if (ignoreLinesStr) {
+      snippet.#ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
+    }
 
     { // fileName
       const write = directive.getString(ATTR_KEY_WRITE);
@@ -282,6 +295,7 @@ export class SingleSnippet extends Snippet {
   lineMod: null | LineMod = null;
   #applyInnerId: null | string = null;
   applyOuterId: null | string = null;
+  #ignoreLines = new Set<number>();
   #fileName: null | string = null;
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
@@ -410,7 +424,9 @@ export class SingleSnippet extends Snippet {
     if (this.lineMod) {
       this.lineMod.pushBeforeLines(lines);
     }
-    let body = this.body;
+    let body = this.body.filter(
+      (_line, index) => !this.#ignoreLines.has(index+1)
+    );
     const translator = this.#getXTranslator(config);
     if (translator) {
       body = translator.translate(this.lineNumber, body);

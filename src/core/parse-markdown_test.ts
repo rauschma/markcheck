@@ -1,8 +1,11 @@
 import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
+import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import { LineMod, snippetJson } from './entities.js';
 import { extractCommentContent, parseMarkdown } from './parse-markdown.js';
+
+createSuite(import.meta.url);
 
 test('parseMarkdown', () => {
   const url = new URL(import.meta.resolve('#demo/demo-javascript.md'));

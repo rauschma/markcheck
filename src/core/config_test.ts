@@ -1,6 +1,9 @@
+import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
 import { contextLineNumber } from '../util/errors.js';
 import { Config } from './config.js';
+
+createSuite(import.meta.url);
 
 test('config.toJson()', () => {
   const json = new Config().toJson();

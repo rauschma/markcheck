@@ -126,6 +126,7 @@ These attributes also affect visitation:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
   * `applyInner="id"`: applies an applicable line mod to the core snippet (vs. included snippets or other sequence members)
   * `applyOuter="id"`: applies an applicable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
+  * `ignoreLines="1, 3-5, 7"`: omits lines. The range includes the start and the end – i.e.: `1-3` is equivalent to `1,2,3`.
 * Writing and referring to files:
   * `write`
   * `writeAndRun`
@@ -141,6 +142,10 @@ These attributes also affect visitation:
 ### Global line mods
 
 * `each="lang-name"`
+
+### Applicable line mods
+
+* `id="my-id"`
 
 
 

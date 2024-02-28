@@ -18,8 +18,8 @@
     "clean": "shx rm -rf ./dist/*",
     "chmod": "chmod u+x ./dist/src/marktest.js",
     "\n========== Testing ==========": "",
-    "test": "mocha --enable-source-maps --ui qunit",
-    "testall": "mocha --enable-source-maps --ui qunit \"./dist/**/*_test.js\"",
+    "test": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning",
+    "testall": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
     "circular": "npx madge --circular src/core/marktest.ts"
   },
   "dependencies": {

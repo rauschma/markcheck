@@ -1,5 +1,8 @@
+import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
 import { nodeReplToJs } from './repl-to-js-translator.js';
+
+createSuite(import.meta.url);
 
 test('nodeReplToJs.translate', () => {
   assert.deepEqual(

@@ -9,12 +9,12 @@
   * They have information such as the line number!
 * CLI option: stop after first error (so that files can be examined).
 * JSON schema for config files
+* Per file (and in summary?): How many snippets were run?
 
 ## Attributes
 
 * Attribute: expect exit code.
   * Use case: There were errors, but we don’t want to check stderr, only stdout.
-* Attribute `ignoreLine="1,2"`?
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
 * How to check only part of stdout/stderr?
 

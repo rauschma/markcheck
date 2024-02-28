@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-import type { Output } from '../src/core/run-snippets.js';
+import { outputIgnored } from '../src/core/run-snippets.js';
 const { FileStatus, LogLevel } = await import('../src/core/entities.js');
 const { parseMarkdown } = await import('../src/core/parse-markdown.js');
 const { runFile } = await import('../src/core/run-snippets.js');
@@ -72,16 +72,8 @@ test('Assemble lines with line mods', () => {
 
   const pmr = parseMarkdown(readme);
   const interceptedShellCommands = new Array<Array<string>>();
-  const out: Output = {
-    write: function (_str: string): void {
-      // ignore
-    },
-    writeLine: function (_str?: string): void {
-      // ignore
-    }
-  };
   assert.equal(
-    runFile(out, LogLevel.Normal, '/tmp/markdown/readme.md', pmr, interceptedShellCommands),
+    runFile(outputIgnored(), LogLevel.Normal, '/tmp/markdown/readme.md', pmr, interceptedShellCommands),
     FileStatus.Success
   );
   // Per file: config lines, global line mods

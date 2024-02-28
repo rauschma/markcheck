@@ -16,13 +16,15 @@ const MARKTEST_MARKER = 'marktest';
 
 //========== Attribute keys ==========
 
+export const ATTR_KEY_ID = 'id';
+
 //----- Assembling lines -----
 
-export const ATTR_KEY_ID = 'id';
 export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
 export const ATTR_KEY_APPLY_INNER = 'applyInner';
 export const ATTR_KEY_APPLY_OUTER = 'applyOuter';
+export const ATTR_KEY_IGNORE_LINES = 'ignoreLines';
 
 //----- Writing and referring to files -----
 
@@ -132,6 +134,7 @@ export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrV
   [ATTR_KEY_INCLUDE, AttrValue.String],
   [ATTR_KEY_APPLY_INNER, AttrValue.String],
   [ATTR_KEY_APPLY_OUTER, AttrValue.String],
+  [ATTR_KEY_IGNORE_LINES, AttrValue.String],
   //
   [ATTR_KEY_WRITE, AttrValue.String],
   [ATTR_KEY_WRITE_AND_RUN, AttrValue.String],
@@ -280,4 +283,41 @@ export function parseSequenceNumber(str: string): null | SequenceNumber {
     return null;
   }
   return new SequenceNumber(pos, total);
+}
+
+//========== Line numbers ==========
+
+const RE_RANGE = /^([0-9]+)-([0-9]+)$/;
+const RE_NUMBER = /^[0-9]+$/;
+export function parseLineNumberSet(directiveLineNumber: number, str: string): Set<number> {
+  const result = new Set<number>();
+  const parts = str.split(',').map(s => s.trim());
+  for (const part of parts) {
+    const match = RE_RANGE.exec(part);
+    if (match) {
+      const start = Number(match[1]);
+      assertTrue(!Number.isNaN(start));
+      const end = Number(match[2]);
+      assertTrue(!Number.isNaN(end));
+      if (!(start <= end)) {
+        throw new UserError(
+          `Illegal range: ${stringify(part)}`,
+          { lineNumber: directiveLineNumber }
+        );
+      }
+      for (let i = start; i <= end; i++) {
+        result.add(i);
+      }
+    } else if (RE_NUMBER.test(part)) {
+      const lineNumber = Number(part);
+      assertTrue(!Number.isNaN(lineNumber));
+      result.add(lineNumber);
+    } else {
+      throw new UserError(
+        `Illegal format for line numbers: ${stringify(str)}`,
+        { lineNumber: directiveLineNumber }
+      );
+    }
+  }
+  return result;
 }

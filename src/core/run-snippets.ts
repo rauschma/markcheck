@@ -36,7 +36,13 @@ export type Output = {
   writeLine(str?: string): void;
 };
 
-export function createOutput(writeStream: tty.WriteStream): Output {
+export function outputIgnored(): Output {
+  return {
+    write(_str: string): void { },
+    writeLine(_str = ''): void { },
+  };
+}
+export function outputFromWriteStream(writeStream: tty.WriteStream): Output {
   return {
     write(str: string): void {
       writeStream.write(str);
@@ -454,7 +460,7 @@ export function cliEntry() {
     const text = fs.readFileSync(absFilePath, 'utf-8');
     const pmr = parseMarkdown(text);
     const logLevel = (args.values.verbose ? LogLevel.Verbose : LogLevel.Normal);
-    const out = createOutput(process.stdout);
+    const out = outputFromWriteStream(process.stdout);
     const fileStatus = runFile(out, logLevel, absFilePath, pmr);
     if (fileStatus === FileStatus.Failure) {
       failedFiles.push(relPath(absFilePath));
