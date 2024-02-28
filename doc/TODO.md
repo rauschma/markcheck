@@ -12,14 +12,15 @@
 
 ## Attributes
 
-* Attribute: expect exit code
+* Attribute: expect exit code.
+  * Use case: There were errors, but we don’t want to check stderr, only stdout.
 * Attribute `ignoreLine="1,2"`?
 * Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
 * How to check only part of stdout/stderr?
 
 ## Warnings
 
-Don’t change exit code? Mention in summary?
+They don’t affect exit code? Mention in summary?
 
 * `only` mode (per file)
 * Skipped snippets

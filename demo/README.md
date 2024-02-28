@@ -9,7 +9,7 @@ The following two files have dependencies (all other files can be tested without
 * `demo-typescript.md`:
   * One npm package via [`marktest-data/package.json`](marktest-data/package.json)
   * Two npm packages that are installed automatically via `npx`:
-    * [`ts-expect-error`](https://github.com/rauschma/ts-expect-error)
+    * [`expect-error`](https://github.com/rauschma/expect-error)
     * [`tsx`](https://github.com/privatenumber/tsx)
 
 To install the npm packages:

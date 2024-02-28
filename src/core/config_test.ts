@@ -39,7 +39,7 @@ test('config.toJson()', () => {
           "commands": [
             [
               "npx",
-              "ts-expect-error",
+              "@rauschma/expect-error",
               "$ALL_FILE_NAMES"
             ],
             [

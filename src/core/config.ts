@@ -112,7 +112,7 @@ export class Config {
         kind: 'LangDefCommand',
         defaultFileName: 'main.ts',
         commands: [
-          ["npx", "ts-expect-error", "--report-errors", CMD_VAR_ALL_FILE_NAMES],
+          ["npx", "@rauschma/expect-error", "--report-errors", CMD_VAR_ALL_FILE_NAMES],
           ["npx", "tsx", CMD_VAR_FILE_NAME],
         ],
         beforeLines: [

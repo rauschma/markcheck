@@ -4,7 +4,7 @@ By default, Marktest uses the following tools (which must be installed – e.g. 
 
 * Running TypeScript: [CLI tool `tsx`](https://github.com/privatenumber/tsx)
   * Does not perform any static checks!
-* Checking `@ts-expect-error` and performing static checks (option `--report-errors`): [CLI tool `ts-expect-error`](https://github.com/rauschma/ts-expect-error)
+* Checking `@ts-expect-error` and performing static checks (option `--report-errors`): [CLI tool `expect-error`](https://github.com/rauschma/expect-error)
 * Comparing types and checking the types of values: [library `ts-expect`](https://github.com/TypeStrong/ts-expect)
 
 When it comes to TypeScript examples in documentation, there are three important kinds of static checks that are useful (in addition to running the code as JavaScript to catch runtime errors).
