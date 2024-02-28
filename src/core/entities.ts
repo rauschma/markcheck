@@ -11,6 +11,15 @@ import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OU
 const { stringify } = JSON;
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
+export function getUserErrorContext(entity: MarktestEntity): UserErrorContext {
+  if (entity instanceof ConfigMod || entity instanceof Snippet || entity instanceof Heading) {
+    return contextLineNumber(entity.lineNumber);
+  } else if (entity instanceof LineMod) {
+    return entity.context;
+  } else {
+    throw new UnsupportedValueError(entity);
+  }
+}
 
 //#################### directiveToEntity() ####################
 
@@ -797,7 +806,7 @@ export class ConfigMod {
 //#################### Heading ####################
 
 export class Heading {
-  constructor(public content: string) { }
+  constructor(public lineNumber: number, public content: string) { }
   toJson(): JsonValue {
     return {
       content: this.content,

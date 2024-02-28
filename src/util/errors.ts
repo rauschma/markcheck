@@ -1,3 +1,4 @@
+import { UnsupportedValueError } from "@rauschma/helpers/ts/error.js";
 import { AssertionError } from "node:assert";
 
 export class InternalError extends Error {
@@ -7,6 +8,17 @@ export class InternalError extends Error {
 export type LineNumber = number;
 
 export type UserErrorContext = UserErrorContextLineNumber | UserErrorContextDescription;
+export function describeUserErrorContext(context: UserErrorContext): string {
+  switch (context.kind) {
+    case 'UserErrorContextDescription':
+      return context.description;
+    case 'UserErrorContextLineNumber':
+      return `line ${context.lineNumber}`;
+    default:
+      throw new UnsupportedValueError(context);
+  }
+}
+
 export type UserErrorContextLineNumber = {
   kind: 'UserErrorContextLineNumber',
   lineNumber: number,

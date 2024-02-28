@@ -8,13 +8,6 @@
 * JSON schema for config files
 * Per file (and in summary?): How many snippets were run?
 * Make `around` separator configurable?
-* Exceptions:
-  * Catch arbitrary exceptions per snippet and show line number.
-    * Rethrow with cause?
-  * Catch and report UserErrors?
-    * There may be no need to stop processing at this point!
-    * Per file? Per snippet?
-      * They do contain the line number! Thus, reporting is less important than for arbitrary exceptions.
 * Predefined LineMods such as these?
 
 <!--marktest id="asyncTest" around:

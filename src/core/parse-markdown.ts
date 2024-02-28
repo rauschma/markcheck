@@ -1,9 +1,9 @@
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import markdownit from 'markdown-it';
-import { UserError } from '../util/errors.js';
+import { UserError, describeUserErrorContext } from '../util/errors.js';
 import { Directive } from './directive.js';
-import { ConfigMod, Heading, LineMod, SequenceSnippet, SingleSnippet, directiveToEntity, type MarktestEntity, Snippet } from './entities.js';
+import { ConfigMod, Heading, LineMod, SequenceSnippet, SingleSnippet, Snippet, directiveToEntity, type MarktestEntity } from './entities.js';
 
 export type ParseMarkdownResult = {
   entities: Array<MarktestEntity>,
@@ -17,7 +17,7 @@ export function parseMarkdown(text: string): ParseMarkdownResult {
 
   let openSingleSnippet: null | SingleSnippet = null;
   let openSequence: null | SequenceSnippet = null;
-  let prevHeading: null | string = null;
+  let prevHeading: null | Heading = null;
   let prevType: null | string = null
 
   // Look up tokens via “debug”: https://markdown-it.github.io
@@ -76,7 +76,9 @@ export function parseMarkdown(text: string): ParseMarkdownResult {
           ));
         }
       } else if (token.type === 'inline' && prevType === 'heading_open') {
-        prevHeading = token.content;
+        assertNonNullable(token.map);
+        const lineNumber = token.map[0] + 1;
+        prevHeading = new Heading(lineNumber, token.content);
       }
     } finally {
       prevType = token.type;
@@ -99,16 +101,16 @@ export function parseMarkdown(text: string): ParseMarkdownResult {
   };
 
   function pushSingleSnippet(
-    prevHeading: null | string, openSequence: null | SequenceSnippet, snippet: SingleSnippet
+    prevHeading: null | Heading, openSequence: null | SequenceSnippet, snippet: SingleSnippet
   ): {
-    prevHeading: null | string,
+    prevHeading: null | Heading,
     openSequence: null | SequenceSnippet,
   } {
     // In the result, prevHeading is always `null` – so that we show each
     // heading at most once.
 
     if (prevHeading) {
-      result.push(new Heading(prevHeading));
+      result.push(prevHeading);
     }
 
     assertTrue(snippet.isClosed);
@@ -167,9 +169,10 @@ function createIdToLineMod(entities: Array<MarktestEntity>): Map<string, LineMod
     if (entity instanceof LineMod && entity.id) {
       const other = idToLineMod.get(entity.id);
       if (other) {
+        const description = describeUserErrorContext(other.context);
         throw new UserError(
-          `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
-          { lineNumber: entity.lineNumber }
+          `Duplicate id ${JSON.stringify(entity)} (other usage is ${description})`,
+          { context: entity.context }
         );
       }
       idToLineMod.set(entity.id, entity);

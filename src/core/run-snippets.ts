@@ -11,11 +11,11 @@ import * as path from 'node:path';
 import * as tty from 'node:tty';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
-import { UserError, contextDescription, contextLineNumber } from '../util/errors.js';
+import { UserError, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
 import { containedIn, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_CONTAINED_IN, ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity } from './entities.js';
+import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, getUserErrorContext, type CliState, type MarktestEntity } from './entities.js';
 import { parseMarkdown, type ParseMarkdownResult } from './parse-markdown.js';
 
 //@ts-expect-error: Module '#package_json' has no default export.
@@ -97,13 +97,20 @@ export function runFile(out: Output, logLevel: LogLevel, absFilePath: string, pm
 
   let prevHeading: null | Heading = null;
   for (const entity of pmr.entities) {
-    const entityKind = handleOneEntity(out, cliState, config, prevHeading, entity);
-    if (entity instanceof Heading) {
-      prevHeading = entity; // update
-    } else if (entityKind === EntityKind.Runnable) {
-      // If an entity was run, it printed the most recent heading,
-      // therefore “using it up”.
-      prevHeading = null; // clear
+    try {
+      const entityKind = handleOneEntity(out, cliState, config, prevHeading, entity);
+      if (entity instanceof Heading) {
+        prevHeading = entity; // update
+      } else if (entityKind === EntityKind.Runnable) {
+        // If an entity was run, it printed the most recent heading,
+        // therefore “using it up”.
+        prevHeading = null; // clear
+      }
+    } catch (err) {
+      const description = describeUserErrorContext(
+        getUserErrorContext(entity)
+      );
+      throw new Error(`Error in entity (${description})`, {cause: err});
     }
   }
 
@@ -208,8 +215,12 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
 
   //----- Write files (often in preparation for running) -----
 
+  // At this point, the file may be written or run or both or neither
   const lines = assembleLines(cliState, config, snippet);
-  writeFiles(out, cliState, config, snippet, langDef, lines);
+  const fileName = snippet.getFileName(langDef);
+  if (fileName) {
+    writeFiles(out, cliState, config, snippet, fileName, lines);
+  }
 
   //----- Run the snippet’s file -----
 
@@ -224,7 +235,6 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
   }
 
   assertTrue(langDef.kind === 'LangDefCommand');
-  const fileName = snippet.getFileName(langDef);
   if (fileName === null) {
     throw new UserError(
       `Snippet is runnable but its language does not have a ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} nor does the snippet override the default with its own filename`,
@@ -246,9 +256,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
 
 //#################### writeFiles() ####################
 
-function writeFiles(out: Output, cliState: CliState, config: Config, snippet: Snippet, langDef: LangDef, lines: Array<string>): void {
-  const fileName = snippet.getFileName(langDef);
-  assertTrue(fileName !== null);
+function writeFiles(out: Output, cliState: CliState, config: Config, snippet: Snippet, fileName: string, lines: Array<string>): void {
   writeOneFile(out, cliState, config, fileName, lines);
 
   for (const { id, fileName } of snippet.externalSpecs) {
