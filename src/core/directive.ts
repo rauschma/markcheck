@@ -42,6 +42,7 @@ export const ATTR_KEY_INCLUDE = 'include';
 export const ATTR_KEY_APPLY_INNER = 'applyInner';
 export const ATTR_KEY_APPLY_OUTER = 'applyOuter';
 export const ATTR_KEY_IGNORE_LINES = 'ignoreLines';
+export const ATTR_KEY_SEARCH_AND_REPLACE = 'searchAndReplace';
 
 //----- Other ways of “running” a snippet -----
 
@@ -148,6 +149,7 @@ export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrV
   [ATTR_KEY_APPLY_INNER, AttrValue.String],
   [ATTR_KEY_APPLY_OUTER, AttrValue.String],
   [ATTR_KEY_IGNORE_LINES, AttrValue.String],
+  [ATTR_KEY_SEARCH_AND_REPLACE, AttrValue.String],
   //
   [ATTR_KEY_CONTAINED_IN, AttrValue.String],
   //

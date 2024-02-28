@@ -3,10 +3,10 @@ import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
-import { InternalError, UserError, type LineNumber } from '../util/errors.js';
+import { InternalError, UserError, type LineNumber, contextLineNumber } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber, SearchAndReplaceSpec } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -222,6 +222,12 @@ export class SingleSnippet extends Snippet {
       if (ignoreLinesStr) {
         snippet.#ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
       }
+      const searchAndReplaceStr = directive.getString(ATTR_KEY_SEARCH_AND_REPLACE);
+      if (searchAndReplaceStr) {
+        snippet.#searchAndReplace = SearchAndReplaceSpec.fromString(
+          contextLineNumber(directive.lineNumber), searchAndReplaceStr
+        );
+      }
 
       const sequence = directive.getString(ATTR_KEY_SEQUENCE);
       if (sequence) {
@@ -291,6 +297,7 @@ export class SingleSnippet extends Snippet {
   #applyInnerId: null | string = null;
   applyOuterId: null | string = null;
   #ignoreLines = new Set<number>();
+  #searchAndReplace: null | SearchAndReplaceSpec = null;
   containedIn: null | string = null;
   #lang: null | string = null;
   #fileName: null | string = null;
@@ -424,7 +431,13 @@ export class SingleSnippet extends Snippet {
     let body = this.body.filter(
       (_line, index) => !this.#ignoreLines.has(index + 1)
     );
-    const translator = this.#getXTranslator(config);
+    const sar = this.#searchAndReplace;
+    if (sar) {
+      body = body.map(
+        line => sar.replaceAll(line)
+      );
+    }
+    const translator = this.#getTranslator(config);
     if (translator) {
       body = translator.translate(this.lineNumber, body);
     }
@@ -437,7 +450,7 @@ export class SingleSnippet extends Snippet {
     }
   }
 
-  #getXTranslator(config: Config): undefined | Translator {
+  #getTranslator(config: Config): undefined | Translator {
     if (this.#lang) {
       const lang = config.getLang(this.#lang);
       if (lang && lang.kind === 'LangDefCommand') {

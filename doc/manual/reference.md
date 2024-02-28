@@ -131,6 +131,7 @@ These attributes also affect visitation:
   * `applyInner="id"`: applies an applicable line mod to the core snippet (vs. included snippets or other sequence members)
   * `applyOuter="id"`: applies an applicable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
   * `ignoreLines="1, 3-5, 7"`: omits lines. A range includes start and end – i.e.: `1-3` is equivalent to `1,2,3`.
+  * `searchAndReplace="/[a-z]/-/i"`
 * Other ways of “running” snippets:
   * `containedIn="filePath"`: `filePath` is either absolute or relative to the Markdown file.
 * Writing and referring to files:
