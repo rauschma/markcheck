@@ -111,6 +111,10 @@ These attributes also affect visitation:
 
 ### Code snippets
 
+* Visitation mode:
+  * `only`
+  * `skip`
+  * `neverSkip`
 * Language: `lang`
   * For body directives
   * To override defaults from code blocks and `write`
@@ -126,15 +130,13 @@ These attributes also affect visitation:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
   * `applyInner="id"`: applies an applicable line mod to the core snippet (vs. included snippets or other sequence members)
   * `applyOuter="id"`: applies an applicable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
-  * `ignoreLines="1, 3-5, 7"`: omits lines. The range includes the start and the end – i.e.: `1-3` is equivalent to `1,2,3`.
+  * `ignoreLines="1, 3-5, 7"`: omits lines. A range includes start and end – i.e.: `1-3` is equivalent to `1,2,3`.
+* Other ways of “running” snippets:
+  * `containedIn="filePath"`: `filePath` is either absolute or relative to the Markdown file.
 * Writing and referring to files:
   * `write`
   * `writeAndRun`
   * `external="id1>lib1.js, lib2.js"`
-* Visitation mode:
-  * `only`
-  * `skip`
-  * `neverSkip`
 * Checking output:
   * `stdout="id"`
   * `stderr="id"`

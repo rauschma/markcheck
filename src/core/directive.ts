@@ -1,9 +1,10 @@
 import { re } from '@rauschma/helpers/js/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertTrue } from '@rauschma/helpers/ts/type.js';
-import { InternalError, UserError, type LineNumber } from '../util/errors.js';
+import { InternalError, UserError, type LineNumber, type UserErrorContext } from '../util/errors.js';
 
 const { stringify } = JSON;
+const { raw } = String;
 
 //#################### Constants ####################
 
@@ -16,7 +17,23 @@ const MARKTEST_MARKER = 'marktest';
 
 //========== Attribute keys ==========
 
+// Used by attributes: stdout, stderr, include, applyInner, applyOuter
 export const ATTR_KEY_ID = 'id';
+
+//----- Visitation mode -----
+
+export const ATTR_KEY_ONLY = 'only';
+export const ATTR_KEY_SKIP = 'skip';
+export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
+
+//----- Language -----
+
+/**
+ * Can prevent running!
+ * - For body directives
+ * - To override defaults from code blocks and `write`
+ */
+export const ATTR_KEY_LANG = 'lang';
 
 //----- Assembling lines -----
 
@@ -25,6 +42,10 @@ export const ATTR_KEY_INCLUDE = 'include';
 export const ATTR_KEY_APPLY_INNER = 'applyInner';
 export const ATTR_KEY_APPLY_OUTER = 'applyOuter';
 export const ATTR_KEY_IGNORE_LINES = 'ignoreLines';
+
+//----- Other ways of “running” a snippet -----
+
+export const ATTR_KEY_CONTAINED_IN = 'containedIn';
 
 //----- Writing and referring to files -----
 
@@ -62,12 +83,6 @@ export function parseExternalSpecs(lineNumber: number, str: string): Array<Exter
   return specs;
 }
 
-//----- Visitation mode -----
-
-export const ATTR_KEY_ONLY = 'only';
-export const ATTR_KEY_SKIP = 'skip';
-export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
-
 //----- Checking output -----
 
 export const ATTR_KEY_STDOUT = 'stdout';
@@ -79,15 +94,6 @@ export const ATTR_KEY_STDERR = 'stderr';
 export const ATTR_KEY_EACH = 'each';
 
 // Applicable line mods have the attribute `id`
-
-//----- Language -----
-
-/**
- * Can prevent running!
- * - For body directives
- * - To override defaults from code blocks and `write`
- */
-export const ATTR_KEY_LANG = 'lang';
 
 //========== Language constants ==========
 // - Location 1: values of attribute `lang`
@@ -130,24 +136,27 @@ export type ExpectedAttributeValues = Map<string, AttrValue | RegExp>;
 
 export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
   [ATTR_KEY_ID, AttrValue.String],
+  //
+  [ATTR_KEY_ONLY, AttrValue.Valueless],
+  [ATTR_KEY_SKIP, AttrValue.Valueless],
+  [ATTR_KEY_NEVER_SKIP, AttrValue.Valueless],
+  //
+  [ATTR_KEY_LANG, RE_LANG_VALUE],
+  //
   [ATTR_KEY_SEQUENCE, AttrValue.String],
   [ATTR_KEY_INCLUDE, AttrValue.String],
   [ATTR_KEY_APPLY_INNER, AttrValue.String],
   [ATTR_KEY_APPLY_OUTER, AttrValue.String],
   [ATTR_KEY_IGNORE_LINES, AttrValue.String],
   //
+  [ATTR_KEY_CONTAINED_IN, AttrValue.String],
+  //
   [ATTR_KEY_WRITE, AttrValue.String],
   [ATTR_KEY_WRITE_AND_RUN, AttrValue.String],
   [ATTR_KEY_EXTERNAL, AttrValue.String],
   //
-  [ATTR_KEY_ONLY, AttrValue.Valueless],
-  [ATTR_KEY_SKIP, AttrValue.Valueless],
-  [ATTR_KEY_NEVER_SKIP, AttrValue.Valueless],
-  //
   [ATTR_KEY_STDOUT, AttrValue.String],
   [ATTR_KEY_STDERR, AttrValue.String],
-  //
-  [ATTR_KEY_LANG, RE_LANG_VALUE],
 ]);
 
 export const GLOBAL_LINE_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
@@ -320,4 +329,44 @@ export function parseLineNumberSet(directiveLineNumber: number, str: string): Se
     }
   }
   return result;
+}
+
+//========== SearchAndReplaceSpec ==========
+
+const RE_INNER = /(?:[^/]|\\[/])*/;
+const RE_SEARCH_AND_REPLACE = re`/^[/](${RE_INNER})[/](${RE_INNER})[/]([i])?$/`;
+
+/**
+ * Example: `"/[⎡⎤]//i"`
+ */
+export class SearchAndReplaceSpec {
+  static fromString(context: UserErrorContext, str: string): SearchAndReplaceSpec {
+    const match = RE_SEARCH_AND_REPLACE.exec(str);
+    if (!match) {
+      throw new UserError(
+        `Not a valid searchAndReplace string: ${stringify(str)}`,
+        {context}
+      );
+    }
+    const search = match[1];
+    const replace = match[2].replaceAll(raw`\/`, '/');
+    const flags = 'g' + (match[3] ?? '');
+    return new SearchAndReplaceSpec(new RegExp(search, flags), replace);
+  }
+  #search;
+  #replace;
+  private constructor(search: RegExp, replace: string) {
+    this.#search = search;
+    this.#replace = replace;
+  }
+  toString(): string {
+    // Stringification of RegExp automatically escapes slashes
+    const searchNoFlags = new RegExp(this.#search, '').toString();
+    const escapedReplace = this.#replace.replaceAll('/', String.raw`\/`);
+    const flags = this.#search.flags.slice(1); // remove 'g'
+    return searchNoFlags + escapedReplace + '/' + flags;
+  }
+  replaceAll(str: string): string {
+    return str.replaceAll(this.#search, this.#replace);
+  }
 }

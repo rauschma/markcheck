@@ -6,7 +6,7 @@ export function trimTrailingEmptyLines(lines: Array<string>): Array<string> {
 }
 
 export function getEndTrimmedLength(lines: Array<string>): number {
-  for (let i=lines.length-1; i>=0; i--) {
+  for (let i = lines.length - 1; i >= 0; i--) {
     if (!isEmptyLine(lines[i])) {
       return i + 1;
     }
@@ -16,4 +16,21 @@ export function getEndTrimmedLength(lines: Array<string>): number {
 
 export function normalizeWhitespace(str: string) {
   return str.replace(/\s+/ug, ' ');
+}
+
+export function containedIn(lines: Array<string>, container: Array<string>): boolean {
+  const lastIndex = container.length - lines.length;
+  containerLoop:
+  for (let containerIndex = 0; containerIndex <= lastIndex; containerIndex++) {
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      const containerLine = container[containerIndex+lineIndex];
+      const line = lines[lineIndex];
+      if (containerLine.trim() !== line.trim()) {
+        continue containerLoop;
+      }
+    }
+    // All lines matched
+    return true;
+  }
+  return false;
 }

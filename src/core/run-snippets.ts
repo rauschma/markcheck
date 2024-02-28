@@ -12,7 +12,7 @@ import * as tty from 'node:tty';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError, contextDescription, contextLineNumber } from '../util/errors.js';
-import { trimTrailingEmptyLines } from '../util/string.js';
+import { containedIn, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
 import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity } from './entities.js';
@@ -84,6 +84,7 @@ export function runFile(out: Output, logLevel: LogLevel, absFilePath: string, pm
   }
 
   const cliState: CliState = {
+    absFilePath,
     tmpDir,
     logLevel,
     idToSnippet: pmr.idToSnippet,
@@ -182,7 +183,21 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     );
   }
 
-  writeFiles(out, cliState, config, snippet, langDef);
+  const lines = assembleLines(cliState, config, snippet);
+
+  if (snippet.containedIn) {
+    const pathName = path.resolve(cliState.absFilePath, '..', snippet.containedIn);
+    const container = splitLinesExclEol(fs.readFileSync(pathName, 'utf-8'));
+    if (!containedIn(lines, container)) {
+      throw new UserError(
+        `Content of snippet is not contained in ${stringify(pathName)}`,
+        {lineNumber: snippet.lineNumber}
+      );
+    }
+    return EntityKind.Runnable;
+  }
+
+  writeFiles(out, cliState, config, snippet, langDef, lines);
 
   if (langDef.kind === 'LangDefErrorIfRun') {
     throw new UserError(
@@ -217,12 +232,10 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
 
 //#################### writeFiles() ####################
 
-function writeFiles(out: Output, cliState: CliState, config: Config, snippet: Snippet, langDef: LangDef): void {
+function writeFiles(out: Output, cliState: CliState, config: Config, snippet: Snippet, langDef: LangDef, lines: Array<string>): void {
   const fileName = snippet.getFileName(langDef);
-  if (fileName) {
-    const lines = assembleLines(cliState, config, snippet);
-    writeOneFile(out, cliState, config, fileName, lines);
-  }
+  assertTrue(fileName !== null);
+  writeOneFile(out, cliState, config, fileName, lines);
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;

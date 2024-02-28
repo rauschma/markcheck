@@ -1,5 +1,6 @@
 # Todo
 
+* Allow escaped quotes in attribute values.
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
@@ -15,7 +16,6 @@
 
 * Attribute: expect exit code.
   * Use case: There were errors, but we don’t want to check stderr, only stdout.
-* Check that the text of a snippet appears in another file (ensures that excerpts of file don’t diverge).
 * How to check only part of stdout/stderr?
 
 ## Warnings

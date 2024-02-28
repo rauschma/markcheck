@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import { InternalError, UserError, type LineNumber } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -145,6 +145,7 @@ export enum FileStatus {
 }
 
 export type CliState = {
+  absFilePath: string,
   tmpDir: string,
   logLevel: LogLevel,
   idToSnippet: Map<string, Snippet>,
@@ -155,29 +156,16 @@ export type CliState = {
   interceptedShellCommands: null | Array<Array<string>>
 };
 
-/** Used for testing */
-export function createTestCliState(): CliState {
-  return {
-    tmpDir: '/tmp/marktest',
-    logLevel: LogLevel.Normal,
-    idToSnippet: new Map(),
-    idToLineMod: new Map(),
-    globalVisitationMode: GlobalVisitationMode.Normal,
-    globalLineMods: new Map(),
-    fileStatus: FileStatus.Success,
-    interceptedShellCommands: null,
-  };
-}
-
 //#################### Snippet ####################
 
 export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
+  abstract get visitationMode(): VisitationMode;
   abstract get lang(): string;
   abstract get applyOuterId(): null | string;
+  abstract get containedIn(): null | string;
   abstract get externalSpecs(): Array<ExternalSpec>;
-  abstract get visitationMode(): VisitationMode;
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
@@ -196,50 +184,6 @@ export class SingleSnippet extends Snippet {
     const snippet = new SingleSnippet(directive.lineNumber);
 
     snippet.id = directive.getString(ATTR_KEY_ID) ?? null;
-    snippet.#applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER) ?? null;
-    snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER) ?? null;
-    const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
-    if (ignoreLinesStr) {
-      snippet.#ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
-    }
-
-    { // fileName
-      const write = directive.getString(ATTR_KEY_WRITE);
-      if (write) {
-        snippet.#fileName = write;
-      }
-      const writeAndRun = directive.getString(ATTR_KEY_WRITE_AND_RUN);
-      if (writeAndRun) {
-        snippet.#fileName = writeAndRun;
-      }
-    }
-
-    { // lang
-      if (directive.hasAttribute(ATTR_KEY_WRITE)) {
-        // Default value if attribute `write` exists. Override via
-        // attribute `lang`.
-        snippet.#lang = LANG_NEVER_RUN;
-      }
-      const lang = directive.getString(ATTR_KEY_LANG);
-      if (lang) {
-        snippet.#lang = lang;
-      }
-    }
-
-    const sequence = directive.getString(ATTR_KEY_SEQUENCE);
-    if (sequence) {
-      snippet.sequenceNumber = parseSequenceNumber(sequence);
-    }
-
-    const include = directive.getString(ATTR_KEY_INCLUDE);
-    if (include) {
-      snippet.includeIds = include.split(/ *, */);
-    }
-
-    const external = directive.getString(ATTR_KEY_EXTERNAL);
-    if (external) {
-      snippet.externalSpecs = parseExternalSpecs(directive.lineNumber, external);
-    }
 
     { // visitationMode
       if (directive.hasAttribute(ATTR_KEY_ID)) {
@@ -271,6 +215,58 @@ export class SingleSnippet extends Snippet {
       }
     }
 
+    { // Assembling lines
+      snippet.#applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER) ?? null;
+      snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER) ?? null;
+      const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
+      if (ignoreLinesStr) {
+        snippet.#ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
+      }
+
+      const sequence = directive.getString(ATTR_KEY_SEQUENCE);
+      if (sequence) {
+        snippet.sequenceNumber = parseSequenceNumber(sequence);
+      }
+
+      const include = directive.getString(ATTR_KEY_INCLUDE);
+      if (include) {
+        snippet.includeIds = include.split(/ *, */);
+      }
+    }
+
+    const containedIn = directive.getString(ATTR_KEY_CONTAINED_IN);
+    if (containedIn) {
+      snippet.containedIn = containedIn;
+    }
+
+    { // lang
+      if (directive.hasAttribute(ATTR_KEY_WRITE)) {
+        // Default value if attribute `write` exists. Override via
+        // attribute `lang`.
+        snippet.#lang = LANG_NEVER_RUN;
+      }
+      const lang = directive.getString(ATTR_KEY_LANG);
+      if (lang) {
+        snippet.#lang = lang;
+      }
+    }
+
+    { // fileName
+      const write = directive.getString(ATTR_KEY_WRITE);
+      if (write) {
+        snippet.#fileName = write;
+      }
+      const writeAndRun = directive.getString(ATTR_KEY_WRITE_AND_RUN);
+      if (writeAndRun) {
+        snippet.#fileName = writeAndRun;
+      }
+    }
+
+    const external = directive.getString(ATTR_KEY_EXTERNAL);
+    if (external) {
+      snippet.externalSpecs = parseExternalSpecs(directive.lineNumber, external);
+    }
+
     snippet.stdoutId = directive.getString(ATTR_KEY_STDOUT) ?? null;
     snippet.stderrId = directive.getString(ATTR_KEY_STDERR) ?? null;
 
@@ -290,12 +286,13 @@ export class SingleSnippet extends Snippet {
     return new SingleSnippet(lineNumber).closeWithBody(lang, lines);
   }
   lineNumber: number;
-  #lang: null | string = null;
   id: null | string = null;
   lineMod: null | LineMod = null;
   #applyInnerId: null | string = null;
   applyOuterId: null | string = null;
   #ignoreLines = new Set<number>();
+  containedIn: null | string = null;
+  #lang: null | string = null;
   #fileName: null | string = null;
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
@@ -425,7 +422,7 @@ export class SingleSnippet extends Snippet {
       this.lineMod.pushBeforeLines(lines);
     }
     let body = this.body.filter(
-      (_line, index) => !this.#ignoreLines.has(index+1)
+      (_line, index) => !this.#ignoreLines.has(index + 1)
     );
     const translator = this.#getXTranslator(config);
     if (translator) {
@@ -537,32 +534,35 @@ export class SequenceSnippet extends Snippet {
   override get id(): null | string {
     return this.firstElement.id;
   }
+  override get visitationMode(): VisitationMode {
+    return this.firstElement.visitationMode;
+  }
+  override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
+    return this.firstElement.isVisited(globalVisitationMode);
+  }
   override get lang(): string {
     return this.firstElement.lang;
   }
+  override get applyOuterId(): null | string {
+    return this.firstElement.applyOuterId;
+  }
+  override get containedIn(): null | string {
+    return this.firstElement.containedIn;
+  }
+  override getFileName(langDef: LangDef): null | string {
+    return this.firstElement.getFileName(langDef);
+  }
+  override getAllFileNames(langDef: LangDefCommand): Array<string> {
+    return this.firstElement.getAllFileNames(langDef);
+  }
   override get externalSpecs(): Array<ExternalSpec> {
     return this.firstElement.externalSpecs;
-  }
-  override get visitationMode(): VisitationMode {
-    return this.firstElement.visitationMode;
   }
   override get stdoutId(): null | string {
     return this.firstElement.stdoutId;
   }
   override get stderrId(): null | string {
     return this.firstElement.stderrId;
-  }
-  override get applyOuterId(): null | string {
-    return this.firstElement.applyOuterId;
-  }
-  override getFileName(langDef: LangDef): null | string {
-    return this.firstElement.getFileName(langDef);
-  }
-  override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
-    return this.firstElement.isVisited(globalVisitationMode);
-  }
-  override getAllFileNames(langDef: LangDefCommand): Array<string> {
-    return this.firstElement.getAllFileNames(langDef);
   }
   toJson(): JsonValue {
     return this.elements.map(e => e.toJson());
