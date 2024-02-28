@@ -25,16 +25,16 @@ test('Assemble lines with line mods', () => {
     •••
     // Local line mod AFTER
     -->
-    ◆◆◆js
+    ▲▲▲js
     console.log('Main snippet');
-    ◆◆◆
+    ▲▲▲
 
     <!--marktest id="other"-->
-    ◆◆◆js
+    ▲▲▲js
     //
     console.log('Included snippet');
     //
-    ◆◆◆
+    ▲▲▲
     
     <!--marktest id="inner-line-mod" around:
     // Inner line mod BEFORE
@@ -46,7 +46,7 @@ test('Assemble lines with line mods', () => {
     •••
     // Outer line mod AFTER
     -->
-  `.replaceAll('◆', '`');
+  `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/marktest-data': {
       'marktest-config.jsonc': outdent`

@@ -14,19 +14,19 @@ createSuite(import.meta.url);
 
 test('ignoreLines: success', () => {
   const readme = outdent`
-    <!--marktest containedIn="other.txt"-->
-    ◆◆◆
-    green
-    blue
-    ◆◆◆
-  `.replaceAll('◆', '`');
+    <!--marktest containedIn="other.js"-->
+    ▲▲▲js
+    // green
+    // blue
+    ▲▲▲
+  `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/marktest-data': {},
     '/tmp/markdown/readme.md': readme,
-    '/tmp/markdown/other.txt': outdent`
-      red
-      green
-      blue
+    '/tmp/markdown/other.js': outdent`
+      // red
+      // green
+      // blue
     `,
   });
 
@@ -45,18 +45,18 @@ test('ignoreLines: success', () => {
 
 test('ignoreLines: failure', () => {
   const readme = outdent`
-    <!--marktest containedIn="other.txt"-->
-    ◆◆◆
-    black
-    ◆◆◆
-  `.replaceAll('◆', '`');
+    <!--marktest containedIn="other.js"-->
+    ▲▲▲js
+    // black
+    ▲▲▲
+  `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/marktest-data': {},
     '/tmp/markdown/readme.md': readme,
-    '/tmp/markdown/other.txt': outdent`
-      red
-      green
-      blue
+    '/tmp/markdown/other.js': outdent`
+      // red
+      // green
+      // blue
     `,
   });
 
@@ -65,7 +65,7 @@ test('ignoreLines: failure', () => {
     () => runFile(outputIgnored(), LogLevel.Normal, '/tmp/markdown/readme.md', pmr, []),
     {
       name: 'UserError',
-      message: 'Content of snippet is not contained in "/tmp/markdown/other.txt"',
+      message: 'Content of snippet is not contained in "/tmp/markdown/other.js"',
     }
   );
 });

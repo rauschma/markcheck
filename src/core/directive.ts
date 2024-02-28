@@ -20,11 +20,12 @@ const MARKTEST_MARKER = 'marktest';
 // Used by attributes: stdout, stderr, include, applyInner, applyOuter
 export const ATTR_KEY_ID = 'id';
 
-//----- Visitation mode -----
+//----- Explicit visitation and running mode -----
 
 export const ATTR_KEY_ONLY = 'only';
 export const ATTR_KEY_SKIP = 'skip';
 export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
+export const ATTR_KEY_NEVER_RUN = 'neverRun';
 
 //----- Language -----
 
@@ -37,6 +38,7 @@ export const ATTR_KEY_LANG = 'lang';
 
 //----- Assembling lines -----
 
+export const ATTR_KEY_NO_OUTER_LINE_MODS = 'noOuterLineMods';
 export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
 export const ATTR_KEY_APPLY_INNER = 'applyInner';
@@ -44,7 +46,7 @@ export const ATTR_KEY_APPLY_OUTER = 'applyOuter';
 export const ATTR_KEY_IGNORE_LINES = 'ignoreLines';
 export const ATTR_KEY_SEARCH_AND_REPLACE = 'searchAndReplace';
 
-//----- Other ways of “running” a snippet -----
+//----- Additional checks -----
 
 export const ATTR_KEY_CONTAINED_IN = 'containedIn';
 
@@ -141,9 +143,11 @@ export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrV
   [ATTR_KEY_ONLY, AttrValue.Valueless],
   [ATTR_KEY_SKIP, AttrValue.Valueless],
   [ATTR_KEY_NEVER_SKIP, AttrValue.Valueless],
+  [ATTR_KEY_NEVER_RUN, AttrValue.Valueless],
   //
   [ATTR_KEY_LANG, RE_LANG_VALUE],
   //
+  [ATTR_KEY_NO_OUTER_LINE_MODS, AttrValue.Valueless],
   [ATTR_KEY_SEQUENCE, AttrValue.String],
   [ATTR_KEY_INCLUDE, AttrValue.String],
   [ATTR_KEY_APPLY_INNER, AttrValue.String],
@@ -197,7 +201,7 @@ export class Directive {
         if (match.groups.value) {
           directive.setAttribute(match.groups.key, match.groups.value);
         } else {
-          directive.setAttribute(match.groups.key, 'true');
+          directive.setAttribute(match.groups.key, Valueless);
         }
       } else if (match.groups.bodyLabel) {
         directive.bodyLabel = match.groups.bodyLabel;
@@ -214,6 +218,26 @@ export class Directive {
   private constructor(lineNumber: LineNumber, body: Array<string>) {
     this.lineNumber = lineNumber;
     this.body = body;
+  }
+  toString(): string {
+    let result = '<!--marktest';
+    for (const [k, v] of this.#attributes) {
+      if (v === Valueless) {
+        result += ' ' + k;
+      } else {
+        result += ` ${k}=${stringify(v)}`;
+      }
+    }
+    if (this.bodyLabel) {
+      result += this.bodyLabel;
+      result += '\n';
+      for (const line of this.body) {
+        result += line;
+        result += '\n';
+      }
+    }
+    result += '-->';
+    return result;
   }
   setAttribute(key: string, value: typeof Valueless | string): void {
     this.#attributes.set(key, value);

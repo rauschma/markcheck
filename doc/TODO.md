@@ -4,13 +4,39 @@
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
-* Catch and report UserErrors?
-  * There is no need to stop processing at this point!
-  * Per file? Per snippet?
-  * They have information such as the line number!
 * CLI option: stop after first error (so that files can be examined).
 * JSON schema for config files
 * Per file (and in summary?): How many snippets were run?
+* Make `around` separator configurable?
+* Exceptions:
+  * Catch arbitrary exceptions per snippet and show line number.
+    * Rethrow with cause?
+  * Catch and report UserErrors?
+    * There may be no need to stop processing at this point!
+    * Per file? Per snippet?
+      * They do contain the line number! Thus, reporting is less important than for arbitrary exceptions.
+* Predefined LineMods such as these?
+
+<!--marktest id="asyncTest" around:
+function test(_name, callback) {
+  return callback();
+}
+•••
+await test();
+-->
+
+<!--marktest id="callbackTest" around:
+function test(_name, callback) {
+  return callback((err) => {
+    if (err) {
+      throw err;
+    }
+    process.exit();
+  });
+}
+•••
+test();
+-->
 
 ## Attributes
 

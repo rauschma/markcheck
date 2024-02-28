@@ -111,10 +111,11 @@ These attributes also affect visitation:
 
 ### Code snippets
 
-* Visitation mode:
+* Visitation and running mode:
   * `only`
   * `skip`
   * `neverSkip`
+  * `neverRun`: same as `lang="[neverRun]"`
 * Language: `lang`
   * For body directives
   * To override defaults from code blocks and `write`
@@ -125,6 +126,7 @@ These attributes also affect visitation:
     * `"[errorIfVisited]"`
 * Assembling lines:
   * `id="my-id"`
+  * `noOuterLineMods`
   * `sequence="1/3"`
   * `include="id1, $THIS, id2"`:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
@@ -132,8 +134,10 @@ These attributes also affect visitation:
   * `applyOuter="id"`: applies an applicable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
   * `ignoreLines="1, 3-5, 7"`: omits lines. A range includes start and end – i.e.: `1-3` is equivalent to `1,2,3`.
   * `searchAndReplace="/[a-z]/-/i"`
-* Other ways of “running” snippets:
-  * `containedIn="filePath"`: `filePath` is either absolute or relative to the Markdown file.
+* Additional checks:
+  * `containedIn="filePath"`:
+    * `filePath` is either absolute or relative to the Markdown file.
+    * The outer LineMods are not applied.
 * Writing and referring to files:
   * `write`
   * `writeAndRun`

@@ -14,7 +14,7 @@ import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError, contextDescription, contextLineNumber } from '../util/errors.js';
 import { containedIn, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
-import { ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
+import { ATTR_KEY_CONTAINED_IN, ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, type CliState, type MarktestEntity } from './entities.js';
 import { parseMarkdown, type ParseMarkdownResult } from './parse-markdown.js';
 
@@ -162,10 +162,12 @@ function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHe
 }
 
 function handleSnippet(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): EntityKind {
+  //----- Skipping -----
+
+  // Explicitly skipped
   if (!snippet.isVisited(cliState.globalVisitationMode)) {
     return EntityKind.NonRunnable;
   }
-
   const langDef = config.getLang(snippet.lang);
   if (langDef === undefined) {
     throw new UserError(
@@ -183,21 +185,33 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     );
   }
 
-  const lines = assembleLines(cliState, config, snippet);
+  //----- Checks that complement running -----
 
   if (snippet.containedIn) {
+    const innerLines = assembleLines(cliState, config, snippet, true);
     const pathName = path.resolve(cliState.absFilePath, '..', snippet.containedIn);
+    if (!fs.existsSync(pathName)) {
+      throw new UserError(
+        `Path of attribute ${stringify(ATTR_KEY_CONTAINED_IN)} does not exist: ${stringify(pathName)}`,
+        { lineNumber: snippet.lineNumber }
+      );
+    }
     const container = splitLinesExclEol(fs.readFileSync(pathName, 'utf-8'));
-    if (!containedIn(lines, container)) {
+    if (!containedIn(innerLines, container)) {
       throw new UserError(
         `Content of snippet is not contained in ${stringify(pathName)}`,
-        {lineNumber: snippet.lineNumber}
+        { lineNumber: snippet.lineNumber }
       );
     }
     return EntityKind.Runnable;
   }
 
+  //----- Write files (often in preparation for running) -----
+
+  const lines = assembleLines(cliState, config, snippet);
   writeFiles(out, cliState, config, snippet, langDef, lines);
+
+  //----- Run the snippet’s file -----
 
   if (langDef.kind === 'LangDefErrorIfRun') {
     throw new UserError(
@@ -213,7 +227,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
   const fileName = snippet.getFileName(langDef);
   if (fileName === null) {
     throw new UserError(
-      `Snippet is runnable but its language does not have a ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} nor does it override the default with its own filename`,
+      `Snippet is runnable but its language does not have a ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} nor does the snippet override the default with its own filename`,
       { lineNumber: snippet.lineNumber }
     );
   }

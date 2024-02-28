@@ -3,10 +3,10 @@ import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
-import { InternalError, UserError, type LineNumber, contextLineNumber } from '../util/errors.js';
+import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
-import { Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber, SearchAndReplaceSpec } from './directive.js';
+import { CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_NO_OUTER_LINE_MODS, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber, ATTR_KEY_NEVER_RUN } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -39,7 +39,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         if (each) {
           // Global LineMod
           directive.checkAttributes(GLOBAL_LINE_MOD_ATTRIBUTES);
-          return new LineMod(directive, {
+          return LineMod.parse(directive, {
             tag: 'LineModKindGlobal',
             targetLanguage: each,
           });
@@ -48,7 +48,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         if (id) {
           // Applicable LineMod
           directive.checkAttributes(APPLICABLE_LINE_MOD_ATTRIBUTES);
-          return new LineMod(directive, {
+          return LineMod.parse(directive, {
             tag: 'LineModKindApplicable',
             id,
           });
@@ -56,7 +56,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         // Open snippet with local LineMod
         directive.checkAttributes(SNIPPET_ATTRIBUTES);
         const snippet = SingleSnippet.createOpen(directive);
-        snippet.lineMod = new LineMod(directive, {
+        snippet.lineMod = LineMod.parse(directive, {
           tag: 'LineModKindLocal',
         });
         return snippet;
@@ -89,47 +89,63 @@ export function assembleLinesForId(cliState: CliState, config: Config, sourceLin
   return assembleLines(cliState, config, targetSnippet);
 }
 
-export function assembleLines(cliState: CliState, config: Config, snippet: Snippet) {
+export function assembleLines(cliState: CliState, config: Config, snippet: Snippet, noOuterLineMods = false) {
   const lines = new Array<string>();
 
-  // Once per file:
-  // - Config before lines
-  // - Global line mod
-  // - Outer applicable line mod
-  if (snippet.lang) {
-    const lang = config.getLang(snippet.lang);
-    if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
-      lines.push(...lang.beforeLines);
-    }
-  }
-  const perFileLineMods = new Array<LineMod>();
-  const globalLineMods = cliState.globalLineMods.get(snippet.lang);
-  if (globalLineMods) {
-    perFileLineMods.push(...globalLineMods);
-  }
-  const applyOuterId = snippet.applyOuterId;
-  if (applyOuterId) {
-    const applyLineMod = cliState.idToLineMod.get(applyOuterId);
-    if (applyLineMod === undefined) {
-      throw new UserError(
-        `Attribute ${ATTR_KEY_APPLY_OUTER} contains an ID that either doesn’t exist or does not refer to a line mod`,
-        { lineNumber: snippet.lineNumber }
-      );
-    }
-    perFileLineMods.push(applyLineMod);
-  }
+  const skipLineMods = noOuterLineMods || snippet.noOuterLineMods;
+  const outerLineMods = (
+    skipLineMods ? new Array<LineMod>() : collectOuterLineMods()
+  );
 
-  for (let i = 0; i < perFileLineMods.length; i++) {
-    perFileLineMods[i].pushBeforeLines(lines);
+  for (let i = 0; i < outerLineMods.length; i++) {
+    outerLineMods[i].pushBeforeLines(lines);
   }
   // Once per snippet (in sequences and includes):
   // - Inner applicable line mod
   // - Local line mod
   snippet.assembleLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
-  for (let i = perFileLineMods.length - 1; i >= 0; i--) {
-    perFileLineMods[i].pushAfterLines(lines);
+  for (let i = outerLineMods.length - 1; i >= 0; i--) {
+    outerLineMods[i].pushAfterLines(lines);
   }
   return lines;
+
+  function collectOuterLineMods(): Array<LineMod> {
+    // Once per file:
+    // - Config before lines
+    // - Global line mod
+    // - Outer applicable line mod
+    const outerLineMods = new Array<LineMod>();
+    if (snippet.lang) {
+      const lang = config.getLang(snippet.lang);
+      if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
+        outerLineMods.push(
+          LineMod.create(
+            contextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
+            { tag: 'LineModKindConfig' },
+            lang.beforeLines,
+            []
+          )
+        );
+        lines.push(...lang.beforeLines);
+      }
+    }
+    const globalLineMods = cliState.globalLineMods.get(snippet.lang);
+    if (globalLineMods) {
+      outerLineMods.push(...globalLineMods);
+    }
+    const applyOuterId = snippet.applyOuterId;
+    if (applyOuterId) {
+      const applyLineMod = cliState.idToLineMod.get(applyOuterId);
+      if (applyLineMod === undefined) {
+        throw new UserError(
+          `Attribute ${ATTR_KEY_APPLY_OUTER} contains an ID that either doesn’t exist or does not refer to a line mod`,
+          { lineNumber: snippet.lineNumber }
+        );
+      }
+      outerLineMods.push(applyLineMod);
+    }
+    return outerLineMods;
+  }
 }
 
 //#################### CliState ####################
@@ -161,11 +177,16 @@ export type CliState = {
 export abstract class Snippet {
   abstract get lineNumber(): number;
   abstract get id(): null | string;
+  //
   abstract get visitationMode(): VisitationMode;
   abstract get lang(): string;
+  //
+  abstract get noOuterLineMods(): boolean;
   abstract get applyOuterId(): null | string;
   abstract get containedIn(): null | string;
+  //
   abstract get externalSpecs(): Array<ExternalSpec>;
+  //
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
@@ -216,6 +237,18 @@ export class SingleSnippet extends Snippet {
     }
 
     { // Assembling lines
+      snippet.noOuterLineMods = directive.hasAttribute(ATTR_KEY_NO_OUTER_LINE_MODS);
+
+      const sequence = directive.getString(ATTR_KEY_SEQUENCE);
+      if (sequence) {
+        snippet.sequenceNumber = parseSequenceNumber(sequence);
+      }
+
+      const include = directive.getString(ATTR_KEY_INCLUDE);
+      if (include) {
+        snippet.includeIds = include.split(/ *, */);
+      }
+
       snippet.#applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER) ?? null;
       snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER) ?? null;
       const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
@@ -228,16 +261,6 @@ export class SingleSnippet extends Snippet {
           contextLineNumber(directive.lineNumber), searchAndReplaceStr
         );
       }
-
-      const sequence = directive.getString(ATTR_KEY_SEQUENCE);
-      if (sequence) {
-        snippet.sequenceNumber = parseSequenceNumber(sequence);
-      }
-
-      const include = directive.getString(ATTR_KEY_INCLUDE);
-      if (include) {
-        snippet.includeIds = include.split(/ *, */);
-      }
     }
 
     const containedIn = directive.getString(ATTR_KEY_CONTAINED_IN);
@@ -248,6 +271,11 @@ export class SingleSnippet extends Snippet {
     { // lang
       if (directive.hasAttribute(ATTR_KEY_WRITE)) {
         // Default value if attribute `write` exists. Override via
+        // attribute `lang`.
+        snippet.#lang = LANG_NEVER_RUN;
+      }
+      if (directive.hasAttribute(ATTR_KEY_NEVER_RUN)) {
+        // Default value if attribute `neverRun` exists. Override via
         // attribute `lang`.
         snippet.#lang = LANG_NEVER_RUN;
       }
@@ -301,6 +329,7 @@ export class SingleSnippet extends Snippet {
   containedIn: null | string = null;
   #lang: null | string = null;
   #fileName: null | string = null;
+  noOuterLineMods: boolean = false;
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
   externalSpecs = new Array<ExternalSpec>();
@@ -556,6 +585,9 @@ export class SequenceSnippet extends Snippet {
   override get lang(): string {
     return this.firstElement.lang;
   }
+  override get noOuterLineMods(): boolean {
+    return this.firstElement.noOuterLineMods;
+  }
   override get applyOuterId(): null | string {
     return this.firstElement.applyOuterId;
   }
@@ -622,12 +654,13 @@ const RE_AROUND_MARKER = /^[ \t]*•••[ \t]*$/;
 const STR_AROUND_MARKER = '•••';
 
 export type LineModKind =
-  | LineModKindLocal
+  | LineModKindConfig
   | LineModKindGlobal
   | LineModKindApplicable
+  | LineModKindLocal
   ;
-export type LineModKindLocal = {
-  tag: 'LineModKindLocal',
+export type LineModKindConfig = {
+  tag: 'LineModKindConfig',
 };
 export type LineModKindGlobal = {
   tag: 'LineModKindGlobal',
@@ -637,47 +670,66 @@ export type LineModKindApplicable = {
   tag: 'LineModKindApplicable',
   id: string,
 };
+export type LineModKindLocal = {
+  tag: 'LineModKindLocal',
+};
 
 export class LineMod {
-  lineNumber: LineNumber;
-  #beforeLines: Array<string>;
-  #afterLines: Array<string>;
-  #kind: LineModKind;
-  constructor(directive: Directive, kind: LineModKind) {
-    this.lineNumber = directive.lineNumber;
-    this.#kind = kind;
+  static parse(directive: Directive, kind: LineModKind): LineMod {
+    let beforeLines: Array<string>;
+    let afterLines: Array<string>;
     const body = trimTrailingEmptyLines(directive.body.slice());
     switch (directive.bodyLabel) {
       case BODY_LABEL_BEFORE: {
-        this.#beforeLines = body;
-        this.#afterLines = [];
-        return;
+        beforeLines = body;
+        afterLines = [];
+        break;
       }
       case BODY_LABEL_AFTER: {
-        this.#beforeLines = [];
-        this.#afterLines = body;
-        return;
+        beforeLines = [];
+        afterLines = body;
+        break;
       }
       case BODY_LABEL_AROUND: {
         const markerIndex = body.findIndex(line => RE_AROUND_MARKER.test(line));
         if (markerIndex < 0) {
           throw new UserError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber: directive.lineNumber });
         }
-        this.#beforeLines = body.slice(0, markerIndex);
-        this.#afterLines = body.slice(markerIndex + 1);
-        return;
+        beforeLines = body.slice(0, markerIndex);
+        afterLines = body.slice(markerIndex + 1);
+        break;
       }
       default:
         throw new InternalError();
     }
+    return new LineMod(
+      contextLineNumber(directive.lineNumber), kind, beforeLines, afterLines
+    );
+  }
+  static create(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>, afterLines: Array<string>) {
+    return new LineMod(context, kind, beforeLines, afterLines);
+  }
+
+  context: UserErrorContext;
+  #kind: LineModKind;
+  #beforeLines: Array<string>;
+  #afterLines: Array<string>;
+
+  private constructor(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>, afterLines: Array<string>) {
+    this.context = context;
+    this.#kind = kind;
+    this.#beforeLines = beforeLines;
+    this.#afterLines = afterLines;
   }
   get id(): undefined | string {
     switch (this.#kind.tag) {
       case 'LineModKindApplicable':
         return this.#kind.id
-      case 'LineModKindLocal':
       case 'LineModKindGlobal':
         return undefined;
+      case 'LineModKindConfig':
+      case 'LineModKindLocal':
+        throw new InternalError('Unsupported operation');
       default:
         throw new UnsupportedValueError(this.#kind);
     }
@@ -686,9 +738,11 @@ export class LineMod {
     switch (this.#kind.tag) {
       case 'LineModKindGlobal':
         return this.#kind.targetLanguage;
-      case 'LineModKindLocal':
       case 'LineModKindApplicable':
         return undefined;
+      case 'LineModKindConfig':
+      case 'LineModKindLocal':
+        throw new InternalError('Unsupported operation');
       default:
         throw new UnsupportedValueError(this.#kind);
     }
@@ -702,15 +756,15 @@ export class LineMod {
   toJson(): JsonValue {
     let props;
     switch (this.#kind.tag) {
-      case 'LineModKindLocal':
-        props = {};
-        break;
       case 'LineModKindGlobal':
         props = { targetLanguage: this.#kind.targetLanguage };
         break;
       case 'LineModKindApplicable':
         props = { id: this.#kind.id };
         break;
+      case 'LineModKindConfig':
+      case 'LineModKindLocal':
+        throw new InternalError('Unsupported operation');
       default:
         throw new UnsupportedValueError(this.#kind);
     }

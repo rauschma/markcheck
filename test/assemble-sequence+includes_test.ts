@@ -15,20 +15,20 @@ createSuite(import.meta.url);
 test('Assemble sequence', () => {
   const readme = outdent`
     <!--marktest sequence="1/3"-->
-    ◆◆◆js
+    ▲▲▲js
     // Part 1
-    ◆◆◆
+    ▲▲▲
     
     <!--marktest sequence="2/3"-->
-    ◆◆◆js
+    ▲▲▲js
     // Part 2
-    ◆◆◆
+    ▲▲▲
     
     <!--marktest sequence="3/3"-->
-    ◆◆◆js
+    ▲▲▲js
     // Part 3
-    ◆◆◆
-  `.replaceAll('◆', '`');
+    ▲▲▲
+  `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/marktest-data': {},
     '/tmp/markdown/readme.md': readme,
@@ -55,16 +55,16 @@ test('Assemble sequence', () => {
 test('Assemble includes', () => {
   const readme = outdent`
     <!--marktest include="helper"-->
-    ◆◆◆node-repl
+    ▲▲▲node-repl
     > twice('abc')
     'abcabc'
-    ◆◆◆
+    ▲▲▲
     
     <!--marktest id="helper"-->
-    ◆◆◆js
+    ▲▲▲js
     function twice(str) { return str + str }
-    ◆◆◆
-  `.replaceAll('◆', '`');
+    ▲▲▲
+  `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/marktest-data': {},
     '/tmp/markdown/readme.md': readme,

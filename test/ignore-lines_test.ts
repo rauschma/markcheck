@@ -15,14 +15,14 @@ createSuite(import.meta.url);
 test('ignoreLines', () => {
   const readme = outdent`
     <!--marktest ignoreLines="1-3, 5"-->
-    ◆◆◆js
+    ▲▲▲js
     // Line 1
     // Line 2
     // Line 3
     // Line 4
     // Line 5
-    ◆◆◆
-  `.replaceAll('◆', '`');
+    ▲▲▲
+  `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/marktest-data': {},
     '/tmp/markdown/readme.md': readme,

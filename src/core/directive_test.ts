@@ -1,11 +1,24 @@
+import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
-import { parseExternalSpecs, parseLineNumberSet, type ExternalSpec, SearchAndReplaceSpec } from './directive.js';
 import { contextLineNumber } from '../util/errors.js';
+import { Directive, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, type ExternalSpec } from './directive.js';
+import { extractCommentContent } from './parse-markdown.js';
 
-const {raw} = String;
+const { raw } = String;
 
 createSuite(import.meta.url);
+
+test('Parse valuelesss attribute', () => {
+  const text = extractCommentContent('<!--marktest noOuterLineMods-->');
+  assert.ok(text !== null);
+  const directive = Directive.parse(1, splitLinesExclEol(text));
+  assert.ok(directive !== null);
+  assert.equal(
+    directive.toString(),
+    '<!--marktest noOuterLineMods-->'
+  );
+});
 
 test('parseExternalSpecs', () => {
   assert.deepEqual(

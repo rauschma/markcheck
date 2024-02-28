@@ -61,6 +61,8 @@ export type Translator = {
 
 //#################### Config ####################
 
+export const CONFIG_PROP_BEFORE_LINES = 'beforeLines';
+
 export class Config {
   searchAndReplaceFunc: (str: string) => string = (str) => str;
   #searchAndReplaceData: Record<string, string> = {};
