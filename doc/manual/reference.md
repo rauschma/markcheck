@@ -137,8 +137,9 @@ These attributes also affect visitation:
   * `ignoreLines="1, 3-5, 7"`: omits lines. A range includes start and end – i.e.: `1-3` is equivalent to `1,2,3`.
   * `searchAndReplace="/[a-z]/-/i"`
 * Additional checks:
+  * `sameAsId="id"`
   * `containedInFile="filePath"`:
-    * `filePath` is either absolute or relative to the Markdown file.
+    * `filePath` is either relative to the Markdown file or absolute.
     * The outer LineMods are not applied.
 * Writing and referring to files:
   * `write`

@@ -43,6 +43,7 @@ export const ATTR_KEY_SEARCH_AND_REPLACE = 'searchAndReplace';
 
 //----- Additional checks -----
 
+export const ATTR_KEY_SAME_AS_ID = 'sameAsId';
 export const ATTR_KEY_CONTAINED_IN_FILE = 'containedInFile';
 
 //----- Writing and referring to files -----
@@ -156,6 +157,7 @@ export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrV
   [ATTR_KEY_IGNORE_LINES, AttrValue.String],
   [ATTR_KEY_SEARCH_AND_REPLACE, AttrValue.String],
   //
+  [ATTR_KEY_SAME_AS_ID, AttrValue.String],
   [ATTR_KEY_CONTAINED_IN_FILE, AttrValue.String],
   //
   [ATTR_KEY_WRITE, AttrValue.String],

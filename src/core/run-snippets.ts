@@ -12,10 +12,10 @@ import * as tty from 'node:tty';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
-import { linesContain, trimTrailingEmptyLines } from '../util/string.js';
-import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
-import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, getUserErrorContext, type CliState, type MarktestEntity } from './entities.js';
+import { linesAreSame, linesContain, trimTrailingEmptyLines } from '../util/string.js';
+import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDefCommand } from './config.js';
+import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
+import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type MarktestEntity } from './entities.js';
 import { parseMarkdown, type ParseMarkdownResult } from './parse-markdown.js';
 
 //@ts-expect-error: Module '#package_json' has no default export.
@@ -198,7 +198,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
   //----- Checks that complement running -----
 
   if (snippet.containedInFile) {
-    const innerLines = assembleLines(cliState, config, snippet, true);
+    const innerLines = assembleInnerLines(cliState, config, snippet);
     const pathName = path.resolve(cliState.absFilePath, '..', snippet.containedInFile);
     if (!fs.existsSync(pathName)) {
       throw new UserError(
@@ -213,13 +213,24 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
         { lineNumber: snippet.lineNumber }
       );
     }
-    return EntityKind.Runnable;
+  }
+
+  if (snippet.sameAsId) {
+    const innerLines = assembleInnerLines(cliState, config, snippet);
+    const otherSnippet = getTargetSnippet(cliState, snippet.lineNumber, ATTR_KEY_SAME_AS_ID, snippet.sameAsId);
+    const otherLines = assembleInnerLines(cliState, config, otherSnippet);
+    if (!linesAreSame(innerLines, otherLines)) {
+      throw new UserError(
+        `Content of snippet is not same as content of snippet ${stringify(snippet.sameAsId)} (line ${otherSnippet.lineNumber})`,
+        { lineNumber: snippet.lineNumber }
+      );
+    }
   }
 
   //----- Write files (often in preparation for running) -----
 
   // At this point, the file may be written or run or both or neither
-  const lines = assembleLines(cliState, config, snippet);
+  const lines = assembleOuterLines(cliState, config, snippet);
   const fileName = snippet.getFileName(langDef);
   if (fileName) {
     writeFiles(out, cliState, config, snippet, fileName, lines);
@@ -264,7 +275,7 @@ function writeFiles(out: Output, cliState: CliState, config: Config, snippet: Sn
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
-    const lines = assembleLinesForId(cliState, config, snippet.lineNumber, id, `attribute ${ATTR_KEY_EXTERNAL}`);
+    const lines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL, id);
     writeOneFile(out, cliState, config, fileName, lines);
   }
 }
@@ -374,7 +385,7 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
   if (commandResult.stderr.length > 0) {
     if (snippet.stderrId) {
       // We expected stderr output
-      const expectedStderrLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stderrId, `attribute ${ATTR_KEY_STDERR}`);
+      const expectedStderrLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDERR, snippet.stderrId);
       trimTrailingEmptyLines(expectedStderrLines);
       if (!isOutputEqual(expectedStderrLines, stderrLines)) {
         throw new UserError(
@@ -396,7 +407,7 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
   }
   if (snippet.stdoutId) {
     // Normally stdout is ignored. But in this case, we examine it.
-    const expectedStdoutLines = assembleLinesForId(cliState, config, snippet.lineNumber, snippet.stdoutId, `attribute ${ATTR_KEY_STDOUT}`);
+    const expectedStdoutLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDOUT, snippet.stdoutId);
     trimTrailingEmptyLines(expectedStdoutLines);
     if (!isOutputEqual(stdoutLines, expectedStdoutLines)) {
       throw new UserError(
