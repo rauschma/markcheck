@@ -88,9 +88,12 @@ export const ATTR_KEY_STDERR = 'stderr';
 
 //----- Line mods -----
 
+// Local LineMods only!
+export const ATTR_KEY_BEFORE_LINE = 'beforeLine';
+export const ATTR_KEY_AFTER_LINE = 'afterLine';
+
 // Global line mods
 export const ATTR_KEY_EACH = 'each';
-
 // Applicable line mods have the attribute `id`
 
 //========== Language constants ==========
@@ -116,6 +119,7 @@ export const BODY_LABEL_BODY = 'body:';
 export const BODY_LABEL_BEFORE = 'before:';
 export const BODY_LABEL_AFTER = 'after:';
 export const BODY_LABEL_AROUND = 'around:';
+export const BODY_LABEL_INSERT = 'insert:'; // only local LineMods
 
 //========== Command variables ==========
 
@@ -125,15 +129,17 @@ export const CMD_VAR_ALL_FILE_NAMES = '$ALL_FILE_NAMES';
 //#################### Expected attribute values ####################
 
 export const Valueless = Symbol('Valueless');
-
 export enum AttrValue {
   Valueless, String
 }
-
 export type ExpectedAttributeValues = Map<string, AttrValue | RegExp>;
 
 export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
   [ATTR_KEY_ID, AttrValue.String],
+  //
+  // Local LineMods only!
+  [ATTR_KEY_BEFORE_LINE, AttrValue.String],
+  [ATTR_KEY_AFTER_LINE, AttrValue.String],
   //
   [ATTR_KEY_ONLY, AttrValue.Valueless],
   [ATTR_KEY_SKIP, AttrValue.Valueless],
@@ -282,13 +288,16 @@ export class Directive {
     const value = this.getAttribute(key);
     if (value === Valueless) {
       throw new UserError(
-        `Attribute ${stringify(key)}: expected no key or a string value, but it was valueless`
+        `Attribute ${stringify(key)} should be missing or a string but was valueless`
       );
     }
     return value;
   }
   hasAttribute(key: string): boolean {
     return this.#attributes.has(key);
+  }
+  hasValuelessAttribute(key: string): boolean {
+    return this.#attributes.get(key) === Valueless;
   }
   checkAttributes(expectedAttributes: ExpectedAttributeValues): void {
     for (const [k, v] of this.#attributes) {

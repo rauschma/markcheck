@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_SKIP, ATTR_KEY_NO_OUTER_LINE_MODS, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber, ATTR_KEY_NEVER_RUN } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_AFTER_LINE, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINE, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_RUN, ATTR_KEY_NEVER_SKIP, ATTR_KEY_NO_OUTER_LINE_MODS, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -39,6 +39,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     case BODY_LABEL_BEFORE:
     case BODY_LABEL_AFTER:
     case BODY_LABEL_AROUND:
+    case BODY_LABEL_INSERT:
     case null: {
       if (directive.bodyLabel !== null) {
         // Either:
@@ -128,11 +129,10 @@ export function assembleLines(cliState: CliState, config: Config, snippet: Snipp
       const lang = config.getLang(snippet.lang);
       if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
         outerLineMods.push(
-          LineMod.create(
+          LineMod.fromBeforeLines(
             contextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
             { tag: 'LineModKindConfig' },
             lang.beforeLines,
-            []
           )
         );
       }
@@ -449,42 +449,92 @@ export class SingleSnippet extends Snippet {
   }
 
   #pushThis(config: Config, idToLineMod: Map<string, LineMod>, lines: Array<string>) {
-    let applyLineMod: undefined | LineMod = undefined;
+    const innerAppliedLineMod = this.#getInnerAppliedLineMod(idToLineMod);
+    if (innerAppliedLineMod) {
+      innerAppliedLineMod.pushBeforeLines(lines);
+    }
+    if (this.lineMod) {
+      this.lineMod.pushBeforeLines(lines);
+    }
+
+    {
+      // - Ignoring lines clashes with inserting lines via `this.lineMod`
+      //   because both change line indices.
+      // - However, ignored line numbers would make no sense at all after
+      //   inserting lines, which is why ignore first.
+      let body = this.body.filter(
+        (_line, index) => !this.#ignoreLines.has(index + 1)
+      );
+  
+      // We only search-and-replace in visible lines (because we can do what
+      // we want in invisible lines).
+      const sar = this.#searchAndReplace;
+      if (sar) {
+        body = body.map(
+          line => sar.replaceAll(line)
+        );
+      }
+  
+      // Apply local LineMod insertions
+      const insertedBefore = this.lineMod?.insertedBefore ?? null;
+      const insertedAfter = this.lineMod?.insertedAfter ?? null;
+      const bodyLen = body.length;
+      body = body.flatMap((bodyLine, index) => [
+        ...(
+          insertedBefore && isEqual(bodyLen, insertedBefore.lineNumber, index)
+          ? insertedBefore.lines
+          : []
+        ),
+        bodyLine,
+        ...(
+          insertedAfter && isEqual(bodyLen, insertedAfter.lineNumber, index)
+          ? insertedAfter.lines
+          : []
+        )
+      ]);
+  
+      // The translator changes line indices even further:
+      // - That is why we apply it after inserting lines.
+      // - Consequence: inserted lines are translated
+      const translator = this.#getTranslator(config);
+      if (translator) {
+        body = translator.translate(this.lineNumber, body);
+      }
+
+      lines.push(...body);
+    }
+
+    if (this.lineMod) {
+      this.lineMod.pushAfterLines(lines);
+    }
+    if (innerAppliedLineMod) {
+      innerAppliedLineMod.pushAfterLines(lines);
+    }
+
+    function isEqual(len: number, lineNumber: null | number, positiveIndex: number): boolean {
+      if (lineNumber === null) {
+        return false;
+      }
+      if (lineNumber < 0) {
+        // -1 is the last line number (which is equal to `len`), etc.
+        lineNumber += len + 1;
+      }
+      return lineNumber === (positiveIndex + 1);
+    }
+  }
+
+  #getInnerAppliedLineMod(idToLineMod: Map<string, LineMod>): undefined | LineMod {
     if (this.#applyInnerId) {
-      applyLineMod = idToLineMod.get(this.#applyInnerId);
-      if (applyLineMod === undefined) {
+      const lineMod = idToLineMod.get(this.#applyInnerId);
+      if (lineMod === undefined) {
         throw new UserError(
           `Attribute ${ATTR_KEY_APPLY_INNER} contains an ID that either doesn’t exist or does not refer to a line mod`,
           { lineNumber: this.lineNumber }
         );
       }
+      return lineMod;
     }
-    if (applyLineMod) {
-      applyLineMod.pushBeforeLines(lines);
-    }
-    if (this.lineMod) {
-      this.lineMod.pushBeforeLines(lines);
-    }
-    let body = this.body.filter(
-      (_line, index) => !this.#ignoreLines.has(index + 1)
-    );
-    const sar = this.#searchAndReplace;
-    if (sar) {
-      body = body.map(
-        line => sar.replaceAll(line)
-      );
-    }
-    const translator = this.#getTranslator(config);
-    if (translator) {
-      body = translator.translate(this.lineNumber, body);
-    }
-    lines.push(...body);
-    if (this.lineMod) {
-      this.lineMod.pushAfterLines(lines);
-    }
-    if (applyLineMod) {
-      applyLineMod.pushAfterLines(lines);
-    }
+    return undefined;
   }
 
   #getTranslator(config: Config): undefined | Translator {
@@ -682,50 +732,107 @@ export type LineModKindLocal = {
   tag: 'LineModKindLocal',
 };
 
+export type InsertedLines = {
+  lineNumber: number,
+  lines: Array<string>,
+};
+
 export class LineMod {
   static parse(directive: Directive, kind: LineModKind): LineMod {
-    let beforeLines: Array<string>;
-    let afterLines: Array<string>;
+    let insertedBefore: null | InsertedLines = null;
+    let insertedAfter: null | InsertedLines = null;
+    let beforeLines = new Array<string>();
+    let afterLines = new Array<string>();
+
     const body = trimTrailingEmptyLines(directive.body.slice());
+
     switch (directive.bodyLabel) {
       case BODY_LABEL_BEFORE: {
         beforeLines = body;
-        afterLines = [];
         break;
       }
       case BODY_LABEL_AFTER: {
-        beforeLines = [];
         afterLines = body;
         break;
       }
       case BODY_LABEL_AROUND: {
-        const markerIndex = body.findIndex(line => RE_AROUND_MARKER.test(line));
-        if (markerIndex < 0) {
-          throw new UserError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber: directive.lineNumber });
+        ({ beforeLines, afterLines } = splitAroundLines(body));
+        break;
+      }
+      case BODY_LABEL_INSERT: {
+        if (kind.tag !== 'LineModKindLocal') {
+          throw new UserError(
+            `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for local line mods`
+          );
         }
-        beforeLines = body.slice(0, markerIndex);
-        afterLines = body.slice(markerIndex + 1);
+    
+        const beforeLineStr = directive.getString(ATTR_KEY_BEFORE_LINE);
+        const afterLineStr = directive.getString(ATTR_KEY_AFTER_LINE);
+        if (beforeLineStr !== undefined && afterLineStr !== undefined) {
+          const split = splitAroundLines(body);
+          insertedBefore = {
+            lineNumber: Number(beforeLineStr),
+            lines: split.beforeLines,
+          };
+          insertedAfter = {
+            lineNumber: Number(afterLineStr),
+            lines: split.afterLines,
+          };
+        } else if (beforeLineStr !== undefined) {
+          insertedBefore = {
+            lineNumber: Number(beforeLineStr),
+            lines: body,
+          };
+        } else if (afterLineStr !== undefined) {
+          insertedAfter = {
+            lineNumber: Number(afterLineStr),
+            lines: body,
+          };
+        } else {
+          throw new UserError(
+            `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but neither attribute ${stringify(ATTR_KEY_BEFORE_LINE)} nor attribute ${stringify(ATTR_KEY_AFTER_LINE)}`,
+            { lineNumber: directive.lineNumber }
+          );
+        }
         break;
       }
       default:
         throw new InternalError();
     }
     return new LineMod(
-      contextLineNumber(directive.lineNumber), kind, beforeLines, afterLines
+      contextLineNumber(directive.lineNumber),
+      kind,
+      insertedBefore, insertedAfter,
+      beforeLines, afterLines
     );
+
+    function splitAroundLines(lines: Array<string>): { beforeLines: Array<string>, afterLines: Array<string> } {
+      const markerIndex = lines.findIndex(line => RE_AROUND_MARKER.test(line));
+      if (markerIndex < 0) {
+        throw new UserError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber: directive.lineNumber });
+      }
+      return {
+        beforeLines: lines.slice(0, markerIndex),
+        afterLines: lines.slice(markerIndex + 1),
+      };
+    }
   }
-  static create(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>, afterLines: Array<string>) {
-    return new LineMod(context, kind, beforeLines, afterLines);
+  static fromBeforeLines(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>) {
+    return new LineMod(context, kind, null, null, beforeLines, []);
   }
 
   context: UserErrorContext;
   #kind: LineModKind;
+  insertedBefore: null | InsertedLines;
+  insertedAfter: null | InsertedLines;
   #beforeLines: Array<string>;
   #afterLines: Array<string>;
 
-  private constructor(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>, afterLines: Array<string>) {
+  private constructor(context: UserErrorContext, kind: LineModKind, insertedBefore: null | InsertedLines, insertedAfter: null | InsertedLines, beforeLines: Array<string>, afterLines: Array<string>) {
     this.context = context;
     this.#kind = kind;
+    this.insertedBefore = insertedBefore;
+    this.insertedAfter = insertedAfter;
     this.#beforeLines = beforeLines;
     this.#afterLines = afterLines;
   }
@@ -765,14 +872,24 @@ export class LineMod {
     let props;
     switch (this.#kind.tag) {
       case 'LineModKindGlobal':
-        props = { targetLanguage: this.#kind.targetLanguage };
+        props = {
+          targetLanguage: this.#kind.targetLanguage,
+        };
         break;
       case 'LineModKindApplicable':
-        props = { id: this.#kind.id };
+        props = {
+          id: this.#kind.id,
+        };
         break;
       case 'LineModKindConfig':
+        props = {};
+        break;
       case 'LineModKindLocal':
-        throw new InternalError('Unsupported operation');
+        props = {
+          insertedBefore: this.insertedBefore,
+          insertedAfter: this.insertedAfter,
+        };
+        break;
       default:
         throw new UnsupportedValueError(this.#kind);
     }

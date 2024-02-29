@@ -56,7 +56,10 @@ After `marktest` there are zero or more attributes. The first line ends either w
 * Body label `before:`, `after:`, `around:`: A _line mod_ directive. Such a directive is used in three ways:
   * Attribute `each="some-lang"`: The modifications are applied to all code blocks with the specified language.
   * Attribute `id="some-id"`: A code block directive can apply the line mod to its code via `applyInner="some-id"` and  `applyOuter="some-id"`.
-  * Various attributes other that `each` and `id`: The directive is a code block directive, the changes are applied to its code.
+  * Neither `each` nor `id`: The directive defines two entities:
+    * A local line mod
+    * A code block directive that uses the line mod locally.
+* Body label `insert:`: Only supported for local line mods.
 
 ## Entities
 
@@ -104,8 +107,7 @@ These attributes also affect visitation:
   * Global line mod
   * Outer applicable line mod
 * Once per snippet (in sequences and includes):
-  * Inner applicable line mod
-  * Local line mod
+  * ❌ FIXME: describe status quo (see especially `.#pushThis()`)
 
 ## Attributes
 
@@ -145,6 +147,11 @@ These attributes also affect visitation:
 * Checking output:
   * `stdout="id"`
   * `stderr="id"`
+
+### Local line mods
+
+* `beforeLine`
+* `afterLine`
 
 ### Global line mods
 
