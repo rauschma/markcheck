@@ -4,12 +4,11 @@
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
-* CLI option: stop after first error (so that files can be examined).
+* CLI option? Stop after first error (so that files can be examined).
 * JSON schema for config files
-* Per file (and in summary?): How many snippets were run?
+* Per file (and/or in summary?): How many snippets were run?
 * Make `around` separator configurable?
-* Predefined LineMods such as these?
-* CLI option: `--only` (what if there are multiple files?)
+* Predefined LineMods such as those below?
 
 <!--marktest id="asyncTest" around:
 function test(_name, callback) {
