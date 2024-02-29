@@ -12,9 +12,9 @@ import * as tty from 'node:tty';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
-import { containedIn, trimTrailingEmptyLines } from '../util/string.js';
+import { linesContain, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDef, type LangDefCommand } from './config.js';
-import { ATTR_KEY_CONTAINED_IN, ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
+import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
 import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleLines, assembleLinesForId, getUserErrorContext, type CliState, type MarktestEntity } from './entities.js';
 import { parseMarkdown, type ParseMarkdownResult } from './parse-markdown.js';
 
@@ -197,17 +197,17 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
 
   //----- Checks that complement running -----
 
-  if (snippet.containedIn) {
+  if (snippet.containedInFile) {
     const innerLines = assembleLines(cliState, config, snippet, true);
-    const pathName = path.resolve(cliState.absFilePath, '..', snippet.containedIn);
+    const pathName = path.resolve(cliState.absFilePath, '..', snippet.containedInFile);
     if (!fs.existsSync(pathName)) {
       throw new UserError(
-        `Path of attribute ${stringify(ATTR_KEY_CONTAINED_IN)} does not exist: ${stringify(pathName)}`,
+        `Path of attribute ${stringify(ATTR_KEY_CONTAINED_IN_FILE)} does not exist: ${stringify(pathName)}`,
         { lineNumber: snippet.lineNumber }
       );
     }
     const container = splitLinesExclEol(fs.readFileSync(pathName, 'utf-8'));
-    if (!containedIn(innerLines, container)) {
+    if (!linesContain(container, innerLines)) {
       throw new UserError(
         `Content of snippet is not contained in ${stringify(pathName)}`,
         { lineNumber: snippet.lineNumber }

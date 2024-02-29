@@ -7,7 +7,7 @@ import type { Translator } from '../translation/translation.js';
 import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_AFTER_LINE, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINE, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_RUN, ATTR_KEY_NEVER_SKIP, ATTR_KEY_NO_OUTER_LINE_MODS, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_AFTER_LINE, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINE, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_RUN, ATTR_KEY_NEVER_SKIP, ATTR_KEY_NO_OUTER_LINE_MODS, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -192,7 +192,7 @@ export abstract class Snippet {
   //
   abstract get noOuterLineMods(): boolean;
   abstract get applyOuterId(): null | string;
-  abstract get containedIn(): null | string;
+  abstract get containedInFile(): null | string;
   //
   abstract get externalSpecs(): Array<ExternalSpec>;
   //
@@ -272,9 +272,9 @@ export class SingleSnippet extends Snippet {
       }
     }
 
-    const containedIn = directive.getString(ATTR_KEY_CONTAINED_IN);
-    if (containedIn) {
-      snippet.containedIn = containedIn;
+    const containedInFile = directive.getString(ATTR_KEY_CONTAINED_IN_FILE);
+    if (containedInFile) {
+      snippet.containedInFile = containedInFile;
     }
 
     { // lang
@@ -335,7 +335,7 @@ export class SingleSnippet extends Snippet {
   applyOuterId: null | string = null;
   #ignoreLines = new Set<number>();
   #searchAndReplace: null | SearchAndReplaceSpec = null;
-  containedIn: null | string = null;
+  containedInFile: null | string = null;
   #lang: null | string = null;
   #fileName: null | string = null;
   noOuterLineMods: boolean = false;
@@ -645,8 +645,8 @@ export class SequenceSnippet extends Snippet {
   override get applyOuterId(): null | string {
     return this.firstElement.applyOuterId;
   }
-  override get containedIn(): null | string {
-    return this.firstElement.containedIn;
+  override get containedInFile(): null | string {
+    return this.firstElement.containedInFile;
   }
   override getFileName(langDef: LangDef): null | string {
     return this.firstElement.getFileName(langDef);

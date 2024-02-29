@@ -18,13 +18,13 @@ export function normalizeWhitespace(str: string) {
   return str.replace(/\s+/ug, ' ');
 }
 
-export function containedIn(lines: Array<string>, container: Array<string>): boolean {
-  const lastIndex = container.length - lines.length;
+export function linesContain(lines: Array<string>, part: Array<string>): boolean {
+  const lastIndex = lines.length - part.length;
   containerLoop:
   for (let containerIndex = 0; containerIndex <= lastIndex; containerIndex++) {
-    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-      const containerLine = container[containerIndex+lineIndex];
-      const line = lines[lineIndex];
+    for (let lineIndex = 0; lineIndex < part.length; lineIndex++) {
+      const containerLine = lines[containerIndex+lineIndex];
+      const line = part[lineIndex];
       if (containerLine.trim() !== line.trim()) {
         continue containerLoop;
       }

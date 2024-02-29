@@ -14,7 +14,7 @@ createSuite(import.meta.url);
 
 test('ignoreLines: success', () => {
   const readme = outdent`
-    <!--marktest containedIn="other.js"-->
+    <!--marktest containedInFile="other.js"-->
     ▲▲▲js
     // green
     // blue
@@ -45,7 +45,7 @@ test('ignoreLines: success', () => {
 
 test('ignoreLines: failure', () => {
   const readme = outdent`
-    <!--marktest containedIn="other.js"-->
+    <!--marktest containedInFile="other.js"-->
     ▲▲▲js
     // black
     ▲▲▲
