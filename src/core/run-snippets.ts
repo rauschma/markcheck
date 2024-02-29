@@ -107,10 +107,13 @@ export function runFile(out: Output, logLevel: LogLevel, absFilePath: string, pm
         prevHeading = null; // clear
       }
     } catch (err) {
+      if (err instanceof UserError) {
+        throw err;
+      }
       const description = describeUserErrorContext(
         getUserErrorContext(entity)
       );
-      throw new Error(`Error in entity (${description})`, {cause: err});
+      throw new Error(`Unexpected error in entity (${description})`, {cause: err});
     }
   }
 

@@ -135,7 +135,6 @@ export function assembleLines(cliState: CliState, config: Config, snippet: Snipp
             []
           )
         );
-        lines.push(...lang.beforeLines);
       }
     }
     const globalLineMods = cliState.globalLineMods.get(snippet.lang);

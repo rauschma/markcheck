@@ -8,12 +8,7 @@ const { raw } = String;
 
 //#################### Constants ####################
 
-//========== Various constants ==========
-
-const RE_LABEL = /[A-Za-z0-9\-_]+/u;
-const RE_TOKEN = re`/[ \t]+((?<bodyLabel>${RE_LABEL}:)|(?<key>${RE_LABEL})([ \t]*=[ \t]*"(?<value>[^"]*)")?)/uy`;
-
-const MARKTEST_MARKER = 'marktest';
+const RE_LABEL = /[A-Za-z0-9\-_]+/;
 
 //========== Attribute keys ==========
 
@@ -180,26 +175,51 @@ export const CONFIG_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
 
 //========== Directive ==========
 
+const MARKTEST_MARKER = 'marktest';
+const RE_BODY_LABEL = re`/(?<bodyLabel>${RE_LABEL}:)/`;
+const RE_QUOTED_VALUE = re`/"(?<value>(\\"|\\\\|[^"])*)"/`;
+const RE_KEY_VALUE = re`/(?<key>${RE_LABEL})([ \t]*=[ \t]*${RE_QUOTED_VALUE})?/`;
+const RE_TOKEN = re`/[ \t]+(${RE_BODY_LABEL}|${RE_KEY_VALUE})/uy`;
+
 export class Directive {
   static parse(lineNumber: LineNumber, commentLines: Array<string>): null | Directive {
     let [firstLine, ...remainingLines] = commentLines;
     if (!firstLine.startsWith(MARKTEST_MARKER)) {
       return null;
     }
-    firstLine = firstLine.slice(MARKTEST_MARKER.length);
+    // Due to RE_TOKEN:
+    // - We need a leading space: That’s why it isn‘t part of
+    //   MARKTEST_MARKER.
+    // - We don’t want trailing whitespace: Matching should stop at the
+    //   very end of the input but RE_TOKEN doesn’t account for trailing
+    //   whitespace. That’s why we .trimEnd().
+    firstLine = firstLine.slice(MARKTEST_MARKER.length).trimEnd();
     const body = remainingLines;
     const directive = new Directive(lineNumber, body);
     RE_TOKEN.lastIndex = 0;
     while (true) {
+      // .lastIndex is reset if there is no match
+      const lastIndex = RE_TOKEN.lastIndex;
       const match = RE_TOKEN.exec(firstLine);
-      if (!match) break;
+      if (!match) {
+        if (lastIndex !== firstLine.length) {
+          throw new UserError(
+            `Could not parse attributes: Stopped parsing before ${stringify(firstLine.slice(lastIndex))}`,
+            { lineNumber }
+          );
+        }
+        break;
+      }
       if (directive.bodyLabel !== null) {
         throw new UserError(`Body label ${JSON.stringify(directive.bodyLabel)} must come after all attributes`, { lineNumber });
       }
       assertTrue(match.groups !== undefined);
       if (match.groups.key) {
-        if (match.groups.value) {
-          directive.setAttribute(match.groups.key, match.groups.value);
+        if (match.groups.value !== undefined) {
+          directive.setAttribute(
+            match.groups.key,
+            match.groups.value.replaceAll(/\\(.)/g, '$1')
+          );
         } else {
           directive.setAttribute(match.groups.key, Valueless);
         }
@@ -218,6 +238,19 @@ export class Directive {
   private constructor(lineNumber: LineNumber, body: Array<string>) {
     this.lineNumber = lineNumber;
     this.body = body;
+  }
+  toJson() {
+    return {
+      lineNumber: this.lineNumber,
+      attributes: Object.fromEntries(
+        Array.from(
+          this.#attributes,
+          ([k, v]) => [k, (v === Valueless ? null : v)]
+        )
+      ),
+      bodyLabel: this.bodyLabel,
+      body: this.body,
+    };
   }
   toString(): string {
     let result = '<!--marktest';
@@ -371,7 +404,7 @@ export class SearchAndReplaceSpec {
     if (!match) {
       throw new UserError(
         `Not a valid searchAndReplace string: ${stringify(str)}`,
-        {context}
+        { context }
       );
     }
     const search = match[1];

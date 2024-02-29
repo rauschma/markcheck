@@ -1,6 +1,6 @@
 # Todo
 
-* Allow escaped quotes in attribute values.
+* At the end of `runFile()`: don’t re-throw `UserError`, report it and continue processing?
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
@@ -9,6 +9,7 @@
 * Per file (and in summary?): How many snippets were run?
 * Make `around` separator configurable?
 * Predefined LineMods such as these?
+* CLI option: `--only` (what if there are multiple files?)
 
 <!--marktest id="asyncTest" around:
 function test(_name, callback) {

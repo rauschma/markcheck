@@ -18,10 +18,10 @@ export type LangDef =
   | LangDefErrorIfRun
   ;
 
-  /**
- * - We delay assembling the actual language definition (via `.extends`) as
- *   long as possible so that all pieces can be changed.
- */
+/**
+* - We delay assembling the actual language definition (via `.extends`) as
+*   long as possible so that all pieces can be changed.
+*/
 export type LangDefCommand = {
   kind: 'LangDefCommand',
   extends?: string,
@@ -72,7 +72,20 @@ export class Config {
     this.#setSearchAndReplace({
       '[⎡⎤]': '',
     });
-    this.#lang.set('', { kind: 'LangDefNeverRun' });
+    // Bare code blocks may be written but are never run.
+    this.#lang.set(
+      '',
+      {
+        kind: 'LangDefNeverRun'
+      }
+    );
+    // txt code blocks are always skipped
+    this.#lang.set(
+      'txt',
+      {
+        kind: 'LangDefSkip'
+      }
+    );
     this.#lang.set(
       "js",
       {
@@ -120,6 +133,16 @@ export class Config {
         beforeLines: [
           `import { expectType, type TypeEqual } from 'ts-expect';`,
           `import assert from 'node:assert/strict';`
+        ],
+      }
+    );
+    this.#lang.set(
+      "html",
+      {
+        kind: 'LangDefCommand',
+        defaultFileName: 'index.html',
+        commands: [
+          ["npx", "html-validate", CMD_VAR_FILE_NAME],
         ],
       }
     );
@@ -336,8 +359,8 @@ function langDefToJson(langDef: LangDef): LangDefPartialJson {
         before: langDef.beforeLines,
         ...(
           langDef.translator
-          ? {translator: langDef.translator.key}
-          : {}
+            ? { translator: langDef.translator.key }
+            : {}
         ),
         defaultFileName: langDef.defaultFileName,
         commands: langDef.commands,

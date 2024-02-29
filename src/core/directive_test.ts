@@ -9,14 +9,62 @@ const { raw } = String;
 
 createSuite(import.meta.url);
 
-test('Parse valuelesss attribute', () => {
-  const text = extractCommentContent('<!--marktest noOuterLineMods-->');
-  assert.ok(text !== null);
-  const directive = Directive.parse(1, splitLinesExclEol(text));
-  assert.ok(directive !== null);
-  assert.equal(
-    directive.toString(),
-    '<!--marktest noOuterLineMods-->'
+test('Directive.parse()', () => {
+  assert.deepEqual(
+    parseDirective(raw`<!--marktest noOuterLineMods-->`).toJson(),
+    {
+      lineNumber: 1,
+      attributes: {
+        noOuterLineMods: null,
+      },
+      bodyLabel: null,
+      body: [],
+    },
+    'Valueless attribute'
+  );
+  assert.deepEqual(
+    parseDirective(raw`<!--marktest key="value \"with\" quotes"-->`).toJson(),
+    {
+      lineNumber: 1,
+      attributes: {
+        key: raw`value "with" quotes`,
+      },
+      bodyLabel: null,
+      body: [],
+    },
+    'Attribute value with escaped quotes'
+  );
+  assert.deepEqual(
+    parseDirective(raw`<!--marktest key="a\\b\\c"-->`).toJson(),
+    {
+      lineNumber: 1,
+      attributes: {
+        key: raw`a\b\c`,
+      },
+      bodyLabel: null,
+      body: [],
+    },
+    'Attribute value with backslashes'
+  );
+  assert.deepEqual(
+    parseDirective(raw`<!--marktest key=""-->`).toJson(),
+    {
+      lineNumber: 1,
+      attributes: {
+        key: raw``,
+      },
+      bodyLabel: null,
+      body: [],
+    },
+    'Empty attribute value'
+  );
+  assert.throws(
+    () => parseDirective(raw`<!--marktest key="unclosed-->`),
+    {
+      name: 'UserError',
+      message: raw`Could not parse attributes: Stopped parsing before "=\"unclosed"`,
+    },
+    'Unclosed attribute value'
   );
 });
 
@@ -102,3 +150,11 @@ test('SearchAndReplaceSpec', () => {
     );
   }
 });
+
+function parseDirective(md: string): Directive {
+  const text = extractCommentContent(md);
+  assert.ok(text !== null);
+  const directive = Directive.parse(1, splitLinesExclEol(text));
+  assert.ok(directive !== null);
+  return directive;
+}
