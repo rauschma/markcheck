@@ -2,9 +2,9 @@ import { createSequentialEscaper } from '@rauschma/helpers/js/escaper.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { z } from 'zod';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
-import { TRANSLATOR_MAP } from '../translation/translators.js';
+import type { Translator } from '../translation/translation.js';
 import { UserError, type UserErrorContext } from '../util/errors.js';
-import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_VISITED, LANG_ERROR_IF_RUN, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
+import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_ERROR_IF_VISITED, LANG_NEVER_RUN, LANG_SKIP } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -54,10 +54,15 @@ export type LangDefErrorIfRun = {
   kind: 'LangDefErrorIfRun',
 };
 
-export type Translator = {
-  key: string,
-  translate(lineNumber: number, lines: Array<string>): Array<string>,
-};
+//#################### Translators ####################
+
+const TRANSLATORS: Array<Translator> = [
+  nodeReplToJs
+];
+
+export const TRANSLATOR_MAP = new Map<string, Translator>(
+  TRANSLATORS.map(t => [t.key, t])
+);
 
 //#################### Config ####################
 

@@ -3,9 +3,10 @@ import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as os from 'node:os';
+import type { Translator } from '../translation/translation.js';
 import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
-import { CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand, type Translator } from './config.js';
+import { CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
 import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_AFTER_LINE, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINE, ATTR_KEY_CONTAINED_IN, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_RUN, ATTR_KEY_NEVER_SKIP, ATTR_KEY_NO_OUTER_LINE_MODS, ATTR_KEY_ONLY, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
@@ -465,7 +466,7 @@ export class SingleSnippet extends Snippet {
       let body = this.body.filter(
         (_line, index) => !this.#ignoreLines.has(index + 1)
       );
-  
+
       // We only search-and-replace in visible lines (because we can do what
       // we want in invisible lines).
       const sar = this.#searchAndReplace;
@@ -474,34 +475,40 @@ export class SingleSnippet extends Snippet {
           line => sar.replaceAll(line)
         );
       }
-  
-      // Apply local LineMod insertions
-      const insertedBefore = this.lineMod?.insertedBefore ?? null;
-      const insertedAfter = this.lineMod?.insertedAfter ?? null;
-      const bodyLen = body.length;
-      body = body.flatMap((bodyLine, index) => [
-        ...(
-          insertedBefore && isEqual(bodyLen, insertedBefore.lineNumber, index)
-          ? insertedBefore.lines
-          : []
-        ),
-        bodyLine,
-        ...(
-          insertedAfter && isEqual(bodyLen, insertedAfter.lineNumber, index)
-          ? insertedAfter.lines
-          : []
-        )
-      ]);
-  
-      // The translator changes line indices even further:
-      // - That is why we apply it after inserting lines.
-      // - Consequence: inserted lines are translated
+
+      //----- Push (potentially translated) body with inserted lines -----
+
+      const insertedBefore = ensurePositiveLineNumber(
+        body.length,
+        this.lineMod?.insertedBefore ?? null
+      );
+      const insertedAfter = ensurePositiveLineNumber(
+        body.length,
+        this.lineMod?.insertedAfter ?? null
+      );
       const translator = this.#getTranslator(config);
       if (translator) {
-        body = translator.translate(this.lineNumber, body);
+        const chunks = translator.translate(this.lineNumber, body);
+        for (const chunk of chunks) {
+          if (insertedBefore && chunk.inputLineNumbers.has(insertedBefore.lineNumber)) {
+            lines.push(...insertedBefore.lines);
+          }
+          lines.push(...chunk.outputLines);
+          if (insertedAfter && chunk.inputLineNumbers.has(insertedAfter.lineNumber)) {
+            lines.push(...insertedAfter.lines);
+          }
+        }
+      } else {
+        for (const [index, line] of body.entries()) {
+          if (insertedBefore && insertedBefore.lineNumber === (index + 1)) {
+            lines.push(...insertedBefore.lines);
+          }
+          lines.push(line);
+          if (insertedAfter && insertedAfter.lineNumber === (index + 1)) {
+            lines.push(...insertedAfter.lines);
+          }
+        }
       }
-
-      lines.push(...body);
     }
 
     if (this.lineMod) {
@@ -509,17 +516,6 @@ export class SingleSnippet extends Snippet {
     }
     if (innerAppliedLineMod) {
       innerAppliedLineMod.pushAfterLines(lines);
-    }
-
-    function isEqual(len: number, lineNumber: null | number, positiveIndex: number): boolean {
-      if (lineNumber === null) {
-        return false;
-      }
-      if (lineNumber < 0) {
-        // -1 is the last line number (which is equal to `len`), etc.
-        lineNumber += len + 1;
-      }
-      return lineNumber === (positiveIndex + 1);
     }
   }
 
@@ -736,6 +732,18 @@ export type InsertedLines = {
   lineNumber: number,
   lines: Array<string>,
 };
+export function ensurePositiveLineNumber(lastLineNumber: number, insertedLines: null | InsertedLines): null | InsertedLines {
+  if (insertedLines === null) {
+    return null;
+  }
+  if (insertedLines.lineNumber >= 0) {
+    return insertedLines;
+  }
+  return {
+    lineNumber: lastLineNumber + insertedLines.lineNumber + 1,
+    lines: insertedLines.lines,
+  };
+}
 
 export class LineMod {
   static parse(directive: Directive, kind: LineModKind): LineMod {
@@ -765,7 +773,7 @@ export class LineMod {
             `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for local line mods`
           );
         }
-    
+
         const beforeLineStr = directive.getString(ATTR_KEY_BEFORE_LINE);
         const afterLineStr = directive.getString(ATTR_KEY_AFTER_LINE);
         if (beforeLineStr !== undefined && afterLineStr !== undefined) {

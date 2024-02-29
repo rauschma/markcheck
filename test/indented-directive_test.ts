@@ -37,6 +37,9 @@ test('Indented directive', () => {
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        const selectEntries = () => {};
+        selectEntries(3, 20, 2)
       `,
     }
   );

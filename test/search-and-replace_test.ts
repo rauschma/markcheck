@@ -14,7 +14,7 @@ createSuite(import.meta.url);
 
 test('searchAndReplace', () => {
   const readme = outdent`
-    <!--marktest searchAndReplace="/ \/\/ \([A-Z]\)//"-->
+    <!--marktest searchAndReplace="/ \\/\\/ \\([A-Z]\\)//"-->
     ▲▲▲js
     console.log('First'); // (A)
     console.log('Second'); // (B)
