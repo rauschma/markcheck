@@ -7,7 +7,7 @@ import type { Translator } from '../translation/translation.js';
 import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, PROP_KEY_DEFAULT_FILE_NAME, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINES, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_AT, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -465,13 +465,13 @@ export class SingleSnippet extends Snippet {
     pathOfIncludeIds.delete(includeId);
   }
 
-  #assembleThis(config: Config, idToLineMod: Map<string, LineMod>, lines: Array<string>) {
+  #assembleThis(config: Config, idToLineMod: Map<string, LineMod>, linesOut: Array<string>) {
     const innerAppliedLineMod = this.#getInnerAppliedLineMod(idToLineMod);
     if (innerAppliedLineMod) {
-      innerAppliedLineMod.pushBeforeLines(lines);
+      innerAppliedLineMod.pushBeforeLines(linesOut);
     }
     if (this.localLineMod) {
-      this.localLineMod.pushBeforeLines(lines);
+      this.localLineMod.pushBeforeLines(linesOut);
     }
 
     {
@@ -498,36 +498,24 @@ export class SingleSnippet extends Snippet {
       if (translator) {
         const chunks = translator.translate(this.lineNumber, body);
         for (const chunk of chunks) {
-          const lineGroup = getLineGroup(this.localLineMod?.insertedLines, chunk.inputLineNumbers, body.length);
-          if (lineGroup) {
-            lines.push(...lineGroup);
-          }
-          lines.push(...chunk.outputLines);
-        }
-        const lineGroup = getLineGroup(this.localLineMod?.insertedLines, new Set([body.length + 1]), body.length);
-        if (lineGroup) {
-          lines.push(...lineGroup);
+          this.localLineMod?.insertionRules.pushBeforeLines(body.length, chunk.inputLineNumbers, linesOut);
+          linesOut.push(...chunk.outputLines);
+          this.localLineMod?.insertionRules.pushAfterLines(body.length, chunk.inputLineNumbers, linesOut);
         }
       } else {
         for (const [index, line] of body.entries()) {
-          const lineGroup = getLineGroup(this.localLineMod?.insertedLines, new Set([index + 1]), body.length);
-          if (lineGroup) {
-            lines.push(...lineGroup);
-          }
-          lines.push(line);
-        }
-        const lineGroup = getLineGroup(this.localLineMod?.insertedLines, new Set([body.length + 1]), body.length);
-        if (lineGroup) {
-          lines.push(...lineGroup);
+          this.localLineMod?.insertionRules.pushBeforeLine(body.length, index+1, linesOut);
+          linesOut.push(line);
+          this.localLineMod?.insertionRules.pushAfterLine(body.length, index+1, linesOut);
         }
       }
     }
 
     if (this.localLineMod) {
-      this.localLineMod.pushAfterLines(lines);
+      this.localLineMod.pushAfterLines(linesOut);
     }
     if (innerAppliedLineMod) {
-      innerAppliedLineMod.pushAfterLines(lines);
+      innerAppliedLineMod.pushAfterLines(linesOut);
     }
   }
 
@@ -751,11 +739,137 @@ export type LineModKindLocal = {
   tag: 'LineModKindLocal',
 };
 
-export type InsertedLineGroups = Map<number, Array<string>>;
+export type InsertionRule = {
+  condition: InsertionCondition,
+  lineGroup: Array<string>,
+};
+
+export class InsertionRules {
+  #rules = new Array<InsertionRule>();
+
+  toJson(): JsonValue {
+    return this.#rules.map(
+      rule => [rule.condition.toJson(), rule.lineGroup]
+    );
+  }
+
+  pushRule(insertionRule: InsertionRule): void {
+    this.#rules.push(insertionRule);
+  }
+  pushBeforeLine(lastLineNumber: number, curLineNumber: number, linesOut: Array<string>): void {
+    const lineGroup = this.#getLineGroupBefore(lastLineNumber, curLineNumber);
+    if (lineGroup) {
+      linesOut.push(...lineGroup);
+    }
+  }
+  pushAfterLine(lastLineNumber: number, curLineNumber: number, linesOut: Array<string>): void {
+    const lineGroup = this.#getLineGroupAfter(lastLineNumber, curLineNumber);
+    if (lineGroup) {
+      linesOut.push(...lineGroup);
+    }
+  }
+  pushBeforeLines(lastLineNumber: number, curLineNumbers: Set<number>, linesOut: Array<string>): void {
+    for (const curLineNumber of curLineNumbers) {
+      const lineGroup = this.#getLineGroupBefore(lastLineNumber, curLineNumber);
+      if (lineGroup) {
+        linesOut.push(...lineGroup);
+        return;
+      }
+    }
+  }
+  pushAfterLines(lastLineNumber: number, curLineNumbers: Set<number>, linesOut: Array<string>): void {
+    for (const curLineNumber of curLineNumbers) {
+      const lineGroup = this.#getLineGroupAfter(lastLineNumber, curLineNumber);
+      if (lineGroup) {
+        linesOut.push(...lineGroup);
+        return;
+      }
+    }
+  }
+  #getLineGroupBefore(lastLineNumber: number, curLineNumber: number): null | Array<string> {
+    for (const rule of this.#rules) {
+      if (rule.condition.matchesBefore(lastLineNumber, curLineNumber)) {
+        return rule.lineGroup
+      }
+    }
+    return null;
+  }
+  #getLineGroupAfter(lastLineNumber: number, curLineNumber: number): null | Array<string> {
+    for (const rule of this.#rules) {
+      if (rule.condition.matchesAfter(lastLineNumber, curLineNumber)) {
+        return rule.lineGroup
+      }
+    }
+    return null;
+  }
+}
+
+const RE_INS_COND = /^(before|after):(-?[0-9]+)$/;
+export abstract class InsertionCondition {
+  static parse(str: string): InsertionCondition {
+    const match = RE_INS_COND.exec(str);
+    if (!match) {
+      throw new UserError(`Illegal insertion condition: ${stringify(str)}`);
+    }
+    const lineNumber = Number(match[2]);
+    if (match[1] === 'before') {
+      return new InsCondBefore(lineNumber);
+    } else if (match[1] === 'after') {
+      return new InsCondAfter(lineNumber);
+    } else {
+      throw new InternalError();
+    }
+  }
+  matchesBefore(_lastLineNumber: number, _curLineNumber: number): boolean {
+    return false;
+  }
+  matchesAfter(_lastLineNumber: number, _curLineNumber: number): boolean {
+    return false;
+  }
+  abstract toJson(): JsonValue;
+}
+class InsCondBefore extends InsertionCondition {
+  constructor(public lineNumber: number) {
+    super();
+  }
+  override matchesBefore(lastLineNumber: number, curLineNumber: number): boolean {
+    return curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber);
+  }
+  override toJson(): JsonValue {
+    return 'before:' + this.lineNumber;
+  }
+}
+class InsCondAfter extends InsertionCondition {
+  constructor(public lineNumber: number) {
+    super();
+  }
+  override matchesAfter(lastLineNumber: number, curLineNumber: number): boolean {
+    return curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber);
+  }
+  override toJson(): JsonValue {
+    return 'after:' + this.lineNumber;
+  }
+}
+
+function ensurePositiveLineNumber(lastLineNumber: number, lineNumber: number): number {
+  let posLineNumber = lineNumber;
+  if (posLineNumber < 0) {
+    // * -1 is the last line number
+    // * -2 is the second-to-last line number
+    // * Etc.
+    posLineNumber = lastLineNumber + posLineNumber + 1;
+  }
+  if (!(1 <= posLineNumber && posLineNumber <= lastLineNumber)) {
+    throw new UserError(
+      `Line number must with range [1, ${lastLineNumber}] (-1 means ${lastLineNumber} etc.): ${lineNumber}`
+    );
+  }
+  return posLineNumber;
+}
 
 export class LineMod {
   static parse(directive: Directive, kind: LineModKind): LineMod {
-    const insertedLines: InsertedLineGroups = new Map();
+    const insertionRules = new InsertionRules();
     let beforeLines = new Array<string>();
     let afterLines = new Array<string>();
 
@@ -781,28 +895,28 @@ export class LineMod {
           );
         }
 
-        const beforeLineStr = directive.getString(ATTR_KEY_BEFORE_LINES);
-        if (beforeLineStr === null) {
+        const atStr = directive.getString(ATTR_KEY_AT);
+        if (atStr === null) {
           throw new UserError(
-            `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but not attribute ${stringify(ATTR_KEY_BEFORE_LINES)}`,
+            `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but not attribute ${stringify(ATTR_KEY_AT)}`,
             { lineNumber: directive.lineNumber }
           );
         }
-        const lineNumbers = beforeLineStr
+        const conditions = atStr
           .split(/,/)
-          .map(s => Number(s.trim()))
+          .map(condStr => InsertionCondition.parse(condStr.trim()))
           ;
         const lineGroups = splitInsertedLines(body);
-        if (lineNumbers.length !== lineGroups.length) {
+        if (conditions.length !== lineGroups.length) {
           throw new UserError(
-            `Attribute ${stringify(ATTR_KEY_BEFORE_LINES)} mentions ${lineNumbers.length} line number(s) but the body after ${stringify(BODY_LABEL_INSERT)} has ${lineGroups.length} line group(s) (separated by ${stringify(STR_AROUND_MARKER)})`,
+            `Attribute ${stringify(ATTR_KEY_AT)} mentions ${conditions.length} condition(s) but the body after ${stringify(BODY_LABEL_INSERT)} has ${lineGroups.length} line group(s) (separated by ${stringify(STR_AROUND_MARKER)})`,
             { lineNumber: directive.lineNumber }
           );
         }
-        for (const [index, lineNumber] of lineNumbers.entries()) {
+        for (const [index, condition] of conditions.entries()) {
           const lineGroup = lineGroups[index];
           assertNonNullable(lineGroup);
-          insertedLines.set(lineNumber, lineGroup);
+          insertionRules.pushRule({condition, lineGroup});
         }
         break;
       }
@@ -812,7 +926,7 @@ export class LineMod {
     return new LineMod(
       contextLineNumber(directive.lineNumber),
       kind,
-      insertedLines,
+      insertionRules,
       beforeLines,
       afterLines,
     );
@@ -842,19 +956,19 @@ export class LineMod {
     }
   }
   static fromBeforeLines(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>) {
-    return new LineMod(context, kind, new Map(), beforeLines, []);
+    return new LineMod(context, kind, new InsertionRules(), beforeLines, []);
   }
 
   context: UserErrorContext;
   #kind: LineModKind;
-  insertedLines: InsertedLineGroups;
+  insertionRules: InsertionRules;
   #beforeLines: Array<string>;
   #afterLines: Array<string>;
 
-  private constructor(context: UserErrorContext, kind: LineModKind, insertedLines: InsertedLineGroups, beforeLines: Array<string>, afterLines: Array<string>) {
+  private constructor(context: UserErrorContext, kind: LineModKind, insertedLines: InsertionRules, beforeLines: Array<string>, afterLines: Array<string>) {
     this.context = context;
     this.#kind = kind;
-    this.insertedLines = insertedLines;
+    this.insertionRules = insertedLines;
     this.#beforeLines = beforeLines;
     this.#afterLines = afterLines;
   }
@@ -908,7 +1022,7 @@ export class LineMod {
         break;
       case 'LineModKindLocal':
         props = {
-          insertedLines: Array.from(this.insertedLines.entries()),
+          insertionRules: this.insertionRules.toJson(),
         };
         break;
       default:
@@ -920,24 +1034,6 @@ export class LineMod {
       ...props,
     };
   }
-}
-
-function getLineGroup(insertedLineGroups: undefined | InsertedLineGroups, lineNumbers: Set<number>, lastLineNumber: number): null | Array<string> {
-  if (insertedLineGroups === undefined) {
-    return null;
-  }
-  for (const lineNumber of lineNumbers) {
-    const posLineGroup = insertedLineGroups.get(lineNumber);
-    if (posLineGroup) return posLineGroup;
-
-    // * -1 is the line after the last line
-    // * -2 is the last line
-    // * Etc.
-    const dist = (lastLineNumber + 2) - lineNumber;
-    const negLineGroup = insertedLineGroups.get(-dist);
-    if (negLineGroup) return negLineGroup;
-  }
-  return null;
 }
 
 //#################### ConfigMod ####################

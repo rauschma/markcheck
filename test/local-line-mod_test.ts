@@ -14,7 +14,7 @@ createSuite(import.meta.url);
 
 test('Insert single line', () => {
   const readme = outdent`
-    <!--marktest beforeLines="2" insert:
+    <!--marktest at="before:2" insert:
     err.stack = beautifyStackTrace(err.stack);
     -->
     ▲▲▲js
@@ -47,7 +47,7 @@ test('Insert single line', () => {
 
 test('Insert multiple lines', () => {
   const readme = outdent`
-    <!--marktest beforeLines="1,2,-1" insert:
+    <!--marktest at="before:1, after:1, after:-1" insert:
     // START
     •••
     // MIDDLE
