@@ -46,3 +46,7 @@ export function linesAreSame(here: Array<string>, there: Array<string>): boolean
   }
   return true;
 }
+
+export function rawToCooked(rawStr: string): string {
+  return rawStr.replaceAll(/\\(.)/g, '$1');
+}

@@ -27,24 +27,24 @@ test('Directive.parse()', () => {
     {
       lineNumber: 1,
       attributes: {
-        key: raw`value "with" quotes`,
+        key: raw`value \"with\" quotes`,
       },
       bodyLabel: null,
       body: [],
     },
-    'Attribute value with escaped quotes'
+    'Attribute value with escaped quotes (raw!)'
   );
   assert.deepEqual(
     parseDirective(raw`<!--marktest key="a\\b\\c"-->`).toJson(),
     {
       lineNumber: 1,
       attributes: {
-        key: raw`a\b\c`,
+        key: raw`a\\b\\c`,
       },
       bodyLabel: null,
       body: [],
     },
-    'Attribute value with backslashes'
+    'Attribute value with backslashes (raw!)'
   );
   assert.deepEqual(
     parseDirective(raw`<!--marktest key=""-->`).toJson(),

@@ -183,7 +183,12 @@ export const CONFIG_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
 
 const MARKTEST_MARKER = 'marktest';
 const RE_BODY_LABEL = re`/(?<bodyLabel>${RE_LABEL}:)/`;
-const RE_QUOTED_VALUE = re`/"(?<value>(\\"|\\\\|[^"])*)"/`;
+// Attribute values are stored raw – then we can decide in each case how to
+// handle backslashes. That is useful when there is nested quoting:
+// ```
+// key="before:'Don\'t do it!'"
+// ```
+const RE_QUOTED_VALUE = re`/"(?<value>(\\.|[^"])*)"/`;
 const RE_KEY_VALUE = re`/(?<key>${RE_LABEL})([ \t]*=[ \t]*${RE_QUOTED_VALUE})?/`;
 const RE_TOKEN = re`/[ \t]+(${RE_BODY_LABEL}|${RE_KEY_VALUE})/uy`;
 
@@ -204,7 +209,7 @@ export class Directive {
     const directive = new Directive(lineNumber, body);
     RE_TOKEN.lastIndex = 0;
     while (true) {
-      // .lastIndex is reset if there is no match
+      // .lastIndex is reset if there is no match: Save it for later.
       const lastIndex = RE_TOKEN.lastIndex;
       const match = RE_TOKEN.exec(firstLine);
       if (!match) {
@@ -224,7 +229,7 @@ export class Directive {
         if (match.groups.value !== undefined) {
           directive.setAttribute(
             match.groups.key,
-            match.groups.value.replaceAll(/\\(.)/g, '$1')
+            match.groups.value
           );
         } else {
           directive.setAttribute(match.groups.key, Valueless);
