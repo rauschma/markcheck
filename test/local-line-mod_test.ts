@@ -12,9 +12,9 @@ const { runFile } = await import('../src/core/run-snippets.js');
 
 createSuite(import.meta.url);
 
-test('afterLine insert', () => {
+test('Insert single line', () => {
   const readme = outdent`
-    <!--marktest afterLine="1" insert:
+    <!--marktest beforeLines="2" insert:
     err.stack = beautifyStackTrace(err.stack);
     -->
     ▲▲▲js
@@ -45,14 +45,18 @@ test('afterLine insert', () => {
   );
 });
 
-test('beforeLine insert', () => {
+test('Insert multiple lines', () => {
   const readme = outdent`
-    <!--marktest afterLine="-1" insert:
-    // LAST
+    <!--marktest beforeLines="1,2,-1" insert:
+    // START
+    •••
+    // MIDDLE
+    •••
+    // END
     -->
     ▲▲▲js
-    // First
-    // Second
+    // first
+    // second
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
@@ -70,9 +74,11 @@ test('beforeLine insert', () => {
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
-        // First
-        // Second
-        // LAST
+        // START
+        // first
+        // MIDDLE
+        // second
+        // END
       `,
     }
   );

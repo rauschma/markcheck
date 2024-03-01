@@ -92,8 +92,7 @@ export const ATTR_KEY_STDERR = 'stderr';
 //----- Line mods -----
 
 // Local LineMods only!
-export const ATTR_KEY_BEFORE_LINE = 'beforeLine';
-export const ATTR_KEY_AFTER_LINE = 'afterLine';
+export const ATTR_KEY_BEFORE_LINES = 'beforeLines';
 
 // Global line mods
 export const ATTR_KEY_EACH = 'each';
@@ -139,8 +138,7 @@ export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrV
   [ATTR_KEY_ID, AttrValue.String],
   //
   // Local LineMods only!
-  [ATTR_KEY_BEFORE_LINE, AttrValue.String],
-  [ATTR_KEY_AFTER_LINE, AttrValue.String],
+  [ATTR_KEY_BEFORE_LINES, AttrValue.String],
   //
   [ATTR_KEY_ONLY, AttrValue.Valueless],
   [ATTR_KEY_SKIP, AttrValue.Valueless],

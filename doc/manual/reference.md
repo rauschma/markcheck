@@ -60,6 +60,10 @@ After `marktest` there are zero or more attributes. The first line ends either w
     * A local line mod
     * A code block directive that uses the line mod locally.
 * Body label `insert:`: Only supported for local line mods.
+  * Attribute `beforeLines`:
+    * `-1` is the line after the last line
+    * `-2` is the last line
+    * Etc.
 
 ## Entities
 
@@ -145,8 +149,11 @@ Running:
 
 ### Local line mods
 
-* `beforeLine`
-* `afterLine`
+* `beforeLines`: comma-separated line numbers
+  * `-1` is the line after the last line
+  * `-2` is the last line
+  * Etc.
+
 
 ### Global line mods
 

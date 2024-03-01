@@ -7,7 +7,7 @@ import type { Translator } from '../translation/translation.js';
 import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
 import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, PROP_KEY_DEFAULT_FILE_NAME, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_ALWAYS_RUN, ATTR_KEY_AFTER_LINE, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINE, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINES, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -381,7 +381,7 @@ export class SingleSnippet extends Snippet {
     }
     throw new UserError(
       `Snippet does not have a filename: neither via config (${stringify(CONFIG_KEY_LANG)} property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}) nor via attribute ${stringify(ATTR_KEY_INTERNAL)}`,
-      {lineNumber: this.lineNumber}
+      { lineNumber: this.lineNumber }
     );
   }
 
@@ -494,35 +494,31 @@ export class SingleSnippet extends Snippet {
 
       //----- Push (potentially translated) body with inserted lines -----
 
-      const insertedBefore = ensurePositiveLineNumber(
-        body.length,
-        this.localLineMod?.insertedBefore ?? null
-      );
-      const insertedAfter = ensurePositiveLineNumber(
-        body.length,
-        this.localLineMod?.insertedAfter ?? null
-      );
       const translator = this.#getTranslator(config);
       if (translator) {
         const chunks = translator.translate(this.lineNumber, body);
         for (const chunk of chunks) {
-          if (insertedBefore && chunk.inputLineNumbers.has(insertedBefore.lineNumber)) {
-            lines.push(...insertedBefore.lines);
+          const lineGroup = getLineGroup(this.localLineMod?.insertedLines, chunk.inputLineNumbers, body.length);
+          if (lineGroup) {
+            lines.push(...lineGroup);
           }
           lines.push(...chunk.outputLines);
-          if (insertedAfter && chunk.inputLineNumbers.has(insertedAfter.lineNumber)) {
-            lines.push(...insertedAfter.lines);
-          }
+        }
+        const lineGroup = getLineGroup(this.localLineMod?.insertedLines, new Set([body.length + 1]), body.length);
+        if (lineGroup) {
+          lines.push(...lineGroup);
         }
       } else {
         for (const [index, line] of body.entries()) {
-          if (insertedBefore && insertedBefore.lineNumber === (index + 1)) {
-            lines.push(...insertedBefore.lines);
+          const lineGroup = getLineGroup(this.localLineMod?.insertedLines, new Set([index + 1]), body.length);
+          if (lineGroup) {
+            lines.push(...lineGroup);
           }
           lines.push(line);
-          if (insertedAfter && insertedAfter.lineNumber === (index + 1)) {
-            lines.push(...insertedAfter.lines);
-          }
+        }
+        const lineGroup = getLineGroup(this.localLineMod?.insertedLines, new Set([body.length + 1]), body.length);
+        if (lineGroup) {
+          lines.push(...lineGroup);
         }
       }
     }
@@ -595,8 +591,11 @@ export class SequenceSnippet extends Snippet {
     this.elements.push(singleSnippet);
   }
 
-  pushElement(singleSnippet: SingleSnippet): void {
-    const num = singleSnippet.sequenceNumber;
+  get nextSequenceNumber(): string {
+    return `${this.elements.length + 1}/${this.total}`;
+  }
+
+  pushElement(singleSnippet: SingleSnippet, num: SequenceNumber): void {
     assertNonNullable(num);
     if (num.total !== this.total) {
       throw new UserError(
@@ -752,27 +751,11 @@ export type LineModKindLocal = {
   tag: 'LineModKindLocal',
 };
 
-export type InsertedLines = {
-  lineNumber: number,
-  lines: Array<string>,
-};
-export function ensurePositiveLineNumber(lastLineNumber: number, insertedLines: null | InsertedLines): null | InsertedLines {
-  if (insertedLines === null) {
-    return null;
-  }
-  if (insertedLines.lineNumber >= 0) {
-    return insertedLines;
-  }
-  return {
-    lineNumber: lastLineNumber + insertedLines.lineNumber + 1,
-    lines: insertedLines.lines,
-  };
-}
+export type InsertedLineGroups = Map<number, Array<string>>;
 
 export class LineMod {
   static parse(directive: Directive, kind: LineModKind): LineMod {
-    let insertedBefore: null | InsertedLines = null;
-    let insertedAfter: null | InsertedLines = null;
+    const insertedLines: InsertedLineGroups = new Map();
     let beforeLines = new Array<string>();
     let afterLines = new Array<string>();
 
@@ -798,33 +781,28 @@ export class LineMod {
           );
         }
 
-        const beforeLineStr = directive.getString(ATTR_KEY_BEFORE_LINE);
-        const afterLineStr = directive.getString(ATTR_KEY_AFTER_LINE);
-        if (beforeLineStr !== null && afterLineStr !== null) {
-          const split = splitAroundLines(body);
-          insertedBefore = {
-            lineNumber: Number(beforeLineStr),
-            lines: split.beforeLines,
-          };
-          insertedAfter = {
-            lineNumber: Number(afterLineStr),
-            lines: split.afterLines,
-          };
-        } else if (beforeLineStr !== null) {
-          insertedBefore = {
-            lineNumber: Number(beforeLineStr),
-            lines: body,
-          };
-        } else if (afterLineStr !== null) {
-          insertedAfter = {
-            lineNumber: Number(afterLineStr),
-            lines: body,
-          };
-        } else {
+        const beforeLineStr = directive.getString(ATTR_KEY_BEFORE_LINES);
+        if (beforeLineStr === null) {
           throw new UserError(
-            `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but neither attribute ${stringify(ATTR_KEY_BEFORE_LINE)} nor attribute ${stringify(ATTR_KEY_AFTER_LINE)}`,
+            `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but not attribute ${stringify(ATTR_KEY_BEFORE_LINES)}`,
             { lineNumber: directive.lineNumber }
           );
+        }
+        const lineNumbers = beforeLineStr
+          .split(/,/)
+          .map(s => Number(s.trim()))
+          ;
+        const lineGroups = splitInsertedLines(body);
+        if (lineNumbers.length !== lineGroups.length) {
+          throw new UserError(
+            `Attribute ${stringify(ATTR_KEY_BEFORE_LINES)} mentions ${lineNumbers.length} line number(s) but the body after ${stringify(BODY_LABEL_INSERT)} has ${lineGroups.length} line group(s) (separated by ${stringify(STR_AROUND_MARKER)})`,
+            { lineNumber: directive.lineNumber }
+          );
+        }
+        for (const [index, lineNumber] of lineNumbers.entries()) {
+          const lineGroup = lineGroups[index];
+          assertNonNullable(lineGroup);
+          insertedLines.set(lineNumber, lineGroup);
         }
         break;
       }
@@ -834,8 +812,9 @@ export class LineMod {
     return new LineMod(
       contextLineNumber(directive.lineNumber),
       kind,
-      insertedBefore, insertedAfter,
-      beforeLines, afterLines
+      insertedLines,
+      beforeLines,
+      afterLines,
     );
 
     function splitAroundLines(lines: Array<string>): { beforeLines: Array<string>, afterLines: Array<string> } {
@@ -848,23 +827,34 @@ export class LineMod {
         afterLines: lines.slice(markerIndex + 1),
       };
     }
+    function splitInsertedLines(lines: Array<string>): Array<Array<string>> {
+      const result: Array<Array<string>> = [[]];
+      for (const line of lines) {
+        if (RE_AROUND_MARKER.test(line)) {
+          result.push([]);
+        } else {
+          const lastLineGroup = result.at(-1);
+          assertNonNullable(lastLineGroup);
+          lastLineGroup.push(line);
+        }
+      }
+      return result;
+    }
   }
   static fromBeforeLines(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>) {
-    return new LineMod(context, kind, null, null, beforeLines, []);
+    return new LineMod(context, kind, new Map(), beforeLines, []);
   }
 
   context: UserErrorContext;
   #kind: LineModKind;
-  insertedBefore: null | InsertedLines;
-  insertedAfter: null | InsertedLines;
+  insertedLines: InsertedLineGroups;
   #beforeLines: Array<string>;
   #afterLines: Array<string>;
 
-  private constructor(context: UserErrorContext, kind: LineModKind, insertedBefore: null | InsertedLines, insertedAfter: null | InsertedLines, beforeLines: Array<string>, afterLines: Array<string>) {
+  private constructor(context: UserErrorContext, kind: LineModKind, insertedLines: InsertedLineGroups, beforeLines: Array<string>, afterLines: Array<string>) {
     this.context = context;
     this.#kind = kind;
-    this.insertedBefore = insertedBefore;
-    this.insertedAfter = insertedAfter;
+    this.insertedLines = insertedLines;
     this.#beforeLines = beforeLines;
     this.#afterLines = afterLines;
   }
@@ -918,8 +908,7 @@ export class LineMod {
         break;
       case 'LineModKindLocal':
         props = {
-          insertedBefore: this.insertedBefore,
-          insertedAfter: this.insertedAfter,
+          insertedLines: Array.from(this.insertedLines.entries()),
         };
         break;
       default:
@@ -931,6 +920,24 @@ export class LineMod {
       ...props,
     };
   }
+}
+
+function getLineGroup(insertedLineGroups: undefined | InsertedLineGroups, lineNumbers: Set<number>, lastLineNumber: number): null | Array<string> {
+  if (insertedLineGroups === undefined) {
+    return null;
+  }
+  for (const lineNumber of lineNumbers) {
+    const posLineGroup = insertedLineGroups.get(lineNumber);
+    if (posLineGroup) return posLineGroup;
+
+    // * -1 is the line after the last line
+    // * -2 is the last line
+    // * Etc.
+    const dist = (lastLineNumber + 2) - lineNumber;
+    const negLineGroup = insertedLineGroups.get(-dist);
+    if (negLineGroup) return negLineGroup;
+  }
+  return null;
 }
 
 //#################### ConfigMod ####################

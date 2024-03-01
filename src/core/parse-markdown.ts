@@ -126,7 +126,14 @@ export function parseMarkdown(text: string): ParseMarkdownResult {
       openSequence = new SequenceSnippet(snippet);
     } else {
       // There is an active sequence
-      openSequence.pushElement(snippet);
+      const num = snippet.sequenceNumber;
+      if (num === null) {
+        throw new UserError(
+          `Snippet has no sequence number (expected: ${openSequence.nextSequenceNumber})`,
+          {lineNumber: snippet.lineNumber}
+        );
+      }
+      openSequence.pushElement(snippet, num);
     }
     if (openSequence.isComplete()) {
       result.push(openSequence);
