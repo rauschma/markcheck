@@ -12,7 +12,7 @@ test('config.toJson()', () => {
     json,
     {
       "lang": {
-        "": "[neverRun]",
+        "": "[skip]",
         "js": {
           "defaultFileName": "main.mjs",
           "commands": [

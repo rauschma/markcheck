@@ -1,9 +1,11 @@
 # Todo
 
+At the end of `runFile()`: don’t re-throw `UserError`, report it and continue processing?
+
+* Built-in check for JSON
 * Reset file system after a unit test.
   * Must work afterwards: `test/parse-demo-javascript_test.ts`
 * Test inserting JS into REPL code
-* At the end of `runFile()`: don’t re-throw `UserError`, report it and continue processing?
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?

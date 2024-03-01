@@ -19,8 +19,7 @@ export const ATTR_KEY_ID = 'id';
 
 export const ATTR_KEY_ONLY = 'only';
 export const ATTR_KEY_SKIP = 'skip';
-export const ATTR_KEY_NEVER_SKIP = 'neverSkip';
-export const ATTR_KEY_NEVER_RUN = 'neverRun';
+export const ATTR_ALWAYS_RUN = 'alwaysRun';
 
 //----- Language -----
 
@@ -33,11 +32,12 @@ export const ATTR_KEY_LANG = 'lang';
 
 //----- Assembling lines -----
 
-export const ATTR_KEY_NO_OUTER_LINE_MODS = 'noOuterLineMods';
 export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
 export const ATTR_KEY_APPLY_INNER = 'applyInner';
 export const ATTR_KEY_APPLY_OUTER = 'applyOuter';
+/** Exclude config lines and global LineMods */
+export const ATTR_KEY_ONLY_LOCAL_LINES = 'onlyLocalLines';
 export const ATTR_KEY_IGNORE_LINES = 'ignoreLines';
 export const ATTR_KEY_SEARCH_AND_REPLACE = 'searchAndReplace';
 
@@ -48,8 +48,10 @@ export const ATTR_KEY_CONTAINED_IN_FILE = 'containedInFile';
 
 //----- Writing and referring to files -----
 
-export const ATTR_KEY_WRITE = 'write';
-export const ATTR_KEY_WRITE_AND_RUN = 'writeAndRun';
+export const ATTR_KEY_WRITE_INNER = 'writeInner';
+export const ATTR_KEY_WRITE_OUTER = 'writeOuter';
+
+export const ATTR_KEY_INTERNAL = 'internal';
 
 /**
  * ```
@@ -98,17 +100,15 @@ export const ATTR_KEY_EACH = 'each';
 // Applicable line mods have the attribute `id`
 
 //========== Language constants ==========
-// - Location 1: values of attribute `lang`
-// - Location 2: In configurations for language definitions (property
-//   values of "lang" object).
 
+// In configurations for language definitions (property values of "lang"
+// object).
 export const LANG_KEY_EMPTY = '';
-export const LANG_NEVER_RUN = '[neverRun]';
 export const LANG_SKIP = '[skip]';
 export const LANG_ERROR_IF_RUN = '[errorIfRun]';
-export const LANG_ERROR_IF_VISITED = '[errorIfVisited]';
 
-export const RE_LANG_VALUE = /^((?!\[).*|\[neverRun\]|\[skip\]|\[errorIfRun\]|\[errorIfVisited\])$/;
+// Values of property `lang`
+export const RE_LANG_VALUE = /^(?!\[).*$/;
 
 //========== Body labels ==========
 
@@ -144,24 +144,24 @@ export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrV
   //
   [ATTR_KEY_ONLY, AttrValue.Valueless],
   [ATTR_KEY_SKIP, AttrValue.Valueless],
-  [ATTR_KEY_NEVER_SKIP, AttrValue.Valueless],
-  [ATTR_KEY_NEVER_RUN, AttrValue.Valueless],
+  [ATTR_ALWAYS_RUN, AttrValue.Valueless],
   //
   [ATTR_KEY_LANG, RE_LANG_VALUE],
   //
-  [ATTR_KEY_NO_OUTER_LINE_MODS, AttrValue.Valueless],
   [ATTR_KEY_SEQUENCE, AttrValue.String],
   [ATTR_KEY_INCLUDE, AttrValue.String],
   [ATTR_KEY_APPLY_INNER, AttrValue.String],
   [ATTR_KEY_APPLY_OUTER, AttrValue.String],
+  [ATTR_KEY_ONLY_LOCAL_LINES, AttrValue.Valueless],
   [ATTR_KEY_IGNORE_LINES, AttrValue.String],
   [ATTR_KEY_SEARCH_AND_REPLACE, AttrValue.String],
   //
   [ATTR_KEY_SAME_AS_ID, AttrValue.String],
   [ATTR_KEY_CONTAINED_IN_FILE, AttrValue.String],
   //
-  [ATTR_KEY_WRITE, AttrValue.String],
-  [ATTR_KEY_WRITE_AND_RUN, AttrValue.String],
+  [ATTR_KEY_WRITE_INNER, AttrValue.String],
+  [ATTR_KEY_WRITE_OUTER, AttrValue.String],
+  [ATTR_KEY_INTERNAL, AttrValue.String],
   [ATTR_KEY_EXTERNAL, AttrValue.String],
   //
   [ATTR_KEY_STDOUT, AttrValue.String],
@@ -286,8 +286,8 @@ export class Directive {
   getAttribute(key: string): undefined | typeof Valueless | string {
     return this.#attributes.get(key);
   }
-  getString(key: string): undefined | string {
-    const value = this.getAttribute(key);
+  getString(key: string): null | string {
+    const value = this.getAttribute(key) ?? null;
     if (value === Valueless) {
       throw new UserError(
         `Attribute ${stringify(key)} should be missing or a string but was valueless`
@@ -295,11 +295,16 @@ export class Directive {
     }
     return value;
   }
+  getBoolean(key: string): boolean {
+    const value = this.getAttribute(key);
+    if (value === undefined) return false;
+    if (value === Valueless) return true;
+    throw new UserError(
+      `Attribute ${stringify(key)} should be missing or valueless but was ${stringify(value)}`
+    );
+  }
   hasAttribute(key: string): boolean {
     return this.#attributes.has(key);
-  }
-  hasValuelessAttribute(key: string): boolean {
-    return this.#attributes.get(key) === Valueless;
   }
   checkAttributes(expectedAttributes: ExpectedAttributeValues): void {
     for (const [k, v] of this.#attributes) {

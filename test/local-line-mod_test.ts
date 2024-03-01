@@ -2,7 +2,7 @@ import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 import { dirToJson, jsonToCleanDir } from '@rauschma/helpers/nodejs/dir-json.js';
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
-import { FileStatus, LogLevel, SingleSnippet } from '../src/core/entities.js';
+import { FileStatus, LogLevel } from '../src/core/entities.js';
 import { outputIgnored } from '../src/core/run-snippets.js';
 
 // Only dynamically imported modules use the patched `node:fs`!

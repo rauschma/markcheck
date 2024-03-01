@@ -52,7 +52,7 @@ test('Assemble lines with line mods', () => {
       'marktest-config.jsonc': outdent`
         {
           "lang": {
-            "": "[neverRun]",
+            "": "[skip]",
             "js": {
               "before": [
                 "// Config line BEFORE"

@@ -12,9 +12,9 @@ const { runFile } = await import('../src/core/run-snippets.js');
 
 createSuite(import.meta.url);
 
-test('ignoreLines: success', () => {
+test('containedInFile: success', () => {
   const readme = outdent`
-    <!--marktest containedInFile="other.js"-->
+    <!--marktest containedInFile="other.js" skip-->
     ▲▲▲js
     // green
     // blue
@@ -43,9 +43,9 @@ test('ignoreLines: success', () => {
 });
 
 
-test('ignoreLines: failure', () => {
+test('containedInFile: failure', () => {
   const readme = outdent`
-    <!--marktest containedInFile="other.js"-->
+    <!--marktest containedInFile="other.js" skip-->
     ▲▲▲js
     // black
     ▲▲▲

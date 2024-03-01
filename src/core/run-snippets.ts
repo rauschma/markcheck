@@ -15,7 +15,7 @@ import { UserError, contextDescription, contextLineNumber, describeUserErrorCont
 import { linesAreSame, linesContain, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDefCommand } from './config.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, FileStatus, GlobalVisitationMode, Heading, LineMod, LogLevel, Snippet, VisitationMode, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type MarktestEntity } from './entities.js';
+import { ConfigMod, FileStatus, GlobalRunningMode, Heading, LineMod, LogLevel, Snippet, RuningMode, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type MarktestEntity } from './entities.js';
 import { parseMarkdown, type ParseMarkdownResult } from './parse-markdown.js';
 
 //@ts-expect-error: Module '#package_json' has no default export.
@@ -67,9 +67,9 @@ export function runFile(out: Output, logLevel: LogLevel, absFilePath: string, pm
     fs.mkdirSync(tmpDir);
   }
 
-  let globalVisitationMode = GlobalVisitationMode.Normal;
-  if (pmr.entities.some((e) => e instanceof Snippet && e.visitationMode === VisitationMode.Only)) {
-    globalVisitationMode = GlobalVisitationMode.Only;
+  let globalVisitationMode = GlobalRunningMode.Normal;
+  if (pmr.entities.some((e) => e instanceof Snippet && e.runningMode === RuningMode.Only)) {
+    globalVisitationMode = GlobalRunningMode.Only;
   }
 
   const config = new Config();
@@ -108,12 +108,21 @@ export function runFile(out: Output, logLevel: LogLevel, absFilePath: string, pm
       }
     } catch (err) {
       if (err instanceof UserError) {
-        throw err;
+        const description = (
+          err.context
+          ? describeUserErrorContext( err.context )
+          : 'unknown context'
+        );
+        console.log(`${STATUS_EMOJI_FAILURE} ${err.message} (${description})`);
+        if (err.stack) {
+          console.log(err.stack);
+        }
+        continue;
       }
       const description = describeUserErrorContext(
         getUserErrorContext(entity)
       );
-      throw new Error(`Unexpected error in entity (${description})`, {cause: err});
+      throw new Error(`Unexpected error in entity (${description})`, { cause: err });
     }
   }
 
@@ -172,30 +181,8 @@ function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHe
 }
 
 function handleSnippet(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): EntityKind {
-  //----- Skipping -----
 
-  // Explicitly skipped
-  if (!snippet.isVisited(cliState.globalVisitationMode)) {
-    return EntityKind.NonRunnable;
-  }
-  const langDef = config.getLang(snippet.lang);
-  if (langDef === undefined) {
-    throw new UserError(
-      `Unknown language: ${JSON.stringify(snippet.lang)}`,
-      { lineNumber: snippet.lineNumber }
-    );
-  }
-  if (langDef.kind === 'LangDefSkip') {
-    return EntityKind.NonRunnable;
-  }
-  if (langDef.kind === 'LangDefErrorIfVisited') {
-    throw new UserError(
-      `Language must be skipped: ${JSON.stringify(snippet.lang)}`,
-      { lineNumber: snippet.lineNumber }
-    );
-  }
-
-  //----- Checks that complement running -----
+  //----- Checks -----
 
   if (snippet.containedInFile) {
     const innerLines = assembleInnerLines(cliState, config, snippet);
@@ -227,34 +214,49 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     }
   }
 
-  //----- Write files (often in preparation for running) -----
+  //----- Writing -----
 
-  // At this point, the file may be written or run or both or neither
-  const lines = assembleOuterLines(cliState, config, snippet);
-  const fileName = snippet.getFileName(langDef);
-  if (fileName) {
-    writeFiles(out, cliState, config, snippet, fileName, lines);
+  const writeOuter: null | string = snippet.writeOuter;
+  if (writeOuter) {
+    const lines = assembleOuterLines(cliState, config, snippet);
+    writeOneFile(out, cliState, config, writeOuter, lines);
+  }
+  const writeInner: null | string = snippet.writeInner;
+  if (writeInner) {
+    const lines = assembleOuterLines(cliState, config, snippet);
+    writeOneFile(out, cliState, config, writeInner, lines);
   }
 
-  //----- Run the snippet’s file -----
+  //----- Skipping -----
 
+  // Explicitly skipped
+  if (!snippet.isRun(cliState.globalVisitationMode)) {
+    return EntityKind.NonRunnable;
+  }
+  const langDef = config.getLang(snippet.lang);
+  if (langDef === undefined) {
+    throw new UserError(
+      `Unknown language: ${JSON.stringify(snippet.lang)}`,
+      { lineNumber: snippet.lineNumber }
+    );
+  }
+  if (langDef.kind === 'LangDefSkip') {
+    return EntityKind.NonRunnable;
+  }
   if (langDef.kind === 'LangDefErrorIfRun') {
     throw new UserError(
       `Language can’t be run: ${JSON.stringify(snippet.lang)}`,
       { lineNumber: snippet.lineNumber }
     );
   }
-  if (langDef.kind === 'LangDefNeverRun') {
-    return EntityKind.NonRunnable;
-  }
+
+  //----- Running -----
+
+  const fileName = snippet.getInternalFileName(langDef);
+  const lines = assembleOuterLines(cliState, config, snippet);
+  writeFiles(out, cliState, config, snippet, fileName, lines);
 
   assertTrue(langDef.kind === 'LangDefCommand');
-  if (fileName === null) {
-    throw new UserError(
-      `Snippet is runnable but its language does not have a ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} nor does the snippet override the default with its own filename`,
-      { lineNumber: snippet.lineNumber }
-    );
-  }
   if (!langDef.commands) {
     throw new UserError(
       `Snippet is runnable but its language does not have ${stringify(PROP_KEY_COMMANDS)}`,
@@ -293,6 +295,9 @@ function writeOneFile(out: Output, cliState: CliState, config: Config, fileName:
 
 //#################### handleSnippetWithCommands() ####################
 
+const STATUS_EMOJI_SUCCESS = ink.FgGreen`✔︎`;
+const STATUS_EMOJI_FAILURE = '❌';
+
 function handleSnippetWithCommands(out: Output, config: Config, cliState: CliState, prevHeading: Heading | null, snippet: Snippet, langDef: LangDefCommand, fileName: string, commands: Array<Array<string>>) {
   if (prevHeading) {
     out.writeLine(ink.Bold(prevHeading.content));
@@ -308,13 +313,13 @@ function handleSnippetWithCommands(out: Output, config: Config, cliState: CliSta
   try {
     runShellCommands(out, cliState, config, snippet, langDef, fileName, commands);
     if (printStatusEmoji) {
-      out.writeLine(' ' + ink.FgGreen`✔︎`);
+      out.writeLine(' ' + STATUS_EMOJI_SUCCESS);
     }
   } catch (err) {
     if (err instanceof UserError) {
       cliState.fileStatus = FileStatus.Failure;
       if (printStatusEmoji) {
-        out.writeLine(' ❌');
+        out.writeLine(' ' + STATUS_EMOJI_FAILURE);
       }
       if (err.stdoutLines) {
         logStdout(out, err.stdoutLines, err.expectedStdoutLines);

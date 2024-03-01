@@ -79,56 +79,49 @@ After directories were paired with code blocks, we get the following entities:
 
 ## Snippet modes: What can be done with snippets?
 
-Visitation:
+Phases of visitation:
 
-* The following key-only attributes control whether a snippet is considered or ignored: `skip`, `neverSkip`, `only`. The visitation mode `normal` is active if none of the previous attributes are present.
-* Snippets with the attribute `skip` are never considered.
-* Snippets with the attribute `neverSkip` are always considered.
-* If one snippet in a file has the attribute `only`, only snippets with the attributes `only` and `neverSkip` are considered. Other files are not affected.
+* Checks: `sameAsId`, `containedInFile`
+* Writing to disk via `writeInner`, `writeOuter`
+  * Skips running. Use `internal` to change the snippet’s default filename and run it.
+* Running:
+  * Writing to disk (current snippet and external snippets it references)
+    * Override main filename via `internal="file-name"`
+  * Running shell commands
 
-The phases of visitation are:
+Running: 
 
-* Assembling lines (considering sequences, includes, line mods, etc.)
-* Writing to disk (current snippet and external snippets it references)
-* Running shell commands
-
-These attributes also affect visitation:
-
-* `id` skips by default. Such snippets are virtually always included by other snippets and do not have to be considered themselves. The default can be overridden via `neverSkip` or `only`.
-* `lang` overrides the language specified by the code block. It can be set to `"[neverRun]"` – which prevents running.
-* `write` sets `lang` to `"[neverRun]"`.
-  * Override by setting `lang` to something else.
-  * Or use attribute `writeAndRun`.
+* The following key-only attributes control whether a snippet is run:
+  * `skip`: Snippet is never run.
+  * `alwaysRun`: Snippet is always run.
+  * `only`: Affects the whole file. Only snippets with this attribute are run.
+  * Visitation mode `normal` (not an attribute): active if none of the previous attributes are present.
+* `id` sets running mode to `skip`.
+  * Override via `alwaysRun` 
 
 ### How lines are assembled
 
-* Once per file (“before” in this order, “after” in reverse):
+* Outer lines – once per file:
   * Configuration `before` lines
   * Global line mod
-  * Outer applicable line mod
-* Once per snippet (in sequences and includes):
-  * ❌ FIXME: describe status quo (see especially `.#pushThis()`)
+  * Outer applied line mod
+* Inner lines – each snippet (solo, included, part of a sequence, etc.):
+  * TODO ❌
+  * `onlyLocalLines`
 
 ## Attributes
 
 ### Code snippets
 
-* Visitation and running mode:
+* Running mode:
   * `only`
   * `skip`
-  * `neverSkip`
-  * `neverRun`: same as `lang="[neverRun]"`
+  * `alwaysRun`
 * Language: `lang`
   * For body directives
-  * To override defaults from code blocks and `write`
-  * Values other than names of actual languages (`"js" etc.`) – see section “Configuration”:
-    * `"[neverRun]"`
-    * `"[skip]"`
-    * `"[errorIfRun]"`
-    * `"[errorIfVisited]"`
+  * To override code blocks
 * Assembling lines:
   * `id="my-id"`
-  * `noOuterLineMods`
   * `sequence="1/3"`
   * `include="id1, $THIS, id2"`:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
@@ -142,8 +135,9 @@ These attributes also affect visitation:
     * `filePath` is either relative to the Markdown file or absolute.
     * The outer LineMods are not applied.
 * Writing and referring to files:
-  * `write`
-  * `writeAndRun`
+  * `writeInner="filePath"`
+  * `writeOuter="filePath"`
+  * `internal="filePath"`
   * `external="id1>lib1.js, lib2.js"`
 * Checking output:
   * `stdout="id"`
@@ -186,7 +180,7 @@ See all defaults: `marktest --print-config`
 <!--marktest config:
 {
   "lang": {
-    "": "[neverRun]",
+    "": "[skip]",
     "js": {
       "before": [
         "import assert from 'node:assert/strict';"
@@ -209,10 +203,8 @@ Variables for `commands`:
 Property `"lang"`:
 
 * Empty key `""`: for “bare” code blocks without languages
-* Value `"[neverRun]"`: Don’t run the snippets. The contents can still be written somewhere. That’s why this value is used for bare code blocks: They are often used for language-specific configuration files (e.g. as needed for Babel).
-* Value `"[skip]"`: Never visit the snippets.
-* Value `"[errorIfRun]"`: Snippets must not be run – which can, e.g., be avoided via attribute `write`.
-* Value `"[errorIfVisited]"`: Snippets must be skipped – e.g. via attribute `id` or attribute `skip`.
+* Value `"[skip]"`: Don’t run the snippets.
+* Value `"[errorIfRun]"`: Snippets must not be run – which can, e.g., be avoided via attribute `skip`.
 
 ## Search and replace
 

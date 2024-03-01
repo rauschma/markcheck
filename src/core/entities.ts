@@ -6,8 +6,8 @@ import * as os from 'node:os';
 import type { Translator } from '../translation/translation.js';
 import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
-import { CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_AFTER_LINE, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINE, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_NEVER_RUN, ATTR_KEY_NEVER_SKIP, ATTR_KEY_NO_OUTER_LINE_MODS, ATTR_KEY_ONLY, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_AND_RUN, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, LANG_NEVER_RUN, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, PROP_KEY_DEFAULT_FILE_NAME, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_ALWAYS_RUN, ATTR_KEY_AFTER_LINE, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_BEFORE_LINE, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 
 const { stringify } = JSON;
 
@@ -67,7 +67,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         // Open snippet with local LineMod
         directive.checkAttributes(SNIPPET_ATTRIBUTES);
         const snippet = SingleSnippet.createOpen(directive);
-        snippet.lineMod = LineMod.parse(directive, {
+        snippet.localLineMod = LineMod.parse(directive, {
           tag: 'LineModKindLocal',
         });
         return snippet;
@@ -114,44 +114,47 @@ export function assembleInnerLines(cliState: CliState, config: Config, snippet: 
 export function assembleOuterLines(cliState: CliState, config: Config, snippet: Snippet) {
   const lines = new Array<string>();
 
-  const outerLineMods = (
-    snippet.noOuterLineMods ? new Array<LineMod>() : collectOuterLineMods()
-  );
+  const outerLineMods = collectOuterLineMods(snippet.onlyLocalLines);
 
   for (let i = 0; i < outerLineMods.length; i++) {
     outerLineMods[i].pushBeforeLines(lines);
   }
-  // Once per snippet (in sequences and includes):
+  // Once per snippet (in sequences, includes, etc.):
   // - Inner applicable line mod
-  // - Local line mod
+  // - Local line mod (before, after, inserted lines)
   snippet.assembleLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
   for (let i = outerLineMods.length - 1; i >= 0; i--) {
     outerLineMods[i].pushAfterLines(lines);
   }
   return lines;
 
-  function collectOuterLineMods(): Array<LineMod> {
+  function collectOuterLineMods(onlyLocalLines: boolean): Array<LineMod> {
     // Once per file:
     // - Config before lines
     // - Global line mod
     // - Outer applicable line mod
     const outerLineMods = new Array<LineMod>();
-    if (snippet.lang) {
-      const lang = config.getLang(snippet.lang);
-      if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
-        outerLineMods.push(
-          LineMod.fromBeforeLines(
-            contextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
-            { tag: 'LineModKindConfig' },
-            lang.beforeLines,
-          )
-        );
+
+    if (!onlyLocalLines) {
+      if (snippet.lang) {
+        const lang = config.getLang(snippet.lang);
+        if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
+          outerLineMods.push(
+            LineMod.fromBeforeLines(
+              contextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
+              { tag: 'LineModKindConfig' },
+              lang.beforeLines,
+            )
+          );
+        }
+      }
+      const globalLineMods = cliState.globalLineMods.get(snippet.lang);
+      if (globalLineMods) {
+        outerLineMods.push(...globalLineMods);
       }
     }
-    const globalLineMods = cliState.globalLineMods.get(snippet.lang);
-    if (globalLineMods) {
-      outerLineMods.push(...globalLineMods);
-    }
+
+    // `applyOuter` contributes outer lines but is applied locally
     const applyOuterId = snippet.applyOuterId;
     if (applyOuterId) {
       const applyLineMod = cliState.idToLineMod.get(applyOuterId);
@@ -185,7 +188,7 @@ export type CliState = {
   logLevel: LogLevel,
   idToSnippet: Map<string, Snippet>,
   idToLineMod: Map<string, LineMod>,
-  globalVisitationMode: GlobalVisitationMode,
+  globalVisitationMode: GlobalRunningMode,
   globalLineMods: Map<string, Array<LineMod>>,
   fileStatus: FileStatus,
   interceptedShellCommands: null | Array<Array<string>>
@@ -195,23 +198,27 @@ export type CliState = {
 
 export abstract class Snippet {
   abstract get lineNumber(): number;
-  abstract get id(): null | string;
   //
-  abstract get visitationMode(): VisitationMode;
+  abstract get id(): null | string;
+  abstract get runningMode(): RuningMode;
+  //
   abstract get lang(): string;
   //
-  abstract get noOuterLineMods(): boolean;
+  abstract get onlyLocalLines(): boolean;
   abstract get applyOuterId(): null | string;
+  //
   abstract get sameAsId(): null | string;
   abstract get containedInFile(): null | string;
   //
+  abstract get writeInner(): null | string;
+  abstract get writeOuter(): null | string;
   abstract get externalSpecs(): Array<ExternalSpec>;
   //
   abstract get stdoutId(): null | string;
   abstract get stderrId(): null | string;
 
-  abstract getFileName(langDef: LangDef): null | string;
-  abstract isVisited(globalVisitationMode: GlobalVisitationMode): boolean;
+  abstract getInternalFileName(langDef: LangDef): string;
+  abstract isRun(globalVisitationMode: GlobalRunningMode): boolean;
   abstract assembleLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
   abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
 
@@ -224,31 +231,31 @@ export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
     const snippet = new SingleSnippet(directive.lineNumber);
 
-    snippet.id = directive.getString(ATTR_KEY_ID) ?? null;
+    snippet.id = directive.getString(ATTR_KEY_ID);
 
-    { // visitationMode
+    { // runningMode
       if (directive.hasAttribute(ATTR_KEY_ID)) {
         // Initial default value:
-        // - By default, snippets with IDs are not visited.
-        //   - Rationale: included somewhere and visited there.
-        // - To still visit a snippet with an ID, use `only` or `neverSkip`.
-        snippet.visitationMode = VisitationMode.Skip;
+        // - By default, snippets with IDs are not run.
+        //   - Rationale: included somewhere and run there.
+        // - To still run a snippet with an ID, use `only` or `alwaysRun`.
+        snippet.runningMode = RuningMode.Skip;
       }
-      let visitationAttributes = 0;
+      let runningAttributes = 0;
       if (directive.hasAttribute(ATTR_KEY_SKIP)) {
-        snippet.visitationMode = VisitationMode.Skip;
-        visitationAttributes++;
+        snippet.runningMode = RuningMode.Skip;
+        runningAttributes++;
       }
-      if (directive.hasAttribute(ATTR_KEY_NEVER_SKIP)) {
-        snippet.visitationMode = VisitationMode.NeverSkip;
-        visitationAttributes++;
+      if (directive.hasAttribute(ATTR_ALWAYS_RUN)) {
+        snippet.runningMode = RuningMode.AlwaysRun;
+        runningAttributes++;
       }
       if (directive.hasAttribute(ATTR_KEY_ONLY)) {
-        snippet.visitationMode = VisitationMode.Only;
-        visitationAttributes++;
+        snippet.runningMode = RuningMode.Only;
+        runningAttributes++;
       }
-      if (visitationAttributes > 1) {
-        const attrs = [ATTR_KEY_SKIP, ATTR_KEY_NEVER_SKIP, ATTR_KEY_ONLY];
+      if (runningAttributes > 1) {
+        const attrs = [ATTR_KEY_SKIP, ATTR_ALWAYS_RUN, ATTR_KEY_ONLY];
         throw new UserError(
           `Snippet has more than one of these attributes: ${attrs.join(', ')}`,
           { lineNumber: directive.lineNumber }
@@ -257,8 +264,6 @@ export class SingleSnippet extends Snippet {
     }
 
     { // Assembling lines
-      snippet.noOuterLineMods = directive.hasAttribute(ATTR_KEY_NO_OUTER_LINE_MODS);
-
       const sequence = directive.getString(ATTR_KEY_SEQUENCE);
       if (sequence) {
         snippet.sequenceNumber = parseSequenceNumber(sequence);
@@ -269,8 +274,9 @@ export class SingleSnippet extends Snippet {
         snippet.includeIds = include.split(/ *, */);
       }
 
-      snippet.#applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER) ?? null;
-      snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER) ?? null;
+      snippet.#applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER);
+      snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER);
+      snippet.onlyLocalLines = directive.getBoolean(ATTR_KEY_ONLY_LOCAL_LINES);
       const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
       if (ignoreLinesStr) {
         snippet.#ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
@@ -283,50 +289,34 @@ export class SingleSnippet extends Snippet {
       }
     }
 
-    const sameAsId = directive.getString(ATTR_KEY_SAME_AS_ID);
-    if (sameAsId) {
-      snippet.sameAsId = sameAsId;
-    }
-    const containedInFile = directive.getString(ATTR_KEY_CONTAINED_IN_FILE);
-    if (containedInFile) {
-      snippet.containedInFile = containedInFile;
-    }
-
-    { // lang
-      if (directive.hasAttribute(ATTR_KEY_WRITE)) {
-        // Default value if attribute `write` exists. Override via
-        // attribute `lang`.
-        snippet.#lang = LANG_NEVER_RUN;
+    { // Checks
+      const sameAsId = directive.getString(ATTR_KEY_SAME_AS_ID);
+      if (sameAsId) {
+        snippet.sameAsId = sameAsId;
       }
-      if (directive.hasAttribute(ATTR_KEY_NEVER_RUN)) {
-        // Default value if attribute `neverRun` exists. Override via
-        // attribute `lang`.
-        snippet.#lang = LANG_NEVER_RUN;
-      }
-      const lang = directive.getString(ATTR_KEY_LANG);
-      if (lang) {
-        snippet.#lang = lang;
+      const containedInFile = directive.getString(ATTR_KEY_CONTAINED_IN_FILE);
+      if (containedInFile) {
+        snippet.containedInFile = containedInFile;
       }
     }
 
-    { // fileName
-      const write = directive.getString(ATTR_KEY_WRITE);
-      if (write) {
-        snippet.#fileName = write;
-      }
-      const writeAndRun = directive.getString(ATTR_KEY_WRITE_AND_RUN);
-      if (writeAndRun) {
-        snippet.#fileName = writeAndRun;
+    const lang = directive.getString(ATTR_KEY_LANG);
+    if (lang) {
+      snippet.#lang = lang;
+    }
+
+    { // File names
+      snippet.writeInner = directive.getString(ATTR_KEY_WRITE_INNER);
+      snippet.writeOuter = directive.getString(ATTR_KEY_WRITE_OUTER);
+      snippet.#internalFileName = directive.getString(ATTR_KEY_INTERNAL);
+      const external = directive.getString(ATTR_KEY_EXTERNAL);
+      if (external) {
+        snippet.externalSpecs = parseExternalSpecs(directive.lineNumber, external);
       }
     }
 
-    const external = directive.getString(ATTR_KEY_EXTERNAL);
-    if (external) {
-      snippet.externalSpecs = parseExternalSpecs(directive.lineNumber, external);
-    }
-
-    snippet.stdoutId = directive.getString(ATTR_KEY_STDOUT) ?? null;
-    snippet.stderrId = directive.getString(ATTR_KEY_STDERR) ?? null;
+    snippet.stdoutId = directive.getString(ATTR_KEY_STDOUT);
+    snippet.stderrId = directive.getString(ATTR_KEY_STDERR);
 
     return snippet;
   }
@@ -345,23 +335,30 @@ export class SingleSnippet extends Snippet {
   }
   lineNumber: number;
   id: null | string = null;
-  lineMod: null | LineMod = null;
-  #applyInnerId: null | string = null;
-  applyOuterId: null | string = null;
-  #ignoreLines = new Set<number>();
-  #searchAndReplace: null | SearchAndReplaceSpec = null;
-  sameAsId: null | string = null;
-  containedInFile: null | string = null;
-  #lang: null | string = null;
-  #fileName: null | string = null;
-  noOuterLineMods: boolean = false;
+  runningMode: RuningMode = RuningMode.Normal;
+  //
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
+  localLineMod: null | LineMod = null;
+  #applyInnerId: null | string = null;
+  applyOuterId: null | string = null;
+  onlyLocalLines = false;
+  #ignoreLines = new Set<number>();
+  #searchAndReplace: null | SearchAndReplaceSpec = null;
+  //
+  sameAsId: null | string = null;
+  containedInFile: null | string = null;
+  //
+  #lang: null | string = null;
+  //
+  writeInner: null | string = null;
+  writeOuter: null | string = null;
+  #internalFileName: null | string = null;
   externalSpecs = new Array<ExternalSpec>();
-  visitationMode: VisitationMode = VisitationMode.Normal;
+  //
   stdoutId: null | string = null;
   stderrId: null | string = null;
-
+  //
   isClosed = false;
   body = new Array<string>();
 
@@ -375,41 +372,44 @@ export class SingleSnippet extends Snippet {
     return this.#lang;
   }
 
-  override getFileName(langDef: LangDef): null | string {
-    if (this.#fileName) {
-      return this.#fileName;
+  override getInternalFileName(langDef: LangDef): string {
+    if (this.#internalFileName) {
+      return this.#internalFileName;
     }
-    if (langDef.kind === 'LangDefCommand') {
-      return langDef.defaultFileName ?? null;
+    if (langDef.kind === 'LangDefCommand' && langDef.defaultFileName !== undefined) {
+      return langDef.defaultFileName;
     }
-    return null;
+    throw new UserError(
+      `Snippet does not have a filename: neither via config (${stringify(CONFIG_KEY_LANG)} property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}) nor via attribute ${stringify(ATTR_KEY_INTERNAL)}`,
+      {lineNumber: this.lineNumber}
+    );
   }
 
-  override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
+  override isRun(globalVisitationMode: GlobalRunningMode): boolean {
     // this.visitationMode is set up by factory methods where `id` etc. are
     // considered.
     switch (globalVisitationMode) {
-      case GlobalVisitationMode.Normal:
-        switch (this.visitationMode) {
-          case VisitationMode.Normal:
-          case VisitationMode.Only:
-          case VisitationMode.NeverSkip:
+      case GlobalRunningMode.Normal:
+        switch (this.runningMode) {
+          case RuningMode.Normal:
+          case RuningMode.Only:
+          case RuningMode.AlwaysRun:
             return true;
-          case VisitationMode.Skip:
+          case RuningMode.Skip:
             return false;
           default:
-            throw new UnsupportedValueError(this.visitationMode);
+            throw new UnsupportedValueError(this.runningMode);
         }
-      case GlobalVisitationMode.Only:
-        switch (this.visitationMode) {
-          case VisitationMode.Only:
-          case VisitationMode.NeverSkip:
+      case GlobalRunningMode.Only:
+        switch (this.runningMode) {
+          case RuningMode.Only:
+          case RuningMode.AlwaysRun:
             return true;
-          case VisitationMode.Normal:
-          case VisitationMode.Skip:
+          case RuningMode.Normal:
+          case RuningMode.Skip:
             return false;
           default:
-            throw new UnsupportedValueError(this.visitationMode);
+            throw new UnsupportedValueError(this.runningMode);
         }
       default:
         throw new UnsupportedValueError(globalVisitationMode);
@@ -436,19 +436,19 @@ export class SingleSnippet extends Snippet {
     let thisWasIncluded = false;
     for (const includeId of this.includeIds) {
       if (includeId === '$THIS') {
-        this.#pushThis(config, idToLineMod, lines);
+        this.#assembleThis(config, idToLineMod, lines);
         thisWasIncluded = true;
         continue;
       }
-      this.#pushOneInclude(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds, includeId);
+      this.#assembleOneInclude(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds, includeId);
     } // for
     if (!thisWasIncluded) {
       // Omitting `$THIS` is the same as putting it last
-      this.#pushThis(config, idToLineMod, lines);
+      this.#assembleThis(config, idToLineMod, lines);
     }
   }
 
-  #pushOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
+  #assembleOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
     if (pathOfIncludeIds.has(includeId)) {
       const idPath = [...pathOfIncludeIds, includeId];
       throw new UserError(`Cycle of includedIds ` + JSON.stringify(idPath));
@@ -465,26 +465,26 @@ export class SingleSnippet extends Snippet {
     pathOfIncludeIds.delete(includeId);
   }
 
-  #pushThis(config: Config, idToLineMod: Map<string, LineMod>, lines: Array<string>) {
+  #assembleThis(config: Config, idToLineMod: Map<string, LineMod>, lines: Array<string>) {
     const innerAppliedLineMod = this.#getInnerAppliedLineMod(idToLineMod);
     if (innerAppliedLineMod) {
       innerAppliedLineMod.pushBeforeLines(lines);
     }
-    if (this.lineMod) {
-      this.lineMod.pushBeforeLines(lines);
+    if (this.localLineMod) {
+      this.localLineMod.pushBeforeLines(lines);
     }
 
     {
-      // - Ignoring lines clashes with inserting lines via `this.lineMod`
-      //   because both change line indices.
+      // - Line-ignoring clashes with line insertion via
+      //   `this.localLineMod` because both change line indices.
       // - However, ignored line numbers would make no sense at all after
       //   inserting lines, which is why ignore first.
       let body = this.body.filter(
         (_line, index) => !this.#ignoreLines.has(index + 1)
       );
 
-      // We only search-and-replace in visible lines (because we can do what
-      // we want in invisible lines).
+      // We only search-and-replace in visible lines (because we can do
+      // whatever we want in invisible lines).
       const sar = this.#searchAndReplace;
       if (sar) {
         body = body.map(
@@ -496,11 +496,11 @@ export class SingleSnippet extends Snippet {
 
       const insertedBefore = ensurePositiveLineNumber(
         body.length,
-        this.lineMod?.insertedBefore ?? null
+        this.localLineMod?.insertedBefore ?? null
       );
       const insertedAfter = ensurePositiveLineNumber(
         body.length,
-        this.lineMod?.insertedAfter ?? null
+        this.localLineMod?.insertedAfter ?? null
       );
       const translator = this.#getTranslator(config);
       if (translator) {
@@ -527,8 +527,8 @@ export class SingleSnippet extends Snippet {
       }
     }
 
-    if (this.lineMod) {
-      this.lineMod.pushAfterLines(lines);
+    if (this.localLineMod) {
+      this.localLineMod.pushAfterLines(lines);
     }
     if (innerAppliedLineMod) {
       innerAppliedLineMod.pushAfterLines(lines);
@@ -560,9 +560,8 @@ export class SingleSnippet extends Snippet {
   }
 
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
-    const fileName = this.getFileName(langDef);
     return [
-      ...(fileName ? [fileName] : []),
+      this.getInternalFileName(langDef),
       ...this.externalSpecs.map(es => es.fileName),
     ];
   }
@@ -646,20 +645,20 @@ export class SequenceSnippet extends Snippet {
   override get id(): null | string {
     return this.firstElement.id;
   }
-  override get visitationMode(): VisitationMode {
-    return this.firstElement.visitationMode;
+  override get runningMode(): RuningMode {
+    return this.firstElement.runningMode;
   }
-  override isVisited(globalVisitationMode: GlobalVisitationMode): boolean {
-    return this.firstElement.isVisited(globalVisitationMode);
+  override isRun(globalVisitationMode: GlobalRunningMode): boolean {
+    return this.firstElement.isRun(globalVisitationMode);
   }
   override get lang(): string {
     return this.firstElement.lang;
   }
-  override get noOuterLineMods(): boolean {
-    return this.firstElement.noOuterLineMods;
-  }
   override get applyOuterId(): null | string {
     return this.firstElement.applyOuterId;
+  }
+  override get onlyLocalLines(): boolean {
+    return this.firstElement.onlyLocalLines;
   }
   override get sameAsId(): null | string {
     return this.firstElement.sameAsId;
@@ -667,11 +666,17 @@ export class SequenceSnippet extends Snippet {
   override get containedInFile(): null | string {
     return this.firstElement.containedInFile;
   }
-  override getFileName(langDef: LangDef): null | string {
-    return this.firstElement.getFileName(langDef);
+  override getInternalFileName(langDef: LangDef): string {
+    return this.firstElement.getInternalFileName(langDef);
   }
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return this.firstElement.getAllFileNames(langDef);
+  }
+  override get writeInner(): null | string {
+    return this.firstElement.writeInner;
+  }
+  override get writeOuter(): null | string {
+    return this.firstElement.writeOuter;
   }
   override get externalSpecs(): Array<ExternalSpec> {
     return this.firstElement.externalSpecs;
@@ -689,13 +694,13 @@ export class SequenceSnippet extends Snippet {
 
 //========== Snippet helper types ==========
 
-export enum VisitationMode {
+export enum RuningMode {
   Normal = 'Normal',
   Only = 'Only',
   Skip = 'Skip',
-  NeverSkip = 'NeverSkip',
+  AlwaysRun = 'AlwaysRun',
 }
-export enum GlobalVisitationMode {
+export enum GlobalRunningMode {
   Normal = 'Normal',
   Only = 'Only',
 }
@@ -795,7 +800,7 @@ export class LineMod {
 
         const beforeLineStr = directive.getString(ATTR_KEY_BEFORE_LINE);
         const afterLineStr = directive.getString(ATTR_KEY_AFTER_LINE);
-        if (beforeLineStr !== undefined && afterLineStr !== undefined) {
+        if (beforeLineStr !== null && afterLineStr !== null) {
           const split = splitAroundLines(body);
           insertedBefore = {
             lineNumber: Number(beforeLineStr),
@@ -805,12 +810,12 @@ export class LineMod {
             lineNumber: Number(afterLineStr),
             lines: split.afterLines,
           };
-        } else if (beforeLineStr !== undefined) {
+        } else if (beforeLineStr !== null) {
           insertedBefore = {
             lineNumber: Number(beforeLineStr),
             lines: body,
           };
-        } else if (afterLineStr !== undefined) {
+        } else if (afterLineStr !== null) {
           insertedAfter = {
             lineNumber: Number(afterLineStr),
             lines: body,
