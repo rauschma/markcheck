@@ -12,7 +12,7 @@ const RE_LABEL = /[A-Za-z0-9\-_]+/;
 
 //========== Attribute keys ==========
 
-// Used by attributes: stdout, stderr, include, applyInner, applyOuter
+// Referenced by attributes: include, stdout, stderr
 export const ATTR_KEY_ID = 'id';
 
 //----- Explicit visitation and running mode -----
@@ -91,12 +91,15 @@ export const ATTR_KEY_STDERR = 'stderr';
 
 //----- Line mods -----
 
-// Local LineMods only!
-export const ATTR_KEY_AT = 'at';
-
 // Global line mods
 export const ATTR_KEY_EACH = 'each';
-// Applicable line mods have the attribute `id`
+
+// Applicable line mods
+// - Referenced by attributes: applyInner, applyOuter
+export const ATTR_KEY_LINE_MOD_ID = 'lineModId';
+
+// Body label `insert:` (local LineMods only)
+export const ATTR_KEY_AT = 'at';
 
 //========== Language constants ==========
 
@@ -119,7 +122,7 @@ export const BODY_LABEL_BODY = 'body:';
 export const BODY_LABEL_BEFORE = 'before:';
 export const BODY_LABEL_AFTER = 'after:';
 export const BODY_LABEL_AROUND = 'around:';
-export const BODY_LABEL_INSERT = 'insert:'; // only local LineMods
+export const BODY_LABEL_INSERT = 'insert:'; // local LineMods only
 
 //========== Command variables ==========
 
@@ -137,7 +140,7 @@ export type ExpectedAttributeValues = Map<string, AttrValue | RegExp>;
 export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
   [ATTR_KEY_ID, AttrValue.String],
   //
-  // Local LineMods only!
+  // Body label `insert:` (local LineMods only)
   [ATTR_KEY_AT, AttrValue.String],
   //
   [ATTR_KEY_ONLY, AttrValue.Valueless],
@@ -171,7 +174,7 @@ export const GLOBAL_LINE_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
 ]);
 
 export const APPLICABLE_LINE_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
-  [ATTR_KEY_ID, AttrValue.String],
+  [ATTR_KEY_LINE_MOD_ID, AttrValue.String],
 ]);
 
 export const CONFIG_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([

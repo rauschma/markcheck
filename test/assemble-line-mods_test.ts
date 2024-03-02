@@ -36,12 +36,12 @@ test('Assemble lines with line mods', () => {
     //
     ▲▲▲
     
-    <!--marktest id="inner-line-mod" around:
+    <!--marktest lineModId="inner-line-mod" around:
     // Inner line mod BEFORE
     •••
     // Inner line mod AFTER
     -->
-    <!--marktest id="outer-line-mod" around:
+    <!--marktest lineModId="outer-line-mod" around:
     // Outer line mod BEFORE
     •••
     // Outer line mod AFTER

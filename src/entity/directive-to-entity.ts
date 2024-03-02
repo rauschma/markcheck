@@ -1,5 +1,5 @@
 import { UserError } from '../util/errors.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_EACH, ATTR_KEY_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, SNIPPET_ATTRIBUTES, type Directive } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_EACH, ATTR_KEY_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, SNIPPET_ATTRIBUTES, type Directive, ATTR_KEY_LINE_MOD_ID } from './directive.js';
 import { LineMod } from './line-mod.js';
 import { SingleSnippet } from './snippet.js';
 import { ConfigMod } from './config-mod.js';
@@ -27,10 +27,12 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     case null: {
       if (directive.bodyLabel !== null) {
         // Either:
-        // - LineMod (global or applicable)
+        // - Global LineMod
+        // - Applicable LineMod
         // - Open snippet with local LineMod
+
         const each = directive.getString(ATTR_KEY_EACH);
-        if (each) {
+        if (each !== null) {
           // Global LineMod
           directive.checkAttributes(GLOBAL_LINE_MOD_ATTRIBUTES);
           return LineMod.parse(directive, {
@@ -38,8 +40,9 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
             targetLanguage: each,
           });
         }
-        const id = directive.getString(ATTR_KEY_ID);
-        if (id) {
+
+        const id = directive.getString(ATTR_KEY_LINE_MOD_ID);
+        if (id !== null) {
           // Applicable LineMod
           directive.checkAttributes(APPLICABLE_LINE_MOD_ATTRIBUTES);
           return LineMod.parse(directive, {
@@ -47,6 +50,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
             id,
           });
         }
+
         // Open snippet with local LineMod
         directive.checkAttributes(SNIPPET_ATTRIBUTES);
         const snippet = SingleSnippet.createOpen(directive);
@@ -55,7 +59,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         });
         return snippet;
       } else {
-        // Open snippet
+        // Open snippet without a local LineMod
         directive.checkAttributes(SNIPPET_ATTRIBUTES);
         return SingleSnippet.createOpen(directive);
       }
