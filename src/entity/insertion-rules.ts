@@ -3,10 +3,16 @@ import { InternalError, UserError } from '../util/errors.js';
 
 const {stringify} = JSON;
 
-export type InsertionRule = {
-  condition: InsertionCondition;
-  lineGroup: Array<string>;
-};
+export enum LineLocModifier {
+  Before = 'Before',
+  After = 'After',
+}
+
+function lineLocationModifierToString(modifier: LineLocModifier): string {
+  return modifier;
+}
+
+//#################### InsertionRules ####################
 
 export class InsertionRules {
   #rules = new Array<InsertionRule>();
@@ -20,53 +26,30 @@ export class InsertionRules {
   pushRule(insertionRule: InsertionRule): void {
     this.#rules.push(insertionRule);
   }
-  pushBeforeLine(lastLineNumber: number, curLineNumber: number, linesOut: Array<string>): void {
-    const lineGroup = this.#getLineGroupBefore(lastLineNumber, curLineNumber);
+
+  maybePushLineGroup(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string, linesOut: Array<string>): void {
+    const lineGroup = this.#getLineGroup(modifier, lastLineNumber, curLineNumber, line);
     if (lineGroup) {
       linesOut.push(...lineGroup);
     }
   }
-  pushAfterLine(lastLineNumber: number, curLineNumber: number, linesOut: Array<string>): void {
-    const lineGroup = this.#getLineGroupAfter(lastLineNumber, curLineNumber);
-    if (lineGroup) {
-      linesOut.push(...lineGroup);
-    }
-  }
-  pushBeforeLines(lastLineNumber: number, curLineNumbers: Set<number>, linesOut: Array<string>): void {
-    for (const curLineNumber of curLineNumbers) {
-      const lineGroup = this.#getLineGroupBefore(lastLineNumber, curLineNumber);
-      if (lineGroup) {
-        linesOut.push(...lineGroup);
-        return;
-      }
-    }
-  }
-  pushAfterLines(lastLineNumber: number, curLineNumbers: Set<number>, linesOut: Array<string>): void {
-    for (const curLineNumber of curLineNumbers) {
-      const lineGroup = this.#getLineGroupAfter(lastLineNumber, curLineNumber);
-      if (lineGroup) {
-        linesOut.push(...lineGroup);
-        return;
-      }
-    }
-  }
-  #getLineGroupBefore(lastLineNumber: number, curLineNumber: number): null | Array<string> {
+  #getLineGroup(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string): null | Array<string> {
     for (const rule of this.#rules) {
-      if (rule.condition.matchesBefore(lastLineNumber, curLineNumber)) {
-        return rule.lineGroup;
-      }
-    }
-    return null;
-  }
-  #getLineGroupAfter(lastLineNumber: number, curLineNumber: number): null | Array<string> {
-    for (const rule of this.#rules) {
-      if (rule.condition.matchesAfter(lastLineNumber, curLineNumber)) {
+      if (rule.condition.matches(modifier, lastLineNumber, curLineNumber, line)) {
         return rule.lineGroup;
       }
     }
     return null;
   }
 }
+
+export type InsertionRule = {
+  condition: InsertionCondition;
+  lineGroup: Array<string>;
+};
+
+//#################### InsertionCondition ####################
+
 const RE_INS_COND = /^(before|after):(-?[0-9]+)$/;
 export abstract class InsertionCondition {
   static parse(str: string): InsertionCondition {
@@ -76,43 +59,34 @@ export abstract class InsertionCondition {
     }
     const lineNumber = Number(match[2]);
     if (match[1] === 'before') {
-      return new InsCondBefore(lineNumber);
+      return new InsCondLineNumber(LineLocModifier.Before, lineNumber);
     } else if (match[1] === 'after') {
-      return new InsCondAfter(lineNumber);
+      return new InsCondLineNumber(LineLocModifier.After, lineNumber);
     } else {
       throw new InternalError();
     }
   }
-  matchesBefore(_lastLineNumber: number, _curLineNumber: number): boolean {
-    return false;
-  }
-  matchesAfter(_lastLineNumber: number, _curLineNumber: number): boolean {
-    return false;
-  }
+  abstract matches(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string): boolean;
   abstract toJson(): JsonValue;
 }
-class InsCondBefore extends InsertionCondition {
-  constructor(public lineNumber: number) {
+
+//========== InsCondLineNumber ==========
+
+class InsCondLineNumber extends InsertionCondition {
+  constructor(public modifier: LineLocModifier, public lineNumber: number) {
     super();
   }
-  override matchesBefore(lastLineNumber: number, curLineNumber: number): boolean {
-    return curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber);
+  override matches(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, _line: string): boolean {
+    return (
+      modifier === this.modifier &&
+      curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber)
+    );
   }
   override toJson(): JsonValue {
-    return 'before:' + this.lineNumber;
+    return lineLocationModifierToString(this.modifier) + ':' + this.lineNumber;
   }
 }
-class InsCondAfter extends InsertionCondition {
-  constructor(public lineNumber: number) {
-    super();
-  }
-  override matchesAfter(lastLineNumber: number, curLineNumber: number): boolean {
-    return curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber);
-  }
-  override toJson(): JsonValue {
-    return 'after:' + this.lineNumber;
-  }
-}
+
 function ensurePositiveLineNumber(lastLineNumber: number, lineNumber: number): number {
   let posLineNumber = lineNumber;
   if (posLineNumber < 0) {

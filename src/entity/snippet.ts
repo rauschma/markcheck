@@ -8,6 +8,7 @@ import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, LANG_KEY_EMPTY, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 import { Heading } from './heading.js';
+import { LineLocModifier } from './insertion-rules.js';
 import { LineMod } from './line-mod.js';
 
 const { stringify } = JSON;
@@ -386,41 +387,41 @@ export class SingleSnippet extends Snippet {
       this.localLineMod.pushBeforeLines(linesOut);
     }
 
-    {
-      // - Line-ignoring clashes with line insertion via
-      //   `this.localLineMod` because both change line indices.
-      // - However, ignored line numbers would make no sense at all after
-      //   inserting lines, which is why ignore first.
-      let body = this.body.filter(
-        (_line, index) => !this.#ignoreLines.has(index + 1)
+    // - Line-ignoring clashes with line insertion via
+    //   `this.localLineMod` because both change line indices.
+    // - However, ignored line numbers would make no sense at all after
+    //   inserting lines, which is why ignore first.
+    let body = this.body.filter(
+      (_line, index) => !this.#ignoreLines.has(index + 1)
+    );
+
+    // We only search-and-replace in visible (non-inserted) lines because
+    // we can do whatever we want in invisible lines.
+    const sar = this.#searchAndReplace;
+    if (sar) {
+      body = body.map(
+        line => sar.replaceAll(line)
       );
+    }
 
-      // We only search-and-replace in visible lines (because we can do
-      // whatever we want in invisible lines).
-      const sar = this.#searchAndReplace;
-      if (sar) {
-        body = body.map(
-          line => sar.replaceAll(line)
-        );
+    {
+      const nextBody = new Array<string>();
+      for (const [index, line] of body.entries()) {
+        this.localLineMod?.insertionRules.maybePushLineGroup(LineLocModifier.Before, body.length, index + 1, line, nextBody);
+        nextBody.push(line);
+        this.localLineMod?.insertionRules.maybePushLineGroup(LineLocModifier.After, body.length, index + 1, line, nextBody);
       }
+      body = nextBody;
+    }
 
-      //----- Push (potentially translated) body with inserted lines -----
-
-      const translator = this.#getTranslator(config);
-      if (translator) {
-        const chunks = translator.translate(this.lineNumber, body);
-        for (const chunk of chunks) {
-          this.localLineMod?.insertionRules.pushBeforeLines(body.length, chunk.inputLineNumbers, linesOut);
-          linesOut.push(...chunk.outputLines);
-          this.localLineMod?.insertionRules.pushAfterLines(body.length, chunk.inputLineNumbers, linesOut);
-        }
-      } else {
-        for (const [index, line] of body.entries()) {
-          this.localLineMod?.insertionRules.pushBeforeLine(body.length, index+1, linesOut);
-          linesOut.push(line);
-          this.localLineMod?.insertionRules.pushAfterLine(body.length, index+1, linesOut);
-        }
+    const translator = this.#getTranslator(config);
+    if (translator) {
+      const chunks = translator.translate(this.lineNumber, body);
+      for (const chunk of chunks) {
+        linesOut.push(...chunk.outputLines);
       }
+    } else {
+      linesOut.push(...body);
     }
 
     if (this.localLineMod) {
