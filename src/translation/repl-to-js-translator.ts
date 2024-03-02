@@ -1,6 +1,7 @@
+import { isEmptyLine } from '@rauschma/helpers/js/string.js';
 import { UserError } from '../util/errors.js';
 import { normalizeWhitespace } from '../util/string.js';
-import { createLineRange, type TranslatedChunk, type Translator } from './translation.js';
+import { type Translator } from './translation.js';
 
 const RE_INPUT = /^> ?(.*)$/;
 const RE_EXCEPTION = /^([A-Z][A-Za-z0-9_$]+):/;
@@ -8,12 +9,19 @@ const RE_EXCEPTION = /^([A-Z][A-Za-z0-9_$]+):/;
 export const nodeReplToJs: Translator = {
   key: 'node-repl-to-js',
 
-  translate(lineNumber: number, lines: Array<string>): Array<TranslatedChunk> {
-    const result = new Array<TranslatedChunk>();
+  translate(lineNumber: number, lines: Array<string>): Array<string> {
+    const result = new Array<string>();
     let index = 0;
     while (index < lines.length) {
       const inputLine = lines[index];
       const inputLineNumber = index + 1;
+
+      if (isEmptyLine(inputLine)) {
+        result.push(inputLine);
+        index++;
+        continue;
+      }
+
       const match = RE_INPUT.exec(inputLine);
       if (!match) {
         throw new UserError(
@@ -26,12 +34,7 @@ export const nodeReplToJs: Translator = {
       if (input.endsWith(';')) {
         // A statement, not an expression: There is no output (= expected
         // result).
-        result.push({
-          inputLineNumbers: new Set([inputLineNumber]),
-          outputLines: [
-            input
-          ],
-        });
+        result.push(input);
         continue;
       }
       const nextInputLineIndex = findNextInputLine(lines, index);
@@ -48,7 +51,7 @@ export const nodeReplToJs: Translator = {
         // "TypeError: Cannot mix BigInt and other types,"
         // "use explicit conversions"
         const name = exceptionMatch[1];
-        
+
         // First line: remove prefixed exception name
         let message = lines[index].slice(exceptionMatch[0].length);
 
@@ -59,30 +62,22 @@ export const nodeReplToJs: Translator = {
         }
         message = normalizeWhitespace(message).trim();
 
-        result.push({
-          // Range works out because line ranges include the upper limit
-          inputLineNumbers: createLineRange(inputLineNumber, nextInputLineIndex),
-          outputLines: [
-            `assert.throws(`,
-            `() => {`,
-            input,
-            `},`,
-            JSON.stringify({ name, message }),
-            `);`,
-          ],
-        });
+        result.push(
+          `assert.throws(`,
+          `() => {`,
+          input,
+          `},`,
+          JSON.stringify({ name, message }),
+          `);`,
+        );
       } else {
-        result.push({
-          // Range works out because line ranges include the upper limit
-          inputLineNumbers: createLineRange(inputLineNumber, nextInputLineIndex),
-          outputLines: [
-            `assert.deepEqual(`,
-            input,
-            `,`,
-            ...lines.slice(index, nextInputLineIndex),
-            `);`,
-          ],
-        });
+        result.push(
+          `assert.deepEqual(`,
+          input,
+          `,`,
+          ...lines.slice(index, nextInputLineIndex),
+          `);`,
+        );
       }
       index = nextInputLineIndex;
     } // while

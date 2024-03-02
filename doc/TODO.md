@@ -1,5 +1,15 @@
 # Todo
 
+* Errors?
+  * Unused IDs (per file): `id`, `lineModId`
+
+
+* Diagnostics:
+  * `only` mode (per file)
+  * Skipped snippets
+* Continue if this happens? Prevents exceptions while parsing entities?
+  * Unknown attributes (immediately)
+  * Unknown languages
 * Improve: `Could not parse attributes: Stopped parsing before`
 * Testing – e.g. `written-snippet_test.ts`:
   * runFile() logs problems to console instead of throwing.
@@ -13,8 +23,12 @@
 * CLI option? Stop after first error (so that files can be examined).
 * JSON schema for config files
 * Per file (and/or in summary?): How many snippets were run?
-* Make `around` separator configurable?
-* Predefined LineMods such as those below?
+* Make _line group separators_ (`around:`, `insert:`) configurable?
+* Transforming stdout/stderr (before comparing it with a snippet):
+  * Operation: Ignore lines
+  * Operation: searchAndReplace
+  * Define the transformations in the output snippet?
+* Let users predefine LineMods such as those below?
 
 <!--marktest id="asyncTest" around:
 function test(_name, callback) {
@@ -42,16 +56,6 @@ test();
 * Attribute: expect exit code.
   * Use case: There were errors, but we don’t want to check stderr, only stdout.
 * How to check only part of stdout/stderr?
-
-## Warnings
-
-They don’t affect exit code? Mention in summary?
-
-* `only` mode (per file)
-* Skipped snippets
-* Unused IDs (per file)
-* Unknown attributes (immediately)
-* Unknown languages
 
 ## Tests
 

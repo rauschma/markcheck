@@ -422,13 +422,10 @@ export class SingleSnippet extends Snippet {
 
     const translator = this.#getTranslator(config);
     if (translator) {
-      const chunks = translator.translate(this.lineNumber, body);
-      for (const chunk of chunks) {
-        linesOut.push(...chunk.outputLines);
-      }
-    } else {
-      linesOut.push(...body);
+      body = translator.translate(this.lineNumber, body);
     }
+    
+    linesOut.push(...body);
 
     if (this.localLineMod) {
       this.localLineMod.pushAfterLines(linesOut);

@@ -19,7 +19,8 @@ test('nodeReplToJs.translate', () => {
       '},',
       `{"name":"TypeError","message":"Cannot mix BigInt and other types, use explicit conversions"}`,
       `);`,
-    ]
+    ],
+    'Expected exception'
   );
   assert.deepEqual(
     nodeReplToJs.translate(1,
@@ -34,6 +35,29 @@ test('nodeReplToJs.translate', () => {
       ',',
       '256',
       ');',
-    ]
+    ],
+    'Input and output'
+  );
+  assert.deepEqual(
+    nodeReplToJs.translate(1,
+      [
+        `> const map = new Map();`,
+        ``,
+        `> map.set(NaN, 123);`,
+        `> map.get(NaN)`,
+        `123`,
+      ]
+    ),
+    [
+      "const map = new Map();",
+      "",
+      "map.set(NaN, 123);",
+      "assert.deepEqual(",
+      "map.get(NaN)",
+      ",",
+      "123",
+      ");",
+    ],
+    'Empty line before input'
   );
 });

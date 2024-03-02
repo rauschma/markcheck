@@ -316,28 +316,28 @@ export class Directive {
       const expectedValue = expectedAttributes.get(k);
       if (expectedValue === undefined) {
         throw new UserError(
-          `directive has unknown attribute key ${stringify(k)}`,
+          `Unknown directive attribute key ${stringify(k)} (allowed are: ${Array.from(expectedAttributes.keys()).join(', ')})`,
           { lineNumber: this.lineNumber }
         );
       }
       if (expectedValue === AttrValue.Valueless) {
         if (v !== Valueless) {
           throw new UserError(
-            `Attribute ${stringify(k)} of directive must be valueless`,
+            `Directive attribute ${stringify(k)} must be valueless`,
             { lineNumber: this.lineNumber }
           );
         }
       } else if (expectedValue === AttrValue.String) {
         if (typeof v !== 'string') {
           throw new UserError(
-            `Attribute ${stringify(k)} of directive must have a string value`,
+            `Directive attribute ${stringify(k)} must have a string value`,
             { lineNumber: this.lineNumber }
           );
         }
       } else if (expectedValue instanceof RegExp) {
         if (typeof v !== 'string' || !expectedValue.test(v)) {
           throw new UserError(
-            `Attribute ${stringify(k)} has an illegal value (must be string and match ${expectedValue})`,
+            `Directive attribute ${stringify(k)} has an illegal value (must be string and match ${expectedValue})`,
             { lineNumber: this.lineNumber }
           );
         }

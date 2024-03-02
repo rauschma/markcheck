@@ -53,17 +53,16 @@ After `marktest` there are zero or more attributes. The first line ends either w
 * A directive without a body label is a _code block directive_ and must be followed by a code block.
 * Body label `body:`: _body directive_. Such a directive is self-contained.
 * Body label `config:`: _config directive_. Such a directive is self-contained.
-* Body label `before:`, `after:`, `around:`: A _line mod_ directive. Such a directive is used in three ways:
-  * Attribute `each="some-lang"`: The modifications are applied to all code blocks with the specified language.
-  * Attribute `id="some-id"`: A code block directive can apply the line mod to its code via `applyInner="some-id"` and  `applyOuter="some-id"`.
-  * Neither `each` nor `id`: The directive defines two entities:
+* Body label `before:` or `after:`: A _line mod_ directive. Such a directive is used in three ways:
+  * Attribute `each="some-lang"` defines a _global line mod_. Its modifications are applied to all code blocks with the specified language.
+  * Attribute `lineModId="some-id"` defines an _applicable line mod_: A code block directive can apply it to its code via `applyInner="some-id"` and  `applyOuter="some-id"`.
+  * Neither `each` nor `lineModId`: The directive defines two entities:
     * A local line mod
-    * A code block directive that uses the line mod locally.
+    * A snippet that uses the line mod locally
+* Body label `around:` combines `before:` and `after:`. Two groups of lines are separated by the line `•••`.
 * Body label `insert:`: Only supported for local line mods.
-  * Attribute `beforeLines`:
-    * `-1` is the line after the last line
-    * `-2` is the last line
-    * Etc.
+  * One or more groups of lines. Same separator as for `around:`
+  * Required attribute: `at`
 
 ## Entities
 
@@ -111,7 +110,6 @@ Running:
   * Outer applied line mod
 * Inner lines – each snippet (solo, included, part of a sequence, etc.):
   * TODO ❌
-  * `onlyLocalLines`
 
 ## Attributes
 
@@ -126,6 +124,7 @@ Running:
   * To override code blocks
 * Assembling lines:
   * `id="my-id"`
+    * Referenced by attributes: include, stdout, stderr
   * `sequence="1/3"`
   * `include="id1, $THIS, id2"`:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
@@ -149,20 +148,17 @@ Running:
 
 ### Local line mods
 
-* `beforeLines`: comma-separated line numbers
-  * `-1` is the line after the last line
-  * `-2` is the last line
-  * Etc.
-
+* Required for body label `insert:`: `at="before:1, after:-1, before:'console.log'"`
+  * `-1` is the last line (etc.)
 
 ### Global line mods
 
-* `each="lang-name"`
+* Required: `each="lang-name"`
 
 ### Applicable line mods
 
-* `id="my-id"`
-
+* Required: `lineModId="my-id"`
+  * Referenced by attributes: applyInner, applyOuter
 
 
 
