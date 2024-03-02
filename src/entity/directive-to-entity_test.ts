@@ -3,7 +3,7 @@ import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
 import { extractCommentContent } from '../core/parse-markdown.js';
 import { UserError } from '../util/errors.js';
-import { directiveToEntity } from './entity-tools.js';
+import { directiveToEntity } from './directive-to-entity.js';
 import { Directive } from './directive.js';
 
 createSuite(import.meta.url);

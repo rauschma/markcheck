@@ -12,7 +12,7 @@ const { runFile } = await import('../src/core/run-snippets.js');
 
 createSuite(import.meta.url);
 
-test('Insert single line', () => {
+test('Insert single line at line numbers', () => {
   const readme = outdent`
     <!--marktest at="before:2" insert:
     err.stack = beautifyStackTrace(err.stack);
@@ -45,9 +45,49 @@ test('Insert single line', () => {
   );
 });
 
-test('Insert multiple lines', () => {
+test('Insert multiple lines at line numbers', () => {
   const readme = outdent`
     <!--marktest at="before:1, after:1, after:-1" insert:
+    // START
+    •••
+    // MIDDLE
+    •••
+    // END
+    -->
+    ▲▲▲js
+    // first
+    // second
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/marktest-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  const pmr = parseMarkdown(readme);
+  assert.equal(
+    runFile(outputIgnored(), LogLevel.Normal, '/tmp/markdown/readme.md', pmr, []),
+    FileStatus.Success
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        // START
+        // first
+        // MIDDLE
+        // second
+        // END
+      `,
+    }
+  );
+});
+
+
+test('Insert multiple lines at text fragments', () => {
+  const readme = outdent`
+    <!--marktest at="before:'first', after:'first', after:'second'" insert:
     // START
     •••
     // MIDDLE

@@ -1,5 +1,6 @@
 # Todo
 
+* Improve: `Could not parse attributes: Stopped parsing before`
 * Built-in check for JSON
 * Reset file system after a unit test.
   * Must work afterwards: `test/parse-demo-javascript_test.ts`

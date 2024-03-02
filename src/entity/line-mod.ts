@@ -4,7 +4,7 @@ import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
 import { InternalError, UserError, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { ATTR_KEY_AT, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, type Directive } from './directive.js';
-import { InsertionRules, InsertionCondition } from './insertion-rules.js';
+import { InsertionRules, InsertionCondition, parseInsertionConditions } from './insertion-rules.js';
 
 const {stringify} = JSON;
 
@@ -69,9 +69,7 @@ export class LineMod {
             { lineNumber: directive.lineNumber }
           );
         }
-        const conditions = atStr
-          .split(/,/)
-          .map(condStr => InsertionCondition.parse(condStr.trim()));
+        const conditions = parseInsertionConditions(atStr);
         const lineGroups = splitInsertedLines(body);
         if (conditions.length !== lineGroups.length) {
           throw new UserError(

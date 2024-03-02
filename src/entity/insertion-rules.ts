@@ -1,5 +1,8 @@
+import { re } from '@rauschma/helpers/js/re-template-tag.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
+import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
 import { InternalError, UserError } from '../util/errors.js';
+import { insertParsingPos, unescapeBackslashes } from './entity-helpers.js';
 
 const {stringify} = JSON;
 
@@ -50,24 +53,82 @@ export type InsertionRule = {
 
 //#################### InsertionCondition ####################
 
-const RE_INS_COND = /^(before|after):(-?[0-9]+)$/;
-export abstract class InsertionCondition {
-  static parse(str: string): InsertionCondition {
-    const match = RE_INS_COND.exec(str);
+const RE_LINE_NUMBER = /(?<lineNumber>-?[0-9]+)/;
+const RE_TEXT_FRAGMENT = /'(?<textFragment>(\\.|[^'])*)'/;
+const RE_PART = re`/(?<modifier>before|after):(${RE_LINE_NUMBER}|${RE_TEXT_FRAGMENT})(?<comma>\s*,\s*)?/uy`;
+
+export function parseInsertionConditions(str: string): Array<InsertionCondition> {
+  const result = new Array<InsertionCondition>();
+  RE_PART.lastIndex = 0;
+  while (RE_PART.lastIndex < str.length) { // we allow trailing commas
+    const lastIndex = RE_PART.lastIndex;
+    const match = RE_PART.exec(str);
     if (!match) {
-      throw new UserError(`Illegal insertion condition: ${stringify(str)}`);
+      throw new UserError(
+        `Could not parse insertion condition: ${insertParsingPos(str, lastIndex)}`
+      );
     }
-    const lineNumber = Number(match[2]);
-    if (match[1] === 'before') {
-      return new InsCondLineNumber(LineLocModifier.Before, lineNumber);
-    } else if (match[1] === 'after') {
-      return new InsCondLineNumber(LineLocModifier.After, lineNumber);
+    assertNonNullable(match.groups);
+    let modifier;
+    switch (match.groups.modifier) {
+      case 'before':
+        modifier = LineLocModifier.Before;
+        break;
+      case 'after':
+        modifier = LineLocModifier.After;
+        break;
+      default:
+        throw new InternalError();
+    }
+    if (match.groups.lineNumber !== undefined) {
+      const lineNumber = Number(match.groups.lineNumber);
+      result.push(new InsCondLineNumber(modifier, lineNumber));
+    } else if (match.groups.textFragment !== undefined) {
+      const textFragment = unescapeBackslashes(match.groups.textFragment);
+      result.push(new InsCondTextFragment(modifier, textFragment));
     } else {
       throw new InternalError();
     }
+    if (!('comma' in match.groups)) {
+      // If there is no separating comma, we must be at the end
+      if (RE_PART.lastIndex >= str.length) {
+        break;
+      }
+      throw new UserError(
+        `Expected a comma after an insertion condition: ${insertParsingPos(str, RE_PART.lastIndex)}`
+      );
+    }
   }
+  return result;
+}
+
+export function insertionConditionsToJson(conditions: Array<InsertionCondition>): JsonValue {
+  return conditions.map(c => c.toJson());
+}
+
+export abstract class InsertionCondition {
   abstract matches(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string): boolean;
   abstract toJson(): JsonValue;
+}
+
+//========== InsCondTextFragment ==========
+
+class InsCondTextFragment extends InsertionCondition {
+  constructor(public modifier: LineLocModifier, public textFragment: string) {
+    super();
+  }
+  override matches(modifier: LineLocModifier, _lastLineNumber: number, _curLineNumber: number, line: string): boolean {
+    return (
+      modifier === this.modifier &&
+      line.includes(this.textFragment)
+    );
+  }
+  override toJson(): JsonValue {
+    return {
+      modifier: this.modifier,
+      textFragment: this.textFragment,
+    };
+  }
 }
 
 //========== InsCondLineNumber ==========
@@ -83,7 +144,10 @@ class InsCondLineNumber extends InsertionCondition {
     );
   }
   override toJson(): JsonValue {
-    return lineLocationModifierToString(this.modifier) + ':' + this.lineNumber;
+    return {
+      modifier: this.modifier,
+      lineNumber: this.lineNumber,
+    };
   }
 }
 
