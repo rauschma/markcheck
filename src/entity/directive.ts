@@ -177,17 +177,16 @@ export const APPLICABLE_LINE_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
 export const CONFIG_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([
 ]);
 
-//#################### Code ####################
 
-//========== Directive ==========
+//#################### Directive ####################
+
+// Attribute values are stored raw – then we can decide in each case how to
+// handle backslashes.
+// - Use case – body label `insert:`: `at="before:'Don\'t do it!'"`
+// - Use case: `searchAndReplace="/ \/\/ \([A-Z]\)//"`
 
 const MARKTEST_MARKER = 'marktest';
 const RE_BODY_LABEL = re`/(?<bodyLabel>${RE_LABEL}:)/`;
-// Attribute values are stored raw – then we can decide in each case how to
-// handle backslashes. That is useful when there is nested quoting:
-// ```
-// key="before:'Don\'t do it!'"
-// ```
 const RE_QUOTED_VALUE = re`/"(?<value>(\\.|[^"])*)"/`;
 const RE_KEY_VALUE = re`/(?<key>${RE_LABEL})([ \t]*=[ \t]*${RE_QUOTED_VALUE})?/`;
 const RE_TOKEN = re`/[ \t]+(${RE_BODY_LABEL}|${RE_KEY_VALUE})/uy`;
@@ -345,6 +344,8 @@ export class Directive {
     }
   }
 }
+
+//#################### Helpers ####################
 
 //========== Sequence numbers ==========
 

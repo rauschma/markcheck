@@ -1,7 +1,7 @@
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
-import { snippetJson } from '../src/core/entities.js';
+import { snippetJson } from '../src/entity/snippet.js';
 import { parseMarkdown } from '../src/core/parse-markdown.js';
 
 createSuite(import.meta.url);

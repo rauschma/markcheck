@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
 import { outputIgnored } from '../src/core/run-snippets.js';
-const { FileStatus, LogLevel } = await import('../src/core/entities.js');
+import { FileStatus, LogLevel } from '../src/entity/snippet.js';
 const { parseMarkdown } = await import('../src/core/parse-markdown.js');
 const { runFile } = await import('../src/core/run-snippets.js');
 

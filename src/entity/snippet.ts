@@ -1,13 +1,14 @@
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
-import json5 from 'json5';
-import * as os from 'node:os';
+import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { InternalError, UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
-import { getEndTrimmedLength, trimTrailingEmptyLines } from '../util/string.js';
-import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, ConfigModJsonSchema, PROP_KEY_DEFAULT_FILE_NAME, type ConfigModJson, type LangDef, type LangDefCommand } from './config.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_AT, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EACH, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, LANG_KEY_EMPTY, SNIPPET_ATTRIBUTES, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
+import { getEndTrimmedLength } from '../util/string.js';
+import { ConfigMod } from './config-mod.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, LANG_KEY_EMPTY, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { Heading } from './heading.js';
+import { LineMod } from './line-mod.js';
 
 const { stringify } = JSON;
 
@@ -22,72 +23,7 @@ export function getUserErrorContext(entity: MarktestEntity): UserErrorContext {
   }
 }
 
-//#################### directiveToEntity() ####################
-
-/**
- * @returns A snippet is open or closed
- */
-export function directiveToEntity(directive: Directive): null | ConfigMod | SingleSnippet | LineMod {
-  switch (directive.bodyLabel) {
-    case BODY_LABEL_CONFIG:
-      directive.checkAttributes(CONFIG_MOD_ATTRIBUTES);
-      return new ConfigMod(directive);
-
-    case BODY_LABEL_BODY: {
-      return SingleSnippet.createClosedFromBodyDirective(directive);
-    }
-
-    case BODY_LABEL_BEFORE:
-    case BODY_LABEL_AFTER:
-    case BODY_LABEL_AROUND:
-    case BODY_LABEL_INSERT:
-    case null: {
-      if (directive.bodyLabel !== null) {
-        // Either:
-        // - LineMod (global or applicable)
-        // - Open snippet with local LineMod
-        const each = directive.getString(ATTR_KEY_EACH);
-        if (each) {
-          // Global LineMod
-          directive.checkAttributes(GLOBAL_LINE_MOD_ATTRIBUTES);
-          return LineMod.parse(directive, {
-            tag: 'LineModKindGlobal',
-            targetLanguage: each,
-          });
-        }
-        const id = directive.getString(ATTR_KEY_ID);
-        if (id) {
-          // Applicable LineMod
-          directive.checkAttributes(APPLICABLE_LINE_MOD_ATTRIBUTES);
-          return LineMod.parse(directive, {
-            tag: 'LineModKindApplicable',
-            id,
-          });
-        }
-        // Open snippet with local LineMod
-        directive.checkAttributes(SNIPPET_ATTRIBUTES);
-        const snippet = SingleSnippet.createOpen(directive);
-        snippet.localLineMod = LineMod.parse(directive, {
-          tag: 'LineModKindLocal',
-        });
-        return snippet;
-      } else {
-        // Open snippet
-        directive.checkAttributes(SNIPPET_ATTRIBUTES);
-        return SingleSnippet.createOpen(directive);
-      }
-    }
-
-    default: {
-      throw new UserError(
-        `Unsupported body label: ${stringify(directive.bodyLabel)}`,
-        { lineNumber: directive.lineNumber }
-      );
-    }
-  }
-}
-
-//#################### Assemble lines ####################
+//#################### Assembling lines ####################
 
 export function getTargetSnippet(cliState: CliState, sourceLineNumber: number, attrKey: string, targetId: string): Snippet {
   const targetSnippet = cliState.idToSnippet.get(targetId);
@@ -170,30 +106,6 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
   }
 }
 
-//#################### CliState ####################
-
-export enum LogLevel {
-  Verbose,
-  Normal,
-}
-
-export enum FileStatus {
-  Failure,
-  Success,
-}
-
-export type CliState = {
-  absFilePath: string,
-  tmpDir: string,
-  logLevel: LogLevel,
-  idToSnippet: Map<string, Snippet>,
-  idToLineMod: Map<string, LineMod>,
-  globalVisitationMode: GlobalRunningMode,
-  globalLineMods: Map<string, Array<LineMod>>,
-  fileStatus: FileStatus,
-  interceptedShellCommands: null | Array<Array<string>>
-};
-
 //#################### Snippet ####################
 
 export abstract class Snippet {
@@ -225,7 +137,7 @@ export abstract class Snippet {
   abstract toJson(): JsonValue;
 }
 
-//========== SingleSnippet ==========
+//#################### SingleSnippet ####################
 
 export class SingleSnippet extends Snippet {
   static createOpen(directive: Directive): SingleSnippet {
@@ -561,7 +473,7 @@ export class SingleSnippet extends Snippet {
   }
 }
 
-//========== SequenceSnippet ==========
+//#################### SequenceSnippet ####################
 
 export class SequenceSnippet extends Snippet {
   elements = new Array<SingleSnippet>();
@@ -679,7 +591,9 @@ export class SequenceSnippet extends Snippet {
   }
 }
 
-//========== Snippet helper types ==========
+//#################### Snippet helper types ####################
+
+//========== Running modes ==========
 
 export enum RuningMode {
   Normal = 'Normal',
@@ -691,6 +605,8 @@ export enum GlobalRunningMode {
   Normal = 'Normal',
   Only = 'Only',
 }
+
+//========== JSON ==========
 
 export type SingleSnippetJson = {
   lineNumber: number,
@@ -713,354 +629,26 @@ export function snippetJson(partial: Partial<SingleSnippetJson>): SingleSnippetJ
   };
 }
 
-//#################### LineMod ####################
+//========== CliState ==========
 
-const RE_AROUND_MARKER = /^[ \t]*•••[ \t]*$/;
-const STR_AROUND_MARKER = '•••';
+export enum LogLevel {
+  Verbose,
+  Normal
+}
 
-export type LineModKind =
-  | LineModKindConfig
-  | LineModKindGlobal
-  | LineModKindApplicable
-  | LineModKindLocal
-  ;
-export type LineModKindConfig = {
-  tag: 'LineModKindConfig',
+export enum FileStatus {
+  Failure,
+  Success
+}
+
+export type CliState = {
+  absFilePath: string;
+  tmpDir: string;
+  logLevel: LogLevel;
+  idToSnippet: Map<string, Snippet>;
+  idToLineMod: Map<string, LineMod>;
+  globalVisitationMode: GlobalRunningMode;
+  globalLineMods: Map<string, Array<LineMod>>;
+  fileStatus: FileStatus;
+  interceptedShellCommands: null | Array<Array<string>>;
 };
-export type LineModKindGlobal = {
-  tag: 'LineModKindGlobal',
-  targetLanguage: string,
-};
-export type LineModKindApplicable = {
-  tag: 'LineModKindApplicable',
-  id: string,
-};
-export type LineModKindLocal = {
-  tag: 'LineModKindLocal',
-};
-
-export type InsertionRule = {
-  condition: InsertionCondition,
-  lineGroup: Array<string>,
-};
-
-export class InsertionRules {
-  #rules = new Array<InsertionRule>();
-
-  toJson(): JsonValue {
-    return this.#rules.map(
-      rule => [rule.condition.toJson(), rule.lineGroup]
-    );
-  }
-
-  pushRule(insertionRule: InsertionRule): void {
-    this.#rules.push(insertionRule);
-  }
-  pushBeforeLine(lastLineNumber: number, curLineNumber: number, linesOut: Array<string>): void {
-    const lineGroup = this.#getLineGroupBefore(lastLineNumber, curLineNumber);
-    if (lineGroup) {
-      linesOut.push(...lineGroup);
-    }
-  }
-  pushAfterLine(lastLineNumber: number, curLineNumber: number, linesOut: Array<string>): void {
-    const lineGroup = this.#getLineGroupAfter(lastLineNumber, curLineNumber);
-    if (lineGroup) {
-      linesOut.push(...lineGroup);
-    }
-  }
-  pushBeforeLines(lastLineNumber: number, curLineNumbers: Set<number>, linesOut: Array<string>): void {
-    for (const curLineNumber of curLineNumbers) {
-      const lineGroup = this.#getLineGroupBefore(lastLineNumber, curLineNumber);
-      if (lineGroup) {
-        linesOut.push(...lineGroup);
-        return;
-      }
-    }
-  }
-  pushAfterLines(lastLineNumber: number, curLineNumbers: Set<number>, linesOut: Array<string>): void {
-    for (const curLineNumber of curLineNumbers) {
-      const lineGroup = this.#getLineGroupAfter(lastLineNumber, curLineNumber);
-      if (lineGroup) {
-        linesOut.push(...lineGroup);
-        return;
-      }
-    }
-  }
-  #getLineGroupBefore(lastLineNumber: number, curLineNumber: number): null | Array<string> {
-    for (const rule of this.#rules) {
-      if (rule.condition.matchesBefore(lastLineNumber, curLineNumber)) {
-        return rule.lineGroup
-      }
-    }
-    return null;
-  }
-  #getLineGroupAfter(lastLineNumber: number, curLineNumber: number): null | Array<string> {
-    for (const rule of this.#rules) {
-      if (rule.condition.matchesAfter(lastLineNumber, curLineNumber)) {
-        return rule.lineGroup
-      }
-    }
-    return null;
-  }
-}
-
-const RE_INS_COND = /^(before|after):(-?[0-9]+)$/;
-export abstract class InsertionCondition {
-  static parse(str: string): InsertionCondition {
-    const match = RE_INS_COND.exec(str);
-    if (!match) {
-      throw new UserError(`Illegal insertion condition: ${stringify(str)}`);
-    }
-    const lineNumber = Number(match[2]);
-    if (match[1] === 'before') {
-      return new InsCondBefore(lineNumber);
-    } else if (match[1] === 'after') {
-      return new InsCondAfter(lineNumber);
-    } else {
-      throw new InternalError();
-    }
-  }
-  matchesBefore(_lastLineNumber: number, _curLineNumber: number): boolean {
-    return false;
-  }
-  matchesAfter(_lastLineNumber: number, _curLineNumber: number): boolean {
-    return false;
-  }
-  abstract toJson(): JsonValue;
-}
-class InsCondBefore extends InsertionCondition {
-  constructor(public lineNumber: number) {
-    super();
-  }
-  override matchesBefore(lastLineNumber: number, curLineNumber: number): boolean {
-    return curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber);
-  }
-  override toJson(): JsonValue {
-    return 'before:' + this.lineNumber;
-  }
-}
-class InsCondAfter extends InsertionCondition {
-  constructor(public lineNumber: number) {
-    super();
-  }
-  override matchesAfter(lastLineNumber: number, curLineNumber: number): boolean {
-    return curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber);
-  }
-  override toJson(): JsonValue {
-    return 'after:' + this.lineNumber;
-  }
-}
-
-function ensurePositiveLineNumber(lastLineNumber: number, lineNumber: number): number {
-  let posLineNumber = lineNumber;
-  if (posLineNumber < 0) {
-    // * -1 is the last line number
-    // * -2 is the second-to-last line number
-    // * Etc.
-    posLineNumber = lastLineNumber + posLineNumber + 1;
-  }
-  if (!(1 <= posLineNumber && posLineNumber <= lastLineNumber)) {
-    throw new UserError(
-      `Line number must with range [1, ${lastLineNumber}] (-1 means ${lastLineNumber} etc.): ${lineNumber}`
-    );
-  }
-  return posLineNumber;
-}
-
-export class LineMod {
-  static parse(directive: Directive, kind: LineModKind): LineMod {
-    const insertionRules = new InsertionRules();
-    let beforeLines = new Array<string>();
-    let afterLines = new Array<string>();
-
-    const body = trimTrailingEmptyLines(directive.body.slice());
-
-    switch (directive.bodyLabel) {
-      case BODY_LABEL_BEFORE: {
-        beforeLines = body;
-        break;
-      }
-      case BODY_LABEL_AFTER: {
-        afterLines = body;
-        break;
-      }
-      case BODY_LABEL_AROUND: {
-        ({ beforeLines, afterLines } = splitAroundLines(body));
-        break;
-      }
-      case BODY_LABEL_INSERT: {
-        if (kind.tag !== 'LineModKindLocal') {
-          throw new UserError(
-            `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for local line mods`
-          );
-        }
-
-        const atStr = directive.getString(ATTR_KEY_AT);
-        if (atStr === null) {
-          throw new UserError(
-            `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but not attribute ${stringify(ATTR_KEY_AT)}`,
-            { lineNumber: directive.lineNumber }
-          );
-        }
-        const conditions = atStr
-          .split(/,/)
-          .map(condStr => InsertionCondition.parse(condStr.trim()))
-          ;
-        const lineGroups = splitInsertedLines(body);
-        if (conditions.length !== lineGroups.length) {
-          throw new UserError(
-            `Attribute ${stringify(ATTR_KEY_AT)} mentions ${conditions.length} condition(s) but the body after ${stringify(BODY_LABEL_INSERT)} has ${lineGroups.length} line group(s) (separated by ${stringify(STR_AROUND_MARKER)})`,
-            { lineNumber: directive.lineNumber }
-          );
-        }
-        for (const [index, condition] of conditions.entries()) {
-          const lineGroup = lineGroups[index];
-          assertNonNullable(lineGroup);
-          insertionRules.pushRule({condition, lineGroup});
-        }
-        break;
-      }
-      default:
-        throw new InternalError();
-    }
-    return new LineMod(
-      contextLineNumber(directive.lineNumber),
-      kind,
-      insertionRules,
-      beforeLines,
-      afterLines,
-    );
-
-    function splitAroundLines(lines: Array<string>): { beforeLines: Array<string>, afterLines: Array<string> } {
-      const markerIndex = lines.findIndex(line => RE_AROUND_MARKER.test(line));
-      if (markerIndex < 0) {
-        throw new UserError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber: directive.lineNumber });
-      }
-      return {
-        beforeLines: lines.slice(0, markerIndex),
-        afterLines: lines.slice(markerIndex + 1),
-      };
-    }
-    function splitInsertedLines(lines: Array<string>): Array<Array<string>> {
-      const result: Array<Array<string>> = [[]];
-      for (const line of lines) {
-        if (RE_AROUND_MARKER.test(line)) {
-          result.push([]);
-        } else {
-          const lastLineGroup = result.at(-1);
-          assertNonNullable(lastLineGroup);
-          lastLineGroup.push(line);
-        }
-      }
-      return result;
-    }
-  }
-  static fromBeforeLines(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>) {
-    return new LineMod(context, kind, new InsertionRules(), beforeLines, []);
-  }
-
-  context: UserErrorContext;
-  #kind: LineModKind;
-  insertionRules: InsertionRules;
-  #beforeLines: Array<string>;
-  #afterLines: Array<string>;
-
-  private constructor(context: UserErrorContext, kind: LineModKind, insertedLines: InsertionRules, beforeLines: Array<string>, afterLines: Array<string>) {
-    this.context = context;
-    this.#kind = kind;
-    this.insertionRules = insertedLines;
-    this.#beforeLines = beforeLines;
-    this.#afterLines = afterLines;
-  }
-  get id(): undefined | string {
-    switch (this.#kind.tag) {
-      case 'LineModKindApplicable':
-        return this.#kind.id
-      case 'LineModKindGlobal':
-        return undefined;
-      case 'LineModKindConfig':
-      case 'LineModKindLocal':
-        throw new InternalError('Unsupported operation');
-      default:
-        throw new UnsupportedValueError(this.#kind);
-    }
-  }
-  get targetLanguage(): undefined | string {
-    switch (this.#kind.tag) {
-      case 'LineModKindGlobal':
-        return this.#kind.targetLanguage;
-      case 'LineModKindApplicable':
-        return undefined;
-      case 'LineModKindConfig':
-      case 'LineModKindLocal':
-        throw new InternalError('Unsupported operation');
-      default:
-        throw new UnsupportedValueError(this.#kind);
-    }
-  }
-  pushBeforeLines(lines: Array<string>): void {
-    lines.push(...this.#beforeLines);
-  }
-  pushAfterLines(lines: Array<string>): void {
-    lines.push(...this.#afterLines);
-  }
-  toJson(): JsonValue {
-    let props;
-    switch (this.#kind.tag) {
-      case 'LineModKindGlobal':
-        props = {
-          targetLanguage: this.#kind.targetLanguage,
-        };
-        break;
-      case 'LineModKindApplicable':
-        props = {
-          id: this.#kind.id,
-        };
-        break;
-      case 'LineModKindConfig':
-        props = {};
-        break;
-      case 'LineModKindLocal':
-        props = {
-          insertionRules: this.insertionRules.toJson(),
-        };
-        break;
-      default:
-        throw new UnsupportedValueError(this.#kind);
-    }
-    return {
-      beforeLines: this.#beforeLines,
-      afterLines: this.#afterLines,
-      ...props,
-    };
-  }
-}
-
-//#################### ConfigMod ####################
-
-export class ConfigMod {
-  lineNumber: number;
-  configModJson: ConfigModJson;
-  constructor(directive: Directive) {
-    this.lineNumber = directive.lineNumber;
-    const text = directive.body.join(os.EOL);
-    const json = json5.parse(text);
-    this.configModJson = ConfigModJsonSchema.parse(json);
-  }
-  toJson(): JsonValue {
-    return {
-      configModJson: this.configModJson,
-    };
-  }
-}
-
-//#################### Heading ####################
-
-export class Heading {
-  constructor(public lineNumber: number, public content: string) { }
-  toJson(): JsonValue {
-    return {
-      content: this.content,
-    };
-  }
-}

@@ -3,7 +3,7 @@ import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
 import { contextLineNumber } from '../util/errors.js';
 import { Directive, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, type ExternalSpec } from './directive.js';
-import { extractCommentContent } from './parse-markdown.js';
+import { extractCommentContent } from '../core/parse-markdown.js';
 
 const { raw } = String;
 

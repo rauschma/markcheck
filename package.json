@@ -20,7 +20,7 @@
     "\n========== Testing ==========": "",
     "test": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning",
     "testall": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
-    "circular": "npx madge --circular src/core/marktest.ts"
+    "circular": "npx madge --circular src/marktest.ts"
   },
   "dependencies": {
     "@rauschma/helpers": "file:../../libraries/helpers",

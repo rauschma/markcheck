@@ -1,9 +1,13 @@
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import markdownit from 'markdown-it';
+import { ConfigMod } from '../entity/config-mod.js';
+import { directiveToEntity } from '../entity/entity-tools.js';
+import { Directive } from '../entity/directive.js';
+import { Heading } from '../entity/heading.js';
+import { LineMod } from '../entity/line-mod.js';
+import { SequenceSnippet, SingleSnippet, Snippet, type MarktestEntity } from '../entity/snippet.js';
 import { UserError, describeUserErrorContext } from '../util/errors.js';
-import { Directive } from './directive.js';
-import { ConfigMod, Heading, LineMod, SequenceSnippet, SingleSnippet, Snippet, directiveToEntity, type MarktestEntity } from './entities.js';
 
 export type ParseMarkdownResult = {
   entities: Array<MarktestEntity>,

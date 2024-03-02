@@ -14,8 +14,12 @@ import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { UserError, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
 import { linesAreSame, linesContain, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, PROP_KEY_DEFAULT_FILE_NAME, fillInCommandVariables, type LangDefCommand } from './config.js';
-import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from './directive.js';
-import { ConfigMod, FileStatus, GlobalRunningMode, Heading, LineMod, LogLevel, Snippet, RuningMode, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type MarktestEntity } from './entities.js';
+import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME } from '../entity/directive.js';
+import { GlobalRunningMode, Snippet, RuningMode, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type MarktestEntity } from '../entity/snippet.js';
+import { Heading } from '../entity/heading.js';
+import { ConfigMod } from '../entity/config-mod.js';
+import { FileStatus, LogLevel, type CliState } from '../entity/snippet.js';
+import { LineMod } from '../entity/line-mod.js';
 import { parseMarkdown, type ParseMarkdownResult } from './parse-markdown.js';
 
 //@ts-expect-error: Module '#package_json' has no default export.
@@ -196,7 +200,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     const container = splitLinesExclEol(fs.readFileSync(pathName, 'utf-8'));
     if (!linesContain(container, innerLines)) {
       throw new UserError(
-        `Content of snippet is not contained in ${stringify(pathName)}`,
+        `Content of snippet is not contained in file ${stringify(pathName)}`,
         { lineNumber: snippet.lineNumber }
       );
     }
