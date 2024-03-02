@@ -1,6 +1,8 @@
 # Todo
 
 * Improve: `Could not parse attributes: Stopped parsing before`
+* Testing – e.g. `written-snippet_test.ts`:
+  * runFile() logs problems to console instead of throwing.
 * Built-in check for JSON
 * Reset file system after a unit test.
   * Must work afterwards: `test/parse-demo-javascript_test.ts`

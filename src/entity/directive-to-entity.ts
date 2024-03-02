@@ -17,6 +17,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
       return new ConfigMod(directive);
 
     case BODY_LABEL_BODY: {
+      directive.checkAttributes(SNIPPET_ATTRIBUTES);
       return SingleSnippet.createClosedFromBodyDirective(directive);
     }
 

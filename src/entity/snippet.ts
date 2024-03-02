@@ -151,7 +151,13 @@ export class SingleSnippet extends Snippet {
         // Initial default value:
         // - By default, snippets with IDs are not run.
         //   - Rationale: included somewhere and run there.
-        // - To still run a snippet with an ID, use `only` or `alwaysRun`.
+        // - To still run such a snippet, use `only` or `alwaysRun`.
+        snippet.runningMode = RuningMode.Skip;
+      }
+      if (directive.hasAttribute(ATTR_KEY_WRITE_INNER) || directive.hasAttribute(ATTR_KEY_WRITE_OUTER)) {
+        // Initial default value:
+        // - By default, written snippets are not run.
+        // - To still run such a snippet, use `only` or `alwaysRun`.
         snippet.runningMode = RuningMode.Skip;
       }
       let runningAttributes = 0;
