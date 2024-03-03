@@ -1,10 +1,8 @@
-import { re } from '@rauschma/helpers/js/re-template-tag.js';
+import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
-import { InternalError, UserError } from '../util/errors.js';
+import { InternalError, MarktestSyntaxError } from '../util/errors.js';
 import { insertParsingPos, unescapeBackslashes } from './entity-helpers.js';
-
-const {stringify} = JSON;
 
 export enum LineLocModifier {
   Before = 'Before',
@@ -64,7 +62,7 @@ export function parseInsertionConditions(str: string): Array<InsertionCondition>
     const lastIndex = RE_PART.lastIndex;
     const match = RE_PART.exec(str);
     if (!match) {
-      throw new UserError(
+      throw new MarktestSyntaxError(
         `Could not parse insertion condition: ${insertParsingPos(str, lastIndex)}`
       );
     }
@@ -94,7 +92,7 @@ export function parseInsertionConditions(str: string): Array<InsertionCondition>
       if (RE_PART.lastIndex >= str.length) {
         break;
       }
-      throw new UserError(
+      throw new MarktestSyntaxError(
         `Expected a comma after an insertion condition: ${insertParsingPos(str, RE_PART.lastIndex)}`
       );
     }
@@ -125,7 +123,7 @@ class InsCondTextFragment extends InsertionCondition {
   }
   override toJson(): JsonValue {
     return {
-      modifier: this.modifier,
+      modifier: lineLocationModifierToString(this.modifier),
       textFragment: this.textFragment,
     };
   }
@@ -145,7 +143,7 @@ class InsCondLineNumber extends InsertionCondition {
   }
   override toJson(): JsonValue {
     return {
-      modifier: this.modifier,
+      modifier: lineLocationModifierToString(this.modifier),
       lineNumber: this.lineNumber,
     };
   }
@@ -160,7 +158,7 @@ function ensurePositiveLineNumber(lastLineNumber: number, lineNumber: number): n
     posLineNumber = lastLineNumber + posLineNumber + 1;
   }
   if (!(1 <= posLineNumber && posLineNumber <= lastLineNumber)) {
-    throw new UserError(
+    throw new MarktestSyntaxError(
       `Line number must with range [1, ${lastLineNumber}] (-1 means ${lastLineNumber} etc.): ${lineNumber}`
     );
   }

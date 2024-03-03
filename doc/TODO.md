@@ -1,28 +1,32 @@
 # Todo
 
-* Errors?
-  * Unused IDs (per file): `id`, `lineModId`
-
-
 * Diagnostics:
+  * Pluralize: “All succeeded: 1 file”
   * `only` mode (per file)
   * Skipped snippets
-* Continue if this happens? Prevents exceptions while parsing entities?
-  * Unknown attributes (immediately)
-  * Unknown languages
-* Improve: `Could not parse attributes: Stopped parsing before`
+  * Per file (and/or in summary?): How many snippets were run?
+    * “Test failures: 1 of 3”
 * Testing – e.g. `written-snippet_test.ts`:
   * runFile() logs problems to console instead of throwing.
+  * Search for `console.log(`.
+* CLI option? Stop after first error (so that files can be examined).
+* Colorless for non-interactive terminals?
+* Condense successful output?
+* Can `UserErrorContext` be simplified? When is it really needed?
+* Simplify `runParsedMarkdownForTests()`.
+  * Tool function that asserts that there was no failure.
+
+
+* Go from `LineModKind` to subclasses?
+* Improve: `Could not parse attributes: Stopped parsing before`
 * Built-in check for JSON
-* Reset file system after a unit test.
+* Reset in-memory file system after a unit test.
   * Must work afterwards: `test/parse-demo-javascript_test.ts`
-* Test inserting JS into REPL code
+* Test: inserting JS into REPL code
 * At most one LineMod per language
 * Set up `PATH` to include various `node_modules/.bin/` directories?
   * Or simply use `npx` which can also install on demand?
-* CLI option? Stop after first error (so that files can be examined).
 * JSON schema for config files
-* Per file (and/or in summary?): How many snippets were run?
 * Make _line group separators_ (`around:`, `insert:`) configurable?
 * Transforming stdout/stderr (before comparing it with a snippet):
   * Operation: Ignore lines

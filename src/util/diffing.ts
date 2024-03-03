@@ -1,26 +1,26 @@
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
-import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 import { isEntryModule } from '@rauschma/helpers/nodejs/import-meta.js';
-import { ink, type InkResult } from '@rauschma/helpers/nodejs/text-ink.js';
+import { style, type TextStyleResult } from '@rauschma/helpers/nodejs/text-style.js';
+import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import * as diff from 'diff';
 
 export function logDiff(expectedLines: Array<string>, actualLines: Array<string>) {
   const changes = diff.diffArrays(expectedLines, actualLines);
   for (const change of changes) {
     let prefix;
-    let style: InkResult;
+    let lineStyle: TextStyleResult;
     if (change.added) {
       prefix = '+ ';
-      style = ink.FgGreen;
+      lineStyle = style.FgGreen;
     } else if (change.removed) {
       prefix = '- ';
-      style = ink.FgRed;
+      lineStyle = style.FgRed;
     } else {
       prefix = '  ';
-      style = ink.Normal;
+      lineStyle = style.Normal;
     }
     for (const v of change.value) {
-      console.log(style(prefix + v));
+      console.log(lineStyle(prefix + v));
     }
   }
 }

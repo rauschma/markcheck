@@ -3,13 +3,14 @@ import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { UserError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
+import { MarktestSyntaxError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, LANG_KEY_EMPTY, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 import { Heading } from './heading.js';
 import { LineLocModifier } from './insertion-rules.js';
 import { LineMod } from './line-mod.js';
+import { style } from '@rauschma/helpers/nodejs/text-style.js';
 
 const { stringify } = JSON;
 
@@ -29,7 +30,7 @@ export function getUserErrorContext(entity: MarktestEntity): UserErrorContext {
 export function getTargetSnippet(cliState: CliState, sourceLineNumber: number, attrKey: string, targetId: string): Snippet {
   const targetSnippet = cliState.idToSnippet.get(targetId);
   if (!targetSnippet) {
-    throw new UserError(
+    throw new MarktestSyntaxError(
       `Unknown ID ${JSON.stringify(targetId)} (attribute ${stringify(attrKey)})`,
       { lineNumber: sourceLineNumber }
     );
@@ -96,7 +97,7 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
     if (applyOuterId) {
       const applyLineMod = cliState.idToLineMod.get(applyOuterId);
       if (applyLineMod === undefined) {
-        throw new UserError(
+        throw new MarktestSyntaxError(
           `Attribute ${ATTR_KEY_APPLY_OUTER} contains an ID that either doesn’t exist or does not refer to a line mod`,
           { lineNumber: snippet.lineNumber }
         );
@@ -136,6 +137,8 @@ export abstract class Snippet {
   abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
 
   abstract toJson(): JsonValue;
+
+  abstract visitSingleSnippet(visitor: (singleSnippet: SingleSnippet) => void): void;
 }
 
 //#################### SingleSnippet ####################
@@ -175,7 +178,7 @@ export class SingleSnippet extends Snippet {
       }
       if (runningAttributes > 1) {
         const attrs = [ATTR_KEY_SKIP, ATTR_ALWAYS_RUN, ATTR_KEY_ONLY];
-        throw new UserError(
+        throw new MarktestSyntaxError(
           `Snippet has more than one of these attributes: ${attrs.join(', ')}`,
           { lineNumber: directive.lineNumber }
         );
@@ -193,7 +196,7 @@ export class SingleSnippet extends Snippet {
         snippet.includeIds = include.split(/ *, */);
       }
 
-      snippet.#applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER);
+      snippet.applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER);
       snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER);
       snippet.onlyLocalLines = directive.getBoolean(ATTR_KEY_ONLY_LOCAL_LINES);
       const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
@@ -259,7 +262,7 @@ export class SingleSnippet extends Snippet {
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
   localLineMod: null | LineMod = null;
-  #applyInnerId: null | string = null;
+  applyInnerId: null | string = null;
   applyOuterId: null | string = null;
   onlyLocalLines = false;
   #ignoreLines = new Set<number>();
@@ -298,7 +301,7 @@ export class SingleSnippet extends Snippet {
     if (langDef.kind === 'LangDefCommand' && langDef.defaultFileName !== undefined) {
       return langDef.defaultFileName;
     }
-    throw new UserError(
+    throw new MarktestSyntaxError(
       `Snippet does not have a filename: neither via config (${stringify(CONFIG_KEY_LANG)} property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}) nor via attribute ${stringify(ATTR_KEY_INTERNAL)}`,
       { lineNumber: this.lineNumber }
     );
@@ -354,7 +357,7 @@ export class SingleSnippet extends Snippet {
   override assembleLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     let thisWasIncluded = false;
     for (const includeId of this.includeIds) {
-      if (includeId === '$THIS') {
+      if (includeId === INCL_ID_THIS) {
         this.#assembleThis(config, idToLineMod, lines);
         thisWasIncluded = true;
         continue;
@@ -370,11 +373,11 @@ export class SingleSnippet extends Snippet {
   #assembleOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
     if (pathOfIncludeIds.has(includeId)) {
       const idPath = [...pathOfIncludeIds, includeId];
-      throw new UserError(`Cycle of includedIds ` + JSON.stringify(idPath));
+      throw new MarktestSyntaxError(`Cycle of includedIds ` + JSON.stringify(idPath));
     }
     const snippet = idToSnippet.get(includeId);
     if (snippet === undefined) {
-      throw new UserError(
+      throw new MarktestSyntaxError(
         `Snippet includes the unknown ID ${JSON.stringify(includeId)}`,
         { lineNumber: this.lineNumber }
       );
@@ -436,10 +439,10 @@ export class SingleSnippet extends Snippet {
   }
 
   #getInnerAppliedLineMod(idToLineMod: Map<string, LineMod>): undefined | LineMod {
-    if (this.#applyInnerId) {
-      const lineMod = idToLineMod.get(this.#applyInnerId);
+    if (this.applyInnerId) {
+      const lineMod = idToLineMod.get(this.applyInnerId);
       if (lineMod === undefined) {
-        throw new UserError(
+        throw new MarktestSyntaxError(
           `Attribute ${ATTR_KEY_APPLY_INNER} contains an ID that either doesn’t exist or does not refer to a line mod`,
           { lineNumber: this.lineNumber }
         );
@@ -475,6 +478,10 @@ export class SingleSnippet extends Snippet {
       body: this.body,
     };
   }
+
+  override visitSingleSnippet(visitor: (singleSnippet: SingleSnippet) => void): void {
+    visitor(this);
+  }
 }
 
 //#################### SequenceSnippet ####################
@@ -487,7 +494,7 @@ export class SequenceSnippet extends Snippet {
     const num = singleSnippet.sequenceNumber;
     assertNonNullable(num);
     if (num.pos !== 1) {
-      throw new UserError(
+      throw new MarktestSyntaxError(
         'First snippet in a sequence must have position 1 (1/*): ' + num,
         { lineNumber: singleSnippet.lineNumber }
       );
@@ -502,13 +509,13 @@ export class SequenceSnippet extends Snippet {
   pushElement(singleSnippet: SingleSnippet, num: SequenceNumber): void {
     assertNonNullable(num);
     if (num.total !== this.total) {
-      throw new UserError(
+      throw new MarktestSyntaxError(
         `Snippet has different total than current sequence (${this.total}): ${num}`,
         { lineNumber: singleSnippet.lineNumber }
       );
     }
     if (num.pos !== (this.elements.length + 1)) {
-      throw new UserError(
+      throw new MarktestSyntaxError(
         `Expected sequence position ${this.elements.length}, but snippet has: ${num}`,
         { lineNumber: singleSnippet.lineNumber }
       );
@@ -593,6 +600,11 @@ export class SequenceSnippet extends Snippet {
   toJson(): JsonValue {
     return this.elements.map(e => e.toJson());
   }
+  override visitSingleSnippet(visitor: (singleSnippet: SingleSnippet) => void): void {
+    for (const snippet of this.elements) {
+      visitor(snippet);
+    }
+  }
 }
 
 //#################### Snippet helper types ####################
@@ -635,16 +647,6 @@ export function snippetJson(partial: Partial<SingleSnippetJson>): SingleSnippetJ
 
 //========== CliState ==========
 
-export enum LogLevel {
-  Verbose,
-  Normal
-}
-
-export enum FileStatus {
-  Failure,
-  Success
-}
-
 export type CliState = {
   absFilePath: string;
   tmpDir: string;
@@ -653,6 +655,49 @@ export type CliState = {
   idToLineMod: Map<string, LineMod>;
   globalVisitationMode: GlobalRunningMode;
   globalLineMods: Map<string, Array<LineMod>>;
-  fileStatus: FileStatus;
+  statusCounts: StatusCounts;
   interceptedShellCommands: null | Array<Array<string>>;
 };
+
+export class StatusCounts {
+  relFilePath;
+  syntaxErrors = 0;
+  testFailures = 0;
+  warnings = 0;
+
+  constructor(relFilePath: string) {
+    this.relFilePath = relFilePath;
+  }
+
+  getTotalCount(): number {
+    return this.syntaxErrors + this.testFailures + this.warnings;
+  }
+  hasFailed(): boolean {
+    return this.getTotalCount() > 0;
+  }
+  toString(): string {
+    return `File ${stringify(this.relFilePath)}. ${this.describe()}`
+  }
+  describe(): string {
+    const parts = [
+      labeled('Syntax Errors', this.syntaxErrors),
+      labeled('Test failures', this.testFailures),
+      labeled('Warnings', this.warnings),
+    ];
+    return parts.join(', ');
+
+    function labeled(label: string, count: number): string {
+      const str = `${label}: ${count}`;
+      if (count > 0) {
+        return style.Bold.FgRed(str);
+      } else {
+        return str;
+      }
+    }
+  }
+}
+
+export enum LogLevel {
+  Verbose,
+  Normal
+}

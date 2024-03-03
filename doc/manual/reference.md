@@ -124,12 +124,13 @@ Running:
   * To override code blocks
 * Assembling lines:
   * `id="my-id"`
-    * Referenced by attributes: include, stdout, stderr
+    * Referenced by attributes: external, sameAsId, include, stdout, stderr
   * `sequence="1/3"`
   * `include="id1, $THIS, id2"`:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
   * `applyInner="id"`: applies an applicable line mod to the core snippet (vs. included snippets or other sequence members)
   * `applyOuter="id"`: applies an applicable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
+  * `onlyLocalLines`: when a snippet is self-contained and does not need config lines and global LineMod lines.
   * `ignoreLines="1, 3-5, 7"`: omits lines. A range includes start and end – i.e.: `1-3` is equivalent to `1,2,3`.
   * `searchAndReplace="/[a-z]/-/i"`
 * Additional checks:

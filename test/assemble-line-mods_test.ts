@@ -1,14 +1,11 @@
-import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 import { dirToJson, jsonToCleanDir } from '@rauschma/helpers/nodejs/dir-json.js';
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
+import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-import { outputIgnored } from '../src/core/run-snippets.js';
-import { FileStatus, LogLevel } from '../src/entity/snippet.js';
-const { parseMarkdown } = await import('../src/core/parse-markdown.js');
-const { runFile } = await import('../src/core/run-snippets.js');
+const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
@@ -70,11 +67,10 @@ test('Assemble lines with line mods', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  const pmr = parseMarkdown(readme);
   const interceptedShellCommands = new Array<Array<string>>();
   assert.equal(
-    runFile(outputIgnored(), LogLevel.Normal, '/tmp/markdown/readme.md', pmr, interceptedShellCommands),
-    FileStatus.Success
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, interceptedShellCommands).getTotalCount(),
+    0
   );
   // Per file: config lines, global line mods
   // Per snippet: applied line mod, local line mod

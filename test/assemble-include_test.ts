@@ -1,14 +1,11 @@
-import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
 import { dirToJson, jsonToCleanDir } from '@rauschma/helpers/nodejs/dir-json.js';
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
-import { FileStatus, LogLevel } from '../src/entity/snippet.js';
-import { outputIgnored } from '../src/core/run-snippets.js';
+import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { parseMarkdown } = await import('../src/core/parse-markdown.js');
-const { runFile } = await import('../src/core/run-snippets.js');
+const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
@@ -30,10 +27,9 @@ test('Included snippet', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  const pmr = parseMarkdown(readme);
   assert.equal(
-    runFile(outputIgnored(), LogLevel.Normal, '/tmp/markdown/readme.md', pmr, []),
-    FileStatus.Success
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
+    0
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
@@ -74,10 +70,9 @@ test('Included snippet with `before:`', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  const pmr = parseMarkdown(readme);
   assert.equal(
-    runFile(outputIgnored(), LogLevel.Normal, '/tmp/markdown/readme.md', pmr, []),
-    FileStatus.Success
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
+    0
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
@@ -90,6 +85,57 @@ test('Included snippet with `before:`', () => {
         }
         import nock from 'nock';
         await httpGet('http://example.com/textfile.txt');
+      `,
+    }
+  );
+});
+
+test('Assembling code fragments out of order', () => {
+  const readme = outdent`
+    <!--marktest include="step1, step2, $THIS"-->
+    ▲▲▲js
+    steps.push('Step 3');
+
+    assert.deepEqual(
+      steps,
+      ['Step 1', 'Step 2', 'Step 3']
+    );
+    ▲▲▲
+
+    <!--marktest id="step1"-->
+    ▲▲▲js
+    const steps = [];
+    steps.push('Step 1');
+    ▲▲▲
+
+    <!--marktest id="step2"-->
+    ▲▲▲js
+    steps.push('Step 2');
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/marktest-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.equal(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
+    0
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        const steps = [];
+        steps.push('Step 1');
+        steps.push('Step 2');
+        steps.push('Step 3');
+
+        assert.deepEqual(
+          steps,
+          ['Step 1', 'Step 2', 'Step 3']
+        );
       `,
     }
   );

@@ -1,10 +1,10 @@
 import { createSequentialEscaper } from '@rauschma/helpers/js/escaper.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { z } from 'zod';
+import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
-import { UserError, type UserErrorContext } from '../util/errors.js';
-import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP } from '../entity/directive.js';
+import { ConfigurationError, MarktestSyntaxError, type UserErrorContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -197,14 +197,14 @@ export class Config {
       }
       if (visitedLanguages.has(partialCommand.extends)) {
         const keyPath = [...visitedLanguages, partialCommand.extends];
-        throw new UserError(
+        throw new ConfigurationError(
           `Cycle in property ${stringify(PROP_KEY_EXTENDS)} (object ${stringify(CONFIG_KEY_LANG)}): ${stringify(keyPath)}`
         );
       }
       visitedLanguages.add(partialCommand.extends);
       const nextLangDef = this.#lang.get(partialCommand.extends);
       if (nextLangDef === undefined) {
-        throw new UserError(
+        throw new ConfigurationError(
           `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(partialCommand.extends)}`
         );
       }
@@ -225,12 +225,12 @@ export class Config {
       }
     } // while
     if (result.defaultFileName === undefined) {
-      throw new UserError(
+      throw new ConfigurationError(
         `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}`
       );
     }
     if (result.commands === undefined) {
-      throw new UserError(
+      throw new ConfigurationError(
         `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_COMMANDS)}`
       );
     }
@@ -311,7 +311,7 @@ function langDefFromJson(context: UserErrorContext, langDefJson: LangDefPartialJ
   if (langDefJson.translator) {
     translator = TRANSLATOR_MAP.get(langDefJson.translator);
     if (translator === undefined) {
-      throw new UserError(
+      throw new MarktestSyntaxError(
         `Unknown translator: ${stringify(langDefJson.translator)}`,
         { context }
       );

@@ -1,4 +1,4 @@
-import { outdent } from '@rauschma/helpers/js/outdent-template-tag.js';
+import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
 import { LineMod } from '../entity/line-mod.js';

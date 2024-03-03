@@ -1,9 +1,12 @@
-import { UnsupportedValueError } from "@rauschma/helpers/ts/error.js";
-import { AssertionError } from "node:assert";
+import { style } from '@rauschma/helpers/nodejs/text-style.js';
+import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
+import * as os from 'node:os';
+import * as tty from 'node:tty';
 
-export class InternalError extends Error {
-  override name = this.constructor.name;
-}
+export const STATUS_EMOJI_SUCCESS = style.FgGreen`✔︎`;
+export const STATUS_EMOJI_FAILURE = '❌';
+
+//#################### UserErrorContext ####################
 
 export type LineNumber = number;
 
@@ -40,7 +43,9 @@ export function contextDescription(description: string): UserErrorContextDescrip
   };
 }
 
-export interface UserErrorOptions {
+//#################### TestFailure ####################
+
+export interface TestFailureOptions {
   context?: UserErrorContext;
   lineNumber?: number;
   stdoutLines?: Array<string>;
@@ -49,14 +54,15 @@ export interface UserErrorOptions {
   expectedStderrLines?: Array<string>
   cause?: any;
 }
-export class UserError extends Error {
+
+export class TestFailure extends Error {
   override name = this.constructor.name;
   context: undefined | UserErrorContext;
   stdoutLines;
   expectedStdoutLines;
   stderrLines;
   expectedStderrLines;
-  constructor(message: string, opts: UserErrorOptions = {}) {
+  constructor(message: string, opts: TestFailureOptions = {}) {
     super(
       message,
       (opts.cause ? { cause: opts.cause } : undefined)
@@ -74,15 +80,102 @@ export class UserError extends Error {
     this.stderrLines = opts.stderrLines;
     this.expectedStderrLines = opts.expectedStderrLines;
   }
+  logTo(out: Output, prefix = ''): void {
+    const description = (
+      this.context
+        ? describeUserErrorContext(this.context)
+        : 'unknown context'
+    );
+    out.writeLine(`${prefix}[${description}] ${this.message}`);
+    if (this.stack) {
+      out.writeLine(this.stack);
+    }
+  }
+}
+//#################### MarktestSyntaxError ####################
+
+export interface MarktestSyntaxErrorOptions {
+  context?: UserErrorContext;
+  lineNumber?: number;
+  stdoutLines?: Array<string>;
+  expectedStdoutLines?: Array<string>
+  stderrLines?: Array<string>;
+  expectedStderrLines?: Array<string>
+  cause?: any;
 }
 
-export function assertionErrorToUserError(lineNumber: LineNumber, callback: () => void) {
-  try {
-    callback();
-  } catch (err) {
-    if (!(err instanceof AssertionError)) {
-      throw err;
+export class MarktestSyntaxError extends Error {
+  override name = this.constructor.name;
+  context: undefined | UserErrorContext;
+  stdoutLines;
+  expectedStdoutLines;
+  stderrLines;
+  expectedStderrLines;
+  constructor(message: string, opts: MarktestSyntaxErrorOptions = {}) {
+    super(
+      message,
+      (opts.cause ? { cause: opts.cause } : undefined)
+    );
+    if (opts.context) {
+      this.context = opts.context;
+    } else if (opts.lineNumber) {
+      this.context = {
+        kind: 'UserErrorContextLineNumber',
+        lineNumber: opts.lineNumber,
+      };
     }
-    throw new UserError(err.message, { lineNumber, cause: err })
+    this.stdoutLines = opts.stdoutLines;
+    this.expectedStdoutLines = opts.expectedStdoutLines;
+    this.stderrLines = opts.stderrLines;
+    this.expectedStderrLines = opts.expectedStderrLines;
   }
+  logTo(out: Output, prefix = ''): void {
+    const description = (
+      this.context
+        ? describeUserErrorContext(this.context)
+        : 'unknown context'
+    );
+    out.writeLine(`${prefix}[${description}] ${this.message}`);
+    if (this.stack) {
+      out.writeLine(this.stack);
+    }
+  }
+}
+
+//#################### ConfigurationError ####################
+
+export class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+//#################### InternalError ####################
+
+export class InternalError extends Error {
+  override name = this.constructor.name;
+}
+
+//#################### Output ####################
+
+export type Output = {
+  write(str: string): void;
+  writeLine(str?: string): void;
+};
+
+export function outputIgnored(): Output {
+  return {
+    write(_str: string): void { },
+    writeLine(_str = ''): void { },
+  };
+}
+export function outputFromWriteStream(writeStream: tty.WriteStream): Output {
+  return {
+    write(str: string): void {
+      writeStream.write(str);
+    },
+    writeLine(str = ''): void {
+      writeStream.write(str + os.EOL);
+    },
+  };
 }
