@@ -142,9 +142,6 @@ export type ExpectedAttributeValues = Map<string, AttrValue | RegExp>;
 export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
   [ATTR_KEY_ID, AttrValue.String],
   //
-  // Body label `insert:` (local LineMods only)
-  [ATTR_KEY_AT, AttrValue.String],
-  //
   [ATTR_KEY_ONLY, AttrValue.Valueless],
   [ATTR_KEY_SKIP, AttrValue.Valueless],
   [ATTR_ALWAYS_RUN, AttrValue.Valueless],
@@ -169,6 +166,12 @@ export const SNIPPET_ATTRIBUTES: ExpectedAttributeValues = new Map<string, AttrV
   //
   [ATTR_KEY_STDOUT, AttrValue.String],
   [ATTR_KEY_STDERR, AttrValue.String],
+]);
+
+export const SNIPPET_ATTRIBUTES_BODY_LABEL_INSERT: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
+  ...SNIPPET_ATTRIBUTES,
+  // Body label `insert:` (local LineMods only)
+  [ATTR_KEY_AT, AttrValue.String],
 ]);
 
 export const GLOBAL_LINE_MOD_ATTRIBUTES: ExpectedAttributeValues = new Map([

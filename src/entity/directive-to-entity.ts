@@ -1,6 +1,6 @@
 import { MarktestSyntaxError } from '../util/errors.js';
 import { ConfigMod } from './config-mod.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_EACH, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, SNIPPET_ATTRIBUTES, type Directive } from './directive.js';
+import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_EACH, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, SNIPPET_ATTRIBUTES, SNIPPET_ATTRIBUTES_BODY_LABEL_INSERT, type Directive } from './directive.js';
 import { LineMod } from './line-mod.js';
 import { SingleSnippet } from './snippet.js';
 
@@ -26,7 +26,11 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     case BODY_LABEL_AROUND:
     case BODY_LABEL_INSERT:
     case null: {
-      if (directive.bodyLabel !== null) {
+      if (directive.bodyLabel === null) {
+        // Open snippet without a local LineMod
+        directive.checkAttributes(SNIPPET_ATTRIBUTES);
+        return SingleSnippet.createOpen(directive);
+      } else {
         // Either:
         // - Global LineMod
         // - Applicable LineMod
@@ -53,16 +57,16 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         }
 
         // Open snippet with local LineMod
-        directive.checkAttributes(SNIPPET_ATTRIBUTES);
+        if (directive.bodyLabel === BODY_LABEL_INSERT) {
+          directive.checkAttributes(SNIPPET_ATTRIBUTES_BODY_LABEL_INSERT);
+        } else {
+          directive.checkAttributes(SNIPPET_ATTRIBUTES);
+        }
         const snippet = SingleSnippet.createOpen(directive);
         snippet.localLineMod = LineMod.parse(directive, {
           tag: 'LineModKindLocal',
         });
         return snippet;
-      } else {
-        // Open snippet without a local LineMod
-        directive.checkAttributes(SNIPPET_ATTRIBUTES);
-        return SingleSnippet.createOpen(directive);
       }
     }
 
