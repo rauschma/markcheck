@@ -97,20 +97,12 @@ export class TestFailure extends Error {
 export interface MarktestSyntaxErrorOptions {
   context?: UserErrorContext;
   lineNumber?: number;
-  stdoutLines?: Array<string>;
-  expectedStdoutLines?: Array<string>
-  stderrLines?: Array<string>;
-  expectedStderrLines?: Array<string>
   cause?: any;
 }
 
 export class MarktestSyntaxError extends Error {
   override name = this.constructor.name;
   context: undefined | UserErrorContext;
-  stdoutLines;
-  expectedStdoutLines;
-  stderrLines;
-  expectedStderrLines;
   constructor(message: string, opts: MarktestSyntaxErrorOptions = {}) {
     super(
       message,
@@ -124,10 +116,6 @@ export class MarktestSyntaxError extends Error {
         lineNumber: opts.lineNumber,
       };
     }
-    this.stdoutLines = opts.stdoutLines;
-    this.expectedStdoutLines = opts.expectedStdoutLines;
-    this.stderrLines = opts.stderrLines;
-    this.expectedStderrLines = opts.expectedStderrLines;
   }
   logTo(out: Output, prefix = ''): void {
     const description = (
