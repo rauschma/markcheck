@@ -6,13 +6,9 @@
   * Skipped snippets
   * Per file (and/or in summary?): How many snippets were run?
     * “Test failures: 1 of 3”
-* Testing – e.g. `written-snippet_test.ts`:
-  * runFile() logs problems to console instead of throwing.
-  * Search for `console.log(`.
 * CLI option? Stop after first error (so that files can be examined).
 * Colorless for non-interactive terminals?
 * Condense successful output?
-* Can `UserErrorContext` be simplified? When is it really needed?
 * Simplify `runParsedMarkdownForTests()`.
   * Tool function that asserts that there was no failure.
 

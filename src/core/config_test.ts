@@ -7,7 +7,7 @@ createSuite(import.meta.url);
 
 test('config.toJson()', () => {
   const json = new Config().toJson();
-  console.log(JSON.stringify(json, null, 2));
+  // console.log(JSON.stringify(json, null, 2));
   assert.deepEqual(
     json,
     {

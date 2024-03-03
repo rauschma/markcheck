@@ -15,7 +15,7 @@ import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type MarktestEntity } from '../entity/snippet.js';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
-import { ConfigurationError, MarktestSyntaxError, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext, outputFromWriteStream, type Output } from '../util/errors.js';
+import { ConfigurationError, MarktestSyntaxError, Output, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
 import { linesAreSame, linesContain, trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
 import { parseMarkdown, type ParsedMarkdown } from './parse-markdown.js';
@@ -480,7 +480,7 @@ function logStd(out: Output, name: string, actualLines: Array<string>, expectedL
   logAll(out, actualLines);
   out.writeLine('-'.repeat(title.length));
   if (expectedLines) {
-    logDiff(expectedLines, actualLines);
+    logDiff(out, expectedLines, actualLines);
     out.writeLine('-'.repeat(title.length));
   }
 }
@@ -517,7 +517,7 @@ const ARG_OPTIONS = {
 } satisfies ParseArgsConfig['options'];
 
 export function cliEntry() {
-  const out = outputFromWriteStream(process.stdout);
+  const out = Output.fromStdout();
   const args = parseArgs({ allowPositionals: true, options: ARG_OPTIONS });
 
   if (args.values.version) {

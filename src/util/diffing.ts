@@ -3,8 +3,9 @@ import { isEntryModule } from '@rauschma/helpers/nodejs/import-meta.js';
 import { style, type TextStyleResult } from '@rauschma/helpers/nodejs/text-style.js';
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import * as diff from 'diff';
+import { Output } from './errors.js';
 
-export function logDiff(expectedLines: Array<string>, actualLines: Array<string>) {
+export function logDiff(out: Output, expectedLines: Array<string>, actualLines: Array<string>) {
   const changes = diff.diffArrays(expectedLines, actualLines);
   for (const change of changes) {
     let prefix;
@@ -20,21 +21,9 @@ export function logDiff(expectedLines: Array<string>, actualLines: Array<string>
       lineStyle = style.Normal;
     }
     for (const v of change.value) {
-      console.log(lineStyle(prefix + v));
+      out.writeLine(lineStyle(prefix + v));
     }
   }
-}
-
-if (isEntryModule(import.meta)) {
-  const oldStr = outdent`
-    Hello world!
-    More text
-  `;
-  const newStr = outdent`
-    Goodbye world!
-    More text
-  `;
-  logDiff(splitLinesExclEol(oldStr), splitLinesExclEol(newStr));
 }
 
 export function isOutputEqual(expectedLines: Array<string>, actualLines: Array<string>): boolean {
@@ -49,4 +38,16 @@ export function isOutputEqual(expectedLines: Array<string>, actualLines: Array<s
     }
   }
   return true;
+}
+
+if (isEntryModule(import.meta)) {
+  const oldStr = outdent`
+    Hello world!
+    More text
+  `;
+  const newStr = outdent`
+    Goodbye world!
+    More text
+  `;
+  logDiff(Output.fromStdout(), splitLinesExclEol(oldStr), splitLinesExclEol(newStr));
 }

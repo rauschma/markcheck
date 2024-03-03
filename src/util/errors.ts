@@ -143,24 +143,24 @@ export class InternalError extends Error {
 
 //#################### Output ####################
 
-export type Output = {
-  write(str: string): void;
-  writeLine(str?: string): void;
-};
-
-export function outputIgnored(): Output {
-  return {
-    write(_str: string): void { },
-    writeLine(_str = ''): void { },
-  };
-}
-export function outputFromWriteStream(writeStream: tty.WriteStream): Output {
-  return {
-    write(str: string): void {
-      writeStream.write(str);
-    },
-    writeLine(str = ''): void {
-      writeStream.write(str + os.EOL);
-    },
-  };
+export class Output {
+  static fromStdout(): Output {
+    return Output.fromWriteStream(process.stdout);
+  }
+  static fromWriteStream(writeStream: tty.WriteStream): Output {
+    return new Output((str) => writeStream.write(str));
+  }
+  static ignore(): Output {
+    return new Output((_str) => {});
+  }
+  #write;
+  constructor(write: (str: string) => void) {
+    this.#write = write;
+  }
+  write(str: string): void {
+    this.#write(str);
+  }
+  writeLine(str = ''): void {
+    this.#write(str + os.EOL);
+  }
 }
