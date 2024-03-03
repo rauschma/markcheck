@@ -46,7 +46,6 @@ export function contextDescription(description: string): UserErrorContextDescrip
 //#################### TestFailure ####################
 
 export interface TestFailureOptions {
-  context?: UserErrorContext;
   lineNumber?: number;
   stdoutLines?: Array<string>;
   expectedStdoutLines?: Array<string>
@@ -67,9 +66,7 @@ export class TestFailure extends Error {
       message,
       (opts.cause ? { cause: opts.cause } : undefined)
     );
-    if (opts.context) {
-      this.context = opts.context;
-    } else if (opts.lineNumber) {
+    if (opts.lineNumber) {
       this.context = {
         kind: 'UserErrorContextLineNumber',
         lineNumber: opts.lineNumber,

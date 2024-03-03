@@ -163,12 +163,16 @@ export class Config {
       ),
     };
   }
-  applyMod(context: UserErrorContext, mod: ConfigModJson): void {
-    if (mod.searchAndReplace) {
-      this.#setSearchAndReplace(mod.searchAndReplace);
+  /**
+   * @param context `configModJson` comes from a config file or a ConfigMod
+   * (inside a Markdown file).
+   */
+  applyMod(context: UserErrorContext, configModJson: ConfigModJson): void {
+    if (configModJson.searchAndReplace) {
+      this.#setSearchAndReplace(configModJson.searchAndReplace);
     }
-    if (mod.lang) {
-      for (const [key, langDefJson] of Object.entries(mod.lang)) {
+    if (configModJson.lang) {
+      for (const [key, langDefJson] of Object.entries(configModJson.lang)) {
         this.#lang.set(key, langDefFromJson(context, langDefJson));
       }
     }
@@ -296,6 +300,10 @@ export type LangDefCommandPartialJson = {
   commands?: Array<Array<string>>,
 };
 
+/**
+ * @param context `configModJson` comes from a config file or a ConfigMod
+ * (inside a Markdown file).
+ */
 function langDefFromJson(context: UserErrorContext, langDefJson: LangDefPartialJson): LangDef {
   if (typeof langDefJson === 'string') {
     switch (langDefJson) {

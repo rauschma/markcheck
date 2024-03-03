@@ -17,6 +17,11 @@
   * Tool function that asserts that there was no failure.
 
 
+* Exceptions:
+  * Catch `ZodError`
+  * Is `ConfigurationError` needed?
+    * Check all references to this class!
+    * Some `MarkdownSyntaxError` are already causes by config file data.
 * Go from `LineModKind` to subclasses?
 * Improve: `Could not parse attributes: Stopped parsing before`
 * Built-in check for JSON
