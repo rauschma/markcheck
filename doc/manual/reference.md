@@ -131,8 +131,6 @@ Running:
   * `applyInner="id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
   * `applyOuter="id"`: applies an appliable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
   * `onlyLocalLines`: when a snippet is self-contained and does not need config lines and global LineMod lines.
-  * `ignoreLines="1, 3-5, 7"`: omits lines. A range includes start and end – i.e.: `1-3` is equivalent to `1,2,3`.
-  * `searchAndReplace="/[a-z]/-/i"`
 * Additional checks:
   * `sameAsId="id"`
   * `containedInFile="filePath"`:
@@ -144,13 +142,16 @@ Running:
   * `internal="filePath"`
   * `external="id1>lib1.js, lib2.js"`
 * Checking output:
-  * `stdout="id"`
+  * `stdout="|lineModId=id"`
   * `stderr="id"`
 
 ### Local line mods
 
 * Required for body label `insert:`: `at="before:1, after:-1, before:'console.log'"`
   * `-1` is the last line (etc.)
+* `ignoreLines="1, 3..-2, 'xyz', 'a'..'b'"`: omits lines.
+  * A range includes start and end – i.e.: `1..3` is equivalent to `1,2,3`.
+* `searchAndReplace="/[a-z]/-/i"`
 
 ### Global line mods
 
