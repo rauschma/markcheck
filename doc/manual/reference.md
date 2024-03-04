@@ -41,7 +41,7 @@ function functionThatShouldThrow() {
 ```js
 ```
 
-<!--marktest write="some-file.txt" body:
+<!--marktest writeInner="some-file.txt" body:
 Content of some-file.txt
 -->
 ``````
@@ -100,7 +100,8 @@ Running:
   * `only`: Affects the whole file. Only snippets with this attribute are run.
   * Visitation mode `normal` (not an attribute): active if none of the previous attributes are present.
 * `id` sets running mode to `skip`.
-  * Override via `alwaysRun` 
+  * Override via `alwaysRun`
+* ❌ `writeInner`, `writeOuter`
 
 ### How lines are assembled
 

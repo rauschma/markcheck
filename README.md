@@ -189,7 +189,7 @@ Sometimes readers should not see how a file is set up or that the output is chec
 Setting up an external file:
 
 ``````md
-<!--marktest write="some-file.txt" body:
+<!--marktest writeInner="some-file.txt" body:
 Content of some-file.txt
 -->
 

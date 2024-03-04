@@ -6,6 +6,7 @@
   * Use case: There were errors, but we don’t want to check stderr, only stdout.
 * Config..searchAndReplace: use same format as attributes?
   * Downside: strings are not raw!
+  * Alternatives: pairs, `{search,replace}`
   * Update `reference.md` as needed.
 
 
