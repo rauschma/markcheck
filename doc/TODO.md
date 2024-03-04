@@ -1,26 +1,22 @@
 # Todo
 
+* Attribute `applyLocal`
+  * Switches off local LineMod: Error if it is non-empty?
+
+
+* Go from `LineModKind` to subclasses?
 * Diagnostics:
   * Pluralize: “All succeeded: 1 file”
   * `only` mode (per file)
   * Skipped snippets
   * Per file (and/or in summary?): How many snippets were run?
     * “Test failures: 1 of 3”
-* CLI option? Stop after first error (so that files can be examined).
 * Colorless for non-interactive terminals?
-* Condense successful output?
-* Simplify `runParsedMarkdownForTests()`.
-  * Tool function that asserts that there was no failure.
-* Attribute `applyLocal`
-  * Switches off local LineMod: Error if it is non-empty?
-
-
 * Exceptions:
   * Catch `ZodError`
   * Is `ConfigurationError` needed?
     * Check all references to this class!
     * Some `MarkdownSyntaxError` are already causes by config file data.
-* Go from `LineModKind` to subclasses?
 * Improve: `Could not parse attributes: Stopped parsing before`
 * Built-in check for JSON
 * Reset in-memory file system after a unit test.

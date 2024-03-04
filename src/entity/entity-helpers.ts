@@ -8,6 +8,7 @@ export function insertParsingPos(str: string, pos: number): string {
 export function unescapeBackslashes(rawStr: string): string {
   return rawStr.replaceAll(/\\(.)/g, '$1');
 }
-export function escapeSingleQuoted(str: string) {
-  return str.replaceAll(/(['"\\])/g, String.raw`\$1`);
+/** Similar to JSON.stringify(str) */
+export function stringifySingleQuoted(str: string) {
+  return `'` + str.replaceAll(/(['"\\])/g, String.raw`\$1`) + `'`;
 }

@@ -2,9 +2,10 @@ import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/ts/type.js';
 import type { Translator } from '../translation/translation.js';
-import { contextLineNumber, InternalError, MarktestSyntaxError, type UserErrorContext } from '../util/errors.js';
+import { contextLineNumber, InternalError, MarktestSyntaxError, type EntityContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
-import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, parseLineNumberSet, SearchAndReplaceSpec, type Directive } from './directive.js';
+import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, SearchAndReplaceSpec, type Directive } from './directive.js';
+import { parseLineLocSet, type LineLocSet, lineLocSetToLineNumberSet } from './line-loc-set.js';
 import { InsertionRules, LineLocModifier, parseInsertionConditions } from './insertion-rules.js';
 
 const { stringify } = JSON;
@@ -36,11 +37,11 @@ export type LineModKindLocal = {
 //#################### LineMod ####################
 
 type LineModProps = PublicDataProperties<LineMod>;
-function emptyLineModProps(context: UserErrorContext): LineModProps {
+function emptyLineModProps(context: EntityContext): LineModProps {
   return {
     context,
     //
-    ignoreLines: new Set<number>(),
+    ignoreLines: [],
     searchAndReplace: null,
     //
     insertionRules: new InsertionRules,
@@ -56,7 +57,7 @@ export class LineMod {
 
     const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
     if (ignoreLinesStr) {
-      props.ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
+      props.ignoreLines = parseLineLocSet(directive.lineNumber, ignoreLinesStr);
     }
     const searchAndReplaceStr = directive.getString(ATTR_KEY_SEARCH_AND_REPLACE);
     if (searchAndReplaceStr) {
@@ -98,7 +99,7 @@ export class LineMod {
             { lineNumber: directive.lineNumber }
           );
         }
-        const conditions = parseInsertionConditions(atStr);
+        const conditions = parseInsertionConditions(directive.lineNumber, atStr);
         const lineGroups = splitInsertedLines(body);
         if (conditions.length !== lineGroups.length) {
           throw new MarktestSyntaxError(
@@ -118,21 +119,22 @@ export class LineMod {
     }
     return new LineMod(kind, props);
   }
-  static fromBeforeLines(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>) {
+  static fromBeforeLines(context: EntityContext, kind: LineModKind, beforeLines: Array<string>) {
     return new LineMod(kind, {
       ...emptyLineModProps(context),
       beforeLines,
     });
   }
 
+  #kind: LineModKind;
+
   /**
    * LineMods can be created from line in Config. Then they don’t have a
    * line number. Thus, the more general UserErrorContext is needed.
    */
-  #kind: LineModKind;
-  context: UserErrorContext;
+  context: EntityContext;
   //
-  ignoreLines: Set<number>;
+  ignoreLines: LineLocSet;
   searchAndReplace: null | SearchAndReplaceSpec;
   //
   insertionRules: InsertionRules;
@@ -184,8 +186,9 @@ export class LineMod {
     //   indices.
     // - However, ignored line numbers would make no sense at all after
     //   inserting lines, which is why ignore first.
+    const lineNumberSet = lineLocSetToLineNumberSet(this.context, this.ignoreLines, body);
     body = body.filter(
-      (_line, index) => !this.ignoreLines.has(index + 1)
+      (_line, index) => !lineNumberSet.has(index + 1)
     );
 
     // We only search-and-replace in visible (non-inserted) lines because
@@ -200,9 +203,9 @@ export class LineMod {
     {
       const nextBody = new Array<string>();
       for (const [index, line] of body.entries()) {
-        this.insertionRules.maybePushLineGroup(LineLocModifier.Before, body.length, index + 1, line, nextBody);
+        this.insertionRules.maybePushLineGroup(this.context, LineLocModifier.Before, body.length, index + 1, line, nextBody);
         nextBody.push(line);
-        this.insertionRules.maybePushLineGroup(LineLocModifier.After, body.length, index + 1, line, nextBody);
+        this.insertionRules.maybePushLineGroup(this.context, LineLocModifier.After, body.length, index + 1, line, nextBody);
       }
       body = nextBody;
     }

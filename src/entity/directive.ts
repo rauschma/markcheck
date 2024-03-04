@@ -1,7 +1,7 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertTrue } from '@rauschma/helpers/ts/type.js';
-import { InternalError, MarktestSyntaxError, type LineNumber, type UserErrorContext } from '../util/errors.js';
+import { InternalError, MarktestSyntaxError, type LineNumber, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 const { raw } = String;
@@ -394,43 +394,6 @@ export function parseSequenceNumber(str: string): null | SequenceNumber {
   return new SequenceNumber(pos, total);
 }
 
-//========== Line numbers ==========
-
-const RE_RANGE = /^([0-9]+)-([0-9]+)$/;
-const RE_NUMBER = /^[0-9]+$/;
-export function parseLineNumberSet(directiveLineNumber: number, str: string): Set<number> {
-  const result = new Set<number>();
-  const parts = str.split(',').map(s => s.trim());
-  for (const part of parts) {
-    const match = RE_RANGE.exec(part);
-    if (match) {
-      const start = Number(match[1]);
-      assertTrue(!Number.isNaN(start));
-      const end = Number(match[2]);
-      assertTrue(!Number.isNaN(end));
-      if (!(start <= end)) {
-        throw new MarktestSyntaxError(
-          `Illegal range: ${stringify(part)}`,
-          { lineNumber: directiveLineNumber }
-        );
-      }
-      for (let i = start; i <= end; i++) {
-        result.add(i);
-      }
-    } else if (RE_NUMBER.test(part)) {
-      const lineNumber = Number(part);
-      assertTrue(!Number.isNaN(lineNumber));
-      result.add(lineNumber);
-    } else {
-      throw new MarktestSyntaxError(
-        `Illegal format for line numbers: ${stringify(str)}`,
-        { lineNumber: directiveLineNumber }
-      );
-    }
-  }
-  return result;
-}
-
 //========== SearchAndReplaceSpec ==========
 
 const RE_INNER = /(?:[^/]|\\[/])*/;
@@ -440,12 +403,12 @@ const RE_SEARCH_AND_REPLACE = re`/^[/](${RE_INNER})[/](${RE_INNER})[/]([i])?$/`;
  * Example: `"/[⎡⎤]//i"`
  */
 export class SearchAndReplaceSpec {
-  static fromString(context: UserErrorContext, str: string): SearchAndReplaceSpec {
+  static fromString(context: EntityContext, str: string): SearchAndReplaceSpec {
     const match = RE_SEARCH_AND_REPLACE.exec(str);
     if (!match) {
       throw new MarktestSyntaxError(
         `Not a valid searchAndReplace string: ${stringify(str)}`,
-        { context }
+        { entityContext: context }
       );
     }
     const search = match[1];

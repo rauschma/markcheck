@@ -4,7 +4,7 @@ import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { MarktestSyntaxError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
+import { MarktestSyntaxError, contextDescription, contextLineNumber, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
@@ -14,7 +14,7 @@ import { LineMod } from './line-mod.js';
 const { stringify } = JSON;
 
 export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
-export function getUserErrorContext(entity: MarktestEntity): UserErrorContext {
+export function getUserErrorContext(entity: MarktestEntity): EntityContext {
   if (entity instanceof ConfigMod || entity instanceof Snippet || entity instanceof Heading) {
     return contextLineNumber(entity.lineNumber);
   } else if (entity instanceof LineMod) {

@@ -1,8 +1,12 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
-import { InternalError, MarktestSyntaxError } from '../util/errors.js';
+import { InternalError, MarktestSyntaxError, type EntityContext } from '../util/errors.js';
+import { ATTR_KEY_AT } from './directive.js';
 import { insertParsingPos, unescapeBackslashes } from './entity-helpers.js';
+import { KEY_LINE_NUMBER, KEY_TEXT_FRAGMENT, RE_LINE_LOC, ensurePositiveLineNumber } from './line-loc-set.js';
+
+const { stringify } = JSON;
 
 export enum LineLocModifier {
   Before = 'Before',
@@ -28,15 +32,15 @@ export class InsertionRules {
     this.#rules.push(insertionRule);
   }
 
-  maybePushLineGroup(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string, linesOut: Array<string>): void {
-    const lineGroup = this.#getLineGroup(modifier, lastLineNumber, curLineNumber, line);
+  maybePushLineGroup(entityContext: EntityContext, modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string, linesOut: Array<string>): void {
+    const lineGroup = this.#getLineGroup(entityContext, modifier, lastLineNumber, curLineNumber, line);
     if (lineGroup) {
       linesOut.push(...lineGroup);
     }
   }
-  #getLineGroup(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string): null | Array<string> {
+  #getLineGroup(entityContext: EntityContext, modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string): null | Array<string> {
     for (const rule of this.#rules) {
-      if (rule.condition.matches(modifier, lastLineNumber, curLineNumber, line)) {
+      if (rule.condition.matches(entityContext, modifier, lastLineNumber, curLineNumber, line)) {
         return rule.lineGroup;
       }
     }
@@ -51,19 +55,19 @@ export type InsertionRule = {
 
 //#################### InsertionCondition ####################
 
-const RE_LINE_NUMBER = /(?<lineNumber>-?[0-9]+)/;
-const RE_TEXT_FRAGMENT = /'(?<textFragment>(\\.|[^'])*)'/;
-const RE_PART = re`/(?<modifier>before|after):(${RE_LINE_NUMBER}|${RE_TEXT_FRAGMENT})(?<comma>\s*,\s*)?/uy`;
+const RE_PART = re`/(?<modifier>before|after):${RE_LINE_LOC}(?<comma>\s*,\s*)?/uy`;
 
-export function parseInsertionConditions(str: string): Array<InsertionCondition> {
+export function parseInsertionConditions(directiveLineNumber: number, str: string): Array<InsertionCondition> {
   const result = new Array<InsertionCondition>();
   RE_PART.lastIndex = 0;
-  while (RE_PART.lastIndex < str.length) { // we allow trailing commas
+  // Using `true` as `while` condition would make trailing commas illegal
+  while (RE_PART.lastIndex < str.length) {
     const lastIndex = RE_PART.lastIndex;
     const match = RE_PART.exec(str);
     if (!match) {
       throw new MarktestSyntaxError(
-        `Could not parse insertion condition: ${insertParsingPos(str, lastIndex)}`
+        `Could not parse insertion conditions (attribute ${stringify(ATTR_KEY_AT)}): ${insertParsingPos(str, lastIndex)}`,
+        {lineNumber: directiveLineNumber}
       );
     }
     assertNonNullable(match.groups);
@@ -78,22 +82,23 @@ export function parseInsertionConditions(str: string): Array<InsertionCondition>
       default:
         throw new InternalError();
     }
-    if (match.groups.lineNumber !== undefined) {
-      const lineNumber = Number(match.groups.lineNumber);
+    if (match.groups[KEY_LINE_NUMBER] !== undefined) {
+      const lineNumber = Number(match.groups[KEY_LINE_NUMBER]);
       result.push(new InsCondLineNumber(modifier, lineNumber));
-    } else if (match.groups.textFragment !== undefined) {
-      const textFragment = unescapeBackslashes(match.groups.textFragment);
+    } else if (match.groups[KEY_TEXT_FRAGMENT] !== undefined) {
+      const textFragment = unescapeBackslashes(match.groups[KEY_TEXT_FRAGMENT]);
       result.push(new InsCondTextFragment(modifier, textFragment));
     } else {
       throw new InternalError();
     }
-    if (!('comma' in match.groups)) {
-      // If there is no separating comma, we must be at the end
+    if (match.groups.comma === undefined) {
+      // The separating comma can only be omitted at the end
       if (RE_PART.lastIndex >= str.length) {
         break;
       }
       throw new MarktestSyntaxError(
-        `Expected a comma after an insertion condition: ${insertParsingPos(str, RE_PART.lastIndex)}`
+        `Expected a comma after an insertion condition (attribute ${stringify(ATTR_KEY_AT)}): ${insertParsingPos(str, RE_PART.lastIndex)}`,
+        {lineNumber: directiveLineNumber}
       );
     }
   }
@@ -105,7 +110,7 @@ export function insertionConditionsToJson(conditions: Array<InsertionCondition>)
 }
 
 export abstract class InsertionCondition {
-  abstract matches(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, line: string): boolean;
+  abstract matches(entityContext: EntityContext, modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, _line: string): boolean;
   abstract toJson(): JsonValue;
 }
 
@@ -115,7 +120,7 @@ class InsCondTextFragment extends InsertionCondition {
   constructor(public modifier: LineLocModifier, public textFragment: string) {
     super();
   }
-  override matches(modifier: LineLocModifier, _lastLineNumber: number, _curLineNumber: number, line: string): boolean {
+  override matches(_entityContext: EntityContext, modifier: LineLocModifier, _lastLineNumber: number, _curLineNumber: number, line: string): boolean {
     return (
       modifier === this.modifier &&
       line.includes(this.textFragment)
@@ -135,10 +140,10 @@ class InsCondLineNumber extends InsertionCondition {
   constructor(public modifier: LineLocModifier, public lineNumber: number) {
     super();
   }
-  override matches(modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, _line: string): boolean {
+  override matches(entityContext: EntityContext, modifier: LineLocModifier, lastLineNumber: number, curLineNumber: number, _line: string): boolean {
     return (
       modifier === this.modifier &&
-      curLineNumber === ensurePositiveLineNumber(lastLineNumber, this.lineNumber)
+      curLineNumber === ensurePositiveLineNumber(entityContext, lastLineNumber, this.lineNumber, ATTR_KEY_AT)
     );
   }
   override toJson(): JsonValue {
@@ -147,20 +152,4 @@ class InsCondLineNumber extends InsertionCondition {
       lineNumber: this.lineNumber,
     };
   }
-}
-
-function ensurePositiveLineNumber(lastLineNumber: number, lineNumber: number): number {
-  let posLineNumber = lineNumber;
-  if (posLineNumber < 0) {
-    // * -1 is the last line number
-    // * -2 is the second-to-last line number
-    // * Etc.
-    posLineNumber = lastLineNumber + posLineNumber + 1;
-  }
-  if (!(1 <= posLineNumber && posLineNumber <= lastLineNumber)) {
-    throw new MarktestSyntaxError(
-      `Line number must with range [1, ${lastLineNumber}] (-1 means ${lastLineNumber} etc.): ${lineNumber}`
-    );
-  }
-  return posLineNumber;
 }

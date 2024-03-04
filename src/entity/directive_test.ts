@@ -1,9 +1,9 @@
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
-import { contextLineNumber } from '../util/errors.js';
-import { Directive, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, type ExternalSpec } from './directive.js';
 import { extractCommentContent } from '../core/parse-markdown.js';
+import { contextLineNumber } from '../util/errors.js';
+import { Directive, SearchAndReplaceSpec, parseExternalSpecs, type ExternalSpec } from './directive.js';
 
 const { raw } = String;
 
@@ -87,18 +87,6 @@ test('parseExternalSpecs', () => {
     ] satisfies Array<ExternalSpec>
   );
 });
-
-test('parseLineNumberSet', () => {
-  assert.deepEqual(
-    parseLineNumberSet(1, '1, 2, 3'),
-    new Set([1, 2, 3])
-  );
-  assert.deepEqual(
-    parseLineNumberSet(1, '1-2, 4, 6-7'),
-    new Set([1, 2, 4, 6, 7])
-  );
-});
-
 
 test('SearchAndReplaceSpec', () => {
   const testObjs = [

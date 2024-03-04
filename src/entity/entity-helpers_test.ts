@@ -1,14 +1,14 @@
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
-import { escapeSingleQuoted, insertParsingPos, unescapeBackslashes } from './entity-helpers.js';
+import { insertParsingPos, stringifySingleQuoted, unescapeBackslashes } from './entity-helpers.js';
 
 const {raw} = String;
 
 createSuite(import.meta.url);
 
-test('escapeSingleQuoted', () => {
+test('stringifySingleQuoted', () => {
   assert.equal(
-    escapeSingleQuoted(raw`'a"b\c`),
+    stringifySingleQuoted(raw`'a"b\c`),
     raw`\'a\"b\\c`
   );
 });

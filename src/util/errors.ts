@@ -10,35 +10,35 @@ export const STATUS_EMOJI_FAILURE = '❌';
 
 export type LineNumber = number;
 
-export type UserErrorContext = UserErrorContextLineNumber | UserErrorContextDescription;
-export function describeUserErrorContext(context: UserErrorContext): string {
+export type EntityContext = EntityContextLineNumber | EntityContextDescription;
+export function describeUserErrorContext(context: EntityContext): string {
   switch (context.kind) {
-    case 'UserErrorContextDescription':
+    case 'EntityContextDescription':
       return context.description;
-    case 'UserErrorContextLineNumber':
+    case 'EntityContextLineNumber':
       return `line ${context.lineNumber}`;
     default:
       throw new UnsupportedValueError(context);
   }
 }
 
-export type UserErrorContextLineNumber = {
-  kind: 'UserErrorContextLineNumber',
+export type EntityContextLineNumber = {
+  kind: 'EntityContextLineNumber',
   lineNumber: number,
 };
-export function contextLineNumber(lineNumber: number): UserErrorContextLineNumber {
+export function contextLineNumber(lineNumber: number): EntityContextLineNumber {
   return {
-    kind: 'UserErrorContextLineNumber',
+    kind: 'EntityContextLineNumber',
     lineNumber,
   };
 }
-export type UserErrorContextDescription = {
-  kind: 'UserErrorContextDescription',
+export type EntityContextDescription = {
+  kind: 'EntityContextDescription',
   description: string,
 };
-export function contextDescription(description: string): UserErrorContextDescription {
+export function contextDescription(description: string): EntityContextDescription {
   return {
-    kind: 'UserErrorContextDescription',
+    kind: 'EntityContextDescription',
     description,
   };
 }
@@ -56,7 +56,7 @@ export interface TestFailureOptions {
 
 export class TestFailure extends Error {
   override name = this.constructor.name;
-  context: undefined | UserErrorContext;
+  context: undefined | EntityContext;
   stdoutLines;
   expectedStdoutLines;
   stderrLines;
@@ -68,7 +68,7 @@ export class TestFailure extends Error {
     );
     if (opts.lineNumber) {
       this.context = {
-        kind: 'UserErrorContextLineNumber',
+        kind: 'EntityContextLineNumber',
         lineNumber: opts.lineNumber,
       };
     }
@@ -92,24 +92,24 @@ export class TestFailure extends Error {
 //#################### MarktestSyntaxError ####################
 
 export interface MarktestSyntaxErrorOptions {
-  context?: UserErrorContext;
+  entityContext?: EntityContext;
   lineNumber?: number;
   cause?: any;
 }
 
 export class MarktestSyntaxError extends Error {
   override name = this.constructor.name;
-  context: undefined | UserErrorContext;
+  context: undefined | EntityContext;
   constructor(message: string, opts: MarktestSyntaxErrorOptions = {}) {
     super(
       message,
       (opts.cause ? { cause: opts.cause } : undefined)
     );
-    if (opts.context) {
-      this.context = opts.context;
+    if (opts.entityContext) {
+      this.context = opts.entityContext;
     } else if (opts.lineNumber) {
       this.context = {
-        kind: 'UserErrorContextLineNumber',
+        kind: 'EntityContextLineNumber',
         lineNumber: opts.lineNumber,
       };
     }

@@ -191,7 +191,7 @@ function createIdToLineMod(entities: Array<MarktestEntity>): Map<string, LineMod
           const description = describeUserErrorContext(other.context);
           throw new MarktestSyntaxError(
             `Duplicate id ${JSON.stringify(entity)} (other usage is ${description})`,
-            { context: entity.context }
+            { entityContext: entity.context }
           );
         }
         idToLineMod.set(lineModId, entity);

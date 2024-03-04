@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
-import { ConfigurationError, MarktestSyntaxError, type UserErrorContext } from '../util/errors.js';
+import { ConfigurationError, MarktestSyntaxError, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -167,7 +167,7 @@ export class Config {
    * @param context `configModJson` comes from a config file or a ConfigMod
    * (inside a Markdown file).
    */
-  applyMod(context: UserErrorContext, configModJson: ConfigModJson): void {
+  applyMod(context: EntityContext, configModJson: ConfigModJson): void {
     if (configModJson.searchAndReplace) {
       this.#setSearchAndReplace(configModJson.searchAndReplace);
     }
@@ -304,7 +304,7 @@ export type LangDefCommandPartialJson = {
  * @param context `configModJson` comes from a config file or a ConfigMod
  * (inside a Markdown file).
  */
-function langDefFromJson(context: UserErrorContext, langDefJson: LangDefPartialJson): LangDef {
+function langDefFromJson(context: EntityContext, langDefJson: LangDefPartialJson): LangDef {
   if (typeof langDefJson === 'string') {
     switch (langDefJson) {
       case LANG_SKIP:
@@ -321,7 +321,7 @@ function langDefFromJson(context: UserErrorContext, langDefJson: LangDefPartialJ
     if (translator === undefined) {
       throw new MarktestSyntaxError(
         `Unknown translator: ${stringify(langDefJson.translator)}`,
-        { context }
+        { entityContext: context }
       );
     }
   }

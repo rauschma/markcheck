@@ -7,7 +7,7 @@ const {raw} = String;
 createSuite(import.meta.url);
 
 test('parseInsertionConditions', () => {
-  const parse = (str: string) => insertionConditionsToJson(parseInsertionConditions(str));
+  const parse = (str: string) => insertionConditionsToJson(parseInsertionConditions(0, str));
 
   assert.deepEqual(
     parse(''),

@@ -9,15 +9,15 @@ const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('ignoreLines', () => {
+test('ignoreLines: line numbers', () => {
   const readme = outdent`
-    <!--marktest ignoreLines="1-3, 5"-->
+    <!--marktest onlyLocalLines ignoreLines="1..2, -1"-->
     ▲▲▲js
-    // Line 1
-    // Line 2
-    // Line 3
-    // Line 4
-    // Line 5
+    // one
+    // two
+    // three
+    // four
+    // five
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
@@ -32,8 +32,38 @@ test('ignoreLines', () => {
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
-        import assert from 'node:assert/strict';
-        // Line 4
+        // three
+        // four
+      `,
+    }
+  );
+});
+
+test('ignoreLines: text fragments', () => {
+  const readme = outdent`
+    <!--marktest onlyLocalLines ignoreLines="'two', 'four'..'five'"-->
+    ▲▲▲js
+    // one
+    // two
+    // three
+    // four
+    // five
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/marktest-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        // one
+        // three
       `,
     }
   );
