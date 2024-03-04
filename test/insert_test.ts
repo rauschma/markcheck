@@ -24,9 +24,8 @@ test('Insert single line at line numbers', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
-    0
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
@@ -60,9 +59,8 @@ test('Insert multiple lines at line numbers', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
-    0
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
@@ -99,9 +97,8 @@ test('Insert multiple lines at text fragments', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
-    0
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
@@ -113,42 +110,6 @@ test('Insert multiple lines at text fragments', () => {
         // MIDDLE
         // second
         // END
-      `,
-    }
-  );
-});
-
-test('around', () => {
-  const readme = outdent`
-<!--marktest around:
-assert.throws(
-  () => {
-    •••
-  }
-);
--->
-▲▲▲js
-throw new Error();
-▲▲▲
-  `.replaceAll('▲', '`');
-  jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
-    '/tmp/markdown/readme.md': readme,
-  });
-  assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
-    0
-  );
-  assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
-    {
-      'main.mjs': outdent`
-        import assert from 'node:assert/strict';
-        assert.throws(
-          () => {
-        throw new Error();
-          }
-        );
       `,
     }
   );

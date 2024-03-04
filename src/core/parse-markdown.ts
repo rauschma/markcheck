@@ -183,16 +183,19 @@ function createIdToSnippet(entities: Array<MarktestEntity>): Map<string, Snippet
 function createIdToLineMod(entities: Array<MarktestEntity>): Map<string, LineMod> {
   const idToLineMod = new Map<string, LineMod>();
   for (const entity of entities) {
-    if (entity instanceof LineMod && entity.lineModId) {
-      const other = idToLineMod.get(entity.lineModId);
-      if (other) {
-        const description = describeUserErrorContext(other.context);
-        throw new MarktestSyntaxError(
-          `Duplicate id ${JSON.stringify(entity)} (other usage is ${description})`,
-          { context: entity.context }
-        );
+    if (entity instanceof LineMod) {
+      const lineModId = entity.getLineModId();
+      if (lineModId) {
+        const other = idToLineMod.get(lineModId);
+        if (other) {
+          const description = describeUserErrorContext(other.context);
+          throw new MarktestSyntaxError(
+            `Duplicate id ${JSON.stringify(entity)} (other usage is ${description})`,
+            { context: entity.context }
+          );
+        }
+        idToLineMod.set(lineModId, entity);
       }
-      idToLineMod.set(entity.lineModId, entity);
     }
   }
   return idToLineMod;

@@ -11,6 +11,8 @@
 * Condense successful output?
 * Simplify `runParsedMarkdownForTests()`.
   * Tool function that asserts that there was no failure.
+* Attribute `applyLocal`
+  * Switches off local LineMod: Error if it is non-empty?
 
 
 * Exceptions:

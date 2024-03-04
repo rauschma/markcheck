@@ -27,9 +27,8 @@ test('containedInFile: success', () => {
     `,
   });
 
-  assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
-    0
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
@@ -56,11 +55,13 @@ test('containedInFile: failure', () => {
     `,
   });
 
-  assert.throws(
-    () => runParsedMarkdownForTests('/tmp/markdown/readme.md', readme),
+  assert.deepEqual(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).toJson(),
     {
-      name: 'UserError',
-      message: 'Content of snippet is not contained in file "/tmp/markdown/other.js"',
+      relFilePath: '/tmp/markdown/readme.md',
+      syntaxErrors: 0,
+      testFailures: 1,
+      warnings: 0,
     }
   );
 });

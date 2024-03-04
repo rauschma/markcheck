@@ -16,13 +16,14 @@ import { LineMod } from '../entity/line-mod.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type MarktestEntity } from '../entity/snippet.js';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { ConfigurationError, MarktestSyntaxError, Output, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
-import { linesAreSame, linesContain, trimTrailingEmptyLines } from '../util/string.js';
+import { linesAreSame, linesContain } from '../util/line-tools.js';
+import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
 import { parseMarkdown, type ParsedMarkdown } from './parse-markdown.js';
 
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: "json" };
-import { setDifference } from '@rauschma/helpers/collections/set.js';
+import { setDifference } from '@rauschma/helpers/collection/set.js';
 
 const MARKTEST_DIR_NAME = 'marktest-data';
 const MARKTEST_TMP_DIR_NAME = 'tmp';
@@ -146,8 +147,9 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     const referencedIds = new Set<string>();
     for (const entity of parsedMarkdown.entities) {
       if (entity instanceof LineMod) {
-        if (entity.lineModId) {
-          declaredIds.add(entity.lineModId);
+        const lineModId = entity.getLineModId();
+        if (lineModId) {
+          declaredIds.add(lineModId);
         }
       }
       if (entity instanceof Snippet) {
@@ -201,11 +203,12 @@ function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHe
     config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
     return EntityKind.NonRunnable;
   } else if (entity instanceof LineMod) {
-    if (entity.targetLanguage !== undefined) {
-      let lineModArr = cliState.globalLineMods.get(entity.targetLanguage);
+    const targetLanguage = entity.getTargetLanguage();
+    if (targetLanguage !== undefined) {
+      let lineModArr = cliState.globalLineMods.get(targetLanguage);
       if (!lineModArr) {
         lineModArr = [];
-        cliState.globalLineMods.set(entity.targetLanguage, lineModArr);
+        cliState.globalLineMods.set(targetLanguage, lineModArr);
       }
       lineModArr.push(entity);
     }

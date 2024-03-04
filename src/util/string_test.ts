@@ -1,6 +1,6 @@
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
-import { linesContain } from './string.js';
+import { linesContain } from './line-tools.js';
 
 createSuite(import.meta.url);
 

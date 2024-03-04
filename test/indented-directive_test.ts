@@ -25,9 +25,8 @@ test('Indented directive', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).getTotalCount(),
-    0
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),

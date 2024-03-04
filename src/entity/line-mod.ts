@@ -1,10 +1,11 @@
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
-import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
-import { InternalError, contextLineNumber, type UserErrorContext, MarktestSyntaxError } from '../util/errors.js';
+import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/ts/type.js';
+import type { Translator } from '../translation/translation.js';
+import { contextLineNumber, InternalError, MarktestSyntaxError, type UserErrorContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
-import { ATTR_KEY_AT, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, type Directive } from './directive.js';
-import { InsertionRules, InsertionCondition, parseInsertionConditions } from './insertion-rules.js';
+import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, parseLineNumberSet, SearchAndReplaceSpec, type Directive } from './directive.js';
+import { InsertionRules, LineLocModifier, parseInsertionConditions } from './insertion-rules.js';
 
 const { stringify } = JSON;
 
@@ -15,7 +16,7 @@ const STR_AROUND_MARKER = '•••';
 
 export type LineModKind = LineModKindConfig |
   LineModKindGlobal |
-  LineModKindApplicable |
+  LineModKindAppliable |
   LineModKindLocal;
 export type LineModKindConfig = {
   tag: 'LineModKindConfig';
@@ -24,8 +25,8 @@ export type LineModKindGlobal = {
   tag: 'LineModKindGlobal';
   targetLanguage: string;
 };
-export type LineModKindApplicable = {
-  tag: 'LineModKindApplicable';
+export type LineModKindAppliable = {
+  tag: 'LineModKindAppliable';
   lineModId: string;
 };
 export type LineModKindLocal = {
@@ -34,25 +35,53 @@ export type LineModKindLocal = {
 
 //#################### LineMod ####################
 
+type LineModProps = PublicDataProperties<LineMod>;
+function emptyLineModProps(context: UserErrorContext): LineModProps {
+  return {
+    context,
+    //
+    ignoreLines: new Set<number>(),
+    searchAndReplace: null,
+    //
+    insertionRules: new InsertionRules,
+    beforeLines: [],
+    afterLines: []
+  };
+}
+
 export class LineMod {
   static parse(directive: Directive, kind: LineModKind): LineMod {
-    const insertionRules = new InsertionRules();
-    let beforeLines = new Array<string>();
-    let afterLines = new Array<string>();
+    const context = contextLineNumber(directive.lineNumber);
+    const props = emptyLineModProps(context);
+
+    const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
+    if (ignoreLinesStr) {
+      props.ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
+    }
+    const searchAndReplaceStr = directive.getString(ATTR_KEY_SEARCH_AND_REPLACE);
+    if (searchAndReplaceStr) {
+      props.searchAndReplace = SearchAndReplaceSpec.fromString(
+        context, searchAndReplaceStr
+      );
+    }
 
     const body = trimTrailingEmptyLines(directive.body.slice());
-
     switch (directive.bodyLabel) {
+      case null:
+        // No body label – e.g.: <!--marktest ignoreLines="1-3, 5"-->
+        break;
       case BODY_LABEL_BEFORE: {
-        beforeLines = body;
+        props.beforeLines = body;
         break;
       }
       case BODY_LABEL_AFTER: {
-        afterLines = body;
+        props.afterLines = body;
         break;
       }
       case BODY_LABEL_AROUND: {
-        ({ beforeLines, afterLines } = splitAroundLines(body));
+        const l = splitAroundLines(directive.lineNumber, body);
+        props.beforeLines = l.beforeLines;
+        props.afterLines = l.afterLines;
         break;
       }
       case BODY_LABEL_INSERT: {
@@ -80,65 +109,50 @@ export class LineMod {
         for (const [index, condition] of conditions.entries()) {
           const lineGroup = lineGroups[index];
           assertNonNullable(lineGroup);
-          insertionRules.pushRule({ condition, lineGroup });
+          props.insertionRules.pushRule({ condition, lineGroup });
         }
         break;
       }
       default:
         throw new InternalError();
     }
-    return new LineMod(
-      contextLineNumber(directive.lineNumber),
-      kind,
-      insertionRules,
-      beforeLines,
-      afterLines
-    );
-
-    function splitAroundLines(lines: Array<string>): { beforeLines: Array<string>; afterLines: Array<string>; } {
-      const markerIndex = lines.findIndex(line => RE_AROUND_MARKER.test(line));
-      if (markerIndex < 0) {
-        throw new MarktestSyntaxError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber: directive.lineNumber });
-      }
-      return {
-        beforeLines: lines.slice(0, markerIndex),
-        afterLines: lines.slice(markerIndex + 1),
-      };
-    }
-    function splitInsertedLines(lines: Array<string>): Array<Array<string>> {
-      const result: Array<Array<string>> = [[]];
-      for (const line of lines) {
-        if (RE_AROUND_MARKER.test(line)) {
-          result.push([]);
-        } else {
-          const lastLineGroup = result.at(-1);
-          assertNonNullable(lastLineGroup);
-          lastLineGroup.push(line);
-        }
-      }
-      return result;
-    }
+    return new LineMod(kind, props);
   }
   static fromBeforeLines(context: UserErrorContext, kind: LineModKind, beforeLines: Array<string>) {
-    return new LineMod(context, kind, new InsertionRules(), beforeLines, []);
+    return new LineMod(kind, {
+      ...emptyLineModProps(context),
+      beforeLines,
+    });
   }
 
-  context: UserErrorContext;
+  /**
+   * LineMods can be created from line in Config. Then they don’t have a
+   * line number. Thus, the more general UserErrorContext is needed.
+   */
   #kind: LineModKind;
+  context: UserErrorContext;
+  //
+  ignoreLines: Set<number>;
+  searchAndReplace: null | SearchAndReplaceSpec;
+  //
   insertionRules: InsertionRules;
-  #beforeLines: Array<string>;
-  #afterLines: Array<string>;
+  beforeLines: Array<string>;
+  afterLines: Array<string>;
 
-  private constructor(context: UserErrorContext, kind: LineModKind, insertedLines: InsertionRules, beforeLines: Array<string>, afterLines: Array<string>) {
-    this.context = context;
+  private constructor(kind: LineModKind, props: LineModProps) {
     this.#kind = kind;
-    this.insertionRules = insertedLines;
-    this.#beforeLines = beforeLines;
-    this.#afterLines = afterLines;
+    this.context = props.context;
+    //
+    this.ignoreLines = props.ignoreLines;
+    this.searchAndReplace = props.searchAndReplace;
+    //
+    this.insertionRules = props.insertionRules;
+    this.beforeLines = props.beforeLines;
+    this.afterLines = props.afterLines;
   }
-  get lineModId(): undefined | string {
+  getLineModId(): undefined | string {
     switch (this.#kind.tag) {
-      case 'LineModKindApplicable':
+      case 'LineModKindAppliable':
         return this.#kind.lineModId;
       case 'LineModKindGlobal':
         return undefined;
@@ -150,11 +164,11 @@ export class LineMod {
         throw new UnsupportedValueError(this.#kind);
     }
   }
-  get targetLanguage(): undefined | string {
+  getTargetLanguage(): undefined | string {
     switch (this.#kind.tag) {
       case 'LineModKindGlobal':
         return this.#kind.targetLanguage;
-      case 'LineModKindApplicable':
+      case 'LineModKindAppliable':
         return undefined;
       // Not among entities
       case 'LineModKindConfig': // created on-demand from Config
@@ -164,12 +178,51 @@ export class LineMod {
         throw new UnsupportedValueError(this.#kind);
     }
   }
+
+  pushModifiedBodyTo(lineNumber: number, body: Array<string>, translator: Translator | undefined, linesOut: Array<string>) {
+    // - Line-ignoring clashes with line insertion because both change line
+    //   indices.
+    // - However, ignored line numbers would make no sense at all after
+    //   inserting lines, which is why ignore first.
+    body = body.filter(
+      (_line, index) => !this.ignoreLines.has(index + 1)
+    );
+
+    // We only search-and-replace in visible (non-inserted) lines because
+    // we can do whatever we want in invisible lines.
+    const sar = this.searchAndReplace;
+    if (sar) {
+      body = body.map(
+        line => sar.replaceAll(line)
+      );
+    }
+
+    {
+      const nextBody = new Array<string>();
+      for (const [index, line] of body.entries()) {
+        this.insertionRules.maybePushLineGroup(LineLocModifier.Before, body.length, index + 1, line, nextBody);
+        nextBody.push(line);
+        this.insertionRules.maybePushLineGroup(LineLocModifier.After, body.length, index + 1, line, nextBody);
+      }
+      body = nextBody;
+    }
+
+    if (translator) {
+      body = translator.translate(lineNumber, body);
+    }
+
+    linesOut.push(...this.beforeLines);
+    linesOut.push(...body);
+    linesOut.push(...this.afterLines);
+  }
+
   pushBeforeLines(lines: Array<string>): void {
-    lines.push(...this.#beforeLines);
+    lines.push(...this.beforeLines);
   }
   pushAfterLines(lines: Array<string>): void {
-    lines.push(...this.#afterLines);
+    lines.push(...this.afterLines);
   }
+
   toJson(): JsonValue {
     let props;
     switch (this.#kind.tag) {
@@ -178,7 +231,7 @@ export class LineMod {
           targetLanguage: this.#kind.targetLanguage,
         };
         break;
-      case 'LineModKindApplicable':
+      case 'LineModKindAppliable':
         props = {
           lineModId: this.#kind.lineModId,
         };
@@ -195,9 +248,35 @@ export class LineMod {
         throw new UnsupportedValueError(this.#kind);
     }
     return {
-      beforeLines: this.#beforeLines,
-      afterLines: this.#afterLines,
+      beforeLines: this.beforeLines,
+      afterLines: this.afterLines,
       ...props,
     };
   }
+}
+
+//#################### Helpers ####################
+
+export function splitAroundLines(lineNumber: number, lines: Array<string>): { beforeLines: Array<string>; afterLines: Array<string>; } {
+  const markerIndex = lines.findIndex(line => RE_AROUND_MARKER.test(line));
+  if (markerIndex < 0) {
+    throw new MarktestSyntaxError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber });
+  }
+  return {
+    beforeLines: lines.slice(0, markerIndex),
+    afterLines: lines.slice(markerIndex + 1),
+  };
+}
+export function splitInsertedLines(lines: Array<string>): Array<Array<string>> {
+  const result: Array<Array<string>> = [[]];
+  for (const line of lines) {
+    if (RE_AROUND_MARKER.test(line)) {
+      result.push([]);
+    } else {
+      const lastLineGroup = result.at(-1);
+      assertNonNullable(lastLineGroup);
+      lastLineGroup.push(line);
+    }
+  }
+  return result;
 }

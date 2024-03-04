@@ -1,3 +1,4 @@
+import { style } from '@rauschma/helpers/nodejs/text-style.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
@@ -6,11 +7,9 @@ import type { Translator } from '../translation/translation.js';
 import { MarktestSyntaxError, contextDescription, contextLineNumber, type UserErrorContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, SearchAndReplaceSpec, parseExternalSpecs, parseLineNumberSet, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
 import { Heading } from './heading.js';
-import { LineLocModifier } from './insertion-rules.js';
 import { LineMod } from './line-mod.js';
-import { style } from '@rauschma/helpers/nodejs/text-style.js';
 
 const { stringify } = JSON;
 
@@ -58,7 +57,7 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
     outerLineMods[i].pushBeforeLines(lines);
   }
   // Once per snippet (in sequences, includes, etc.):
-  // - Inner applicable line mod
+  // - Inner appliable line mod
   // - Local line mod (before, after, inserted lines)
   snippet.assembleLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
   for (let i = outerLineMods.length - 1; i >= 0; i--) {
@@ -70,7 +69,7 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
     // Once per file:
     // - Config before lines
     // - Global line mod
-    // - Outer applicable line mod
+    // - Outer appliable line mod
     const outerLineMods = new Array<LineMod>();
 
     if (!onlyLocalLines) {
@@ -199,16 +198,6 @@ export class SingleSnippet extends Snippet {
       snippet.applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER);
       snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER);
       snippet.onlyLocalLines = directive.getBoolean(ATTR_KEY_ONLY_LOCAL_LINES);
-      const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
-      if (ignoreLinesStr) {
-        snippet.#ignoreLines = parseLineNumberSet(directive.lineNumber, ignoreLinesStr);
-      }
-      const searchAndReplaceStr = directive.getString(ATTR_KEY_SEARCH_AND_REPLACE);
-      if (searchAndReplaceStr) {
-        snippet.#searchAndReplace = SearchAndReplaceSpec.fromString(
-          contextLineNumber(directive.lineNumber), searchAndReplaceStr
-        );
-      }
     }
 
     { // Checks
@@ -265,8 +254,6 @@ export class SingleSnippet extends Snippet {
   applyInnerId: null | string = null;
   applyOuterId: null | string = null;
   onlyLocalLines = false;
-  #ignoreLines = new Set<number>();
-  #searchAndReplace: null | SearchAndReplaceSpec = null;
   //
   sameAsId: null | string = null;
   containedInFile: null | string = null;
@@ -392,46 +379,15 @@ export class SingleSnippet extends Snippet {
     if (innerAppliedLineMod) {
       innerAppliedLineMod.pushBeforeLines(linesOut);
     }
-    if (this.localLineMod) {
-      this.localLineMod.pushBeforeLines(linesOut);
-    }
-
-    // - Line-ignoring clashes with line insertion via
-    //   `this.localLineMod` because both change line indices.
-    // - However, ignored line numbers would make no sense at all after
-    //   inserting lines, which is why ignore first.
-    let body = this.body.filter(
-      (_line, index) => !this.#ignoreLines.has(index + 1)
-    );
-
-    // We only search-and-replace in visible (non-inserted) lines because
-    // we can do whatever we want in invisible lines.
-    const sar = this.#searchAndReplace;
-    if (sar) {
-      body = body.map(
-        line => sar.replaceAll(line)
-      );
-    }
-
-    {
-      const nextBody = new Array<string>();
-      for (const [index, line] of body.entries()) {
-        this.localLineMod?.insertionRules.maybePushLineGroup(LineLocModifier.Before, body.length, index + 1, line, nextBody);
-        nextBody.push(line);
-        this.localLineMod?.insertionRules.maybePushLineGroup(LineLocModifier.After, body.length, index + 1, line, nextBody);
-      }
-      body = nextBody;
-    }
-
     const translator = this.#getTranslator(config);
-    if (translator) {
-      body = translator.translate(this.lineNumber, body);
-    }
-    
-    linesOut.push(...body);
-
     if (this.localLineMod) {
-      this.localLineMod.pushAfterLines(linesOut);
+      this.localLineMod.pushModifiedBodyTo(this.lineNumber, this.body, translator, linesOut);
+    } else {
+      let body = this.body;
+      if (translator) {
+        body = translator.translate(this.lineNumber, body);
+      }
+      linesOut.push(...body);
     }
     if (innerAppliedLineMod) {
       innerAppliedLineMod.pushAfterLines(linesOut);
@@ -675,8 +631,19 @@ export class StatusCounts {
   hasFailed(): boolean {
     return this.getTotalCount() > 0;
   }
+  hasSucceeded(): boolean {
+    return this.getTotalCount() === 0;
+  }
   toString(): string {
     return `File ${stringify(this.relFilePath)}. ${this.describe()}`
+  }
+  toJson() {
+    return {
+      relFilePath: this.relFilePath,
+      syntaxErrors: this.syntaxErrors,
+      testFailures: this.testFailures,
+      warnings: this.warnings,
+    };
   }
   describe(): string {
     const parts = [

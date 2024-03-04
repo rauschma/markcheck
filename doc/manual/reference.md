@@ -55,7 +55,7 @@ After `marktest` there are zero or more attributes. The first line ends either w
 * Body label `config:`: _config directive_. Such a directive is self-contained.
 * Body label `before:` or `after:`: A _line mod_ directive. Such a directive is used in three ways:
   * Attribute `each="some-lang"` defines a _global line mod_. Its modifications are applied to all code blocks with the specified language.
-  * Attribute `lineModId="some-id"` defines an _applicable line mod_: A code block directive can apply it to its code via `applyInner="some-id"` and  `applyOuter="some-id"`.
+  * Attribute `lineModId="some-id"` defines an _appliable line mod_: A code block directive can apply it to its code via `applyInner="some-id"` and  `applyOuter="some-id"`.
   * Neither `each` nor `lineModId`: The directive defines two entities:
     * A local line mod
     * A snippet that uses the line mod locally
@@ -78,7 +78,7 @@ After directories were paired with code blocks, we get the following entities:
   * Created by line mod directives that are not also code block directives.
   * Kinds of line mods:
     * Global line mod (attribute `each`): Can be activated globally.
-    * Applicable line mod (attribute `id`): Can be applied by snippets via the attributes `applyInner` and `applyOuter`.
+    * Appliable line mod (attribute `id`): Can be applied by snippets via the attributes `applyInner` and `applyOuter`.
 
 ## Snippet modes: What can be done with snippets?
 
@@ -128,8 +128,8 @@ Running:
   * `sequence="1/3"`
   * `include="id1, $THIS, id2"`:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
-  * `applyInner="id"`: applies an applicable line mod to the core snippet (vs. included snippets or other sequence members)
-  * `applyOuter="id"`: applies an applicable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
+  * `applyInner="id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
+  * `applyOuter="id"`: applies an appliable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
   * `onlyLocalLines`: when a snippet is self-contained and does not need config lines and global LineMod lines.
   * `ignoreLines="1, 3-5, 7"`: omits lines. A range includes start and end – i.e.: `1-3` is equivalent to `1,2,3`.
   * `searchAndReplace="/[a-z]/-/i"`
@@ -156,7 +156,7 @@ Running:
 
 * Required: `each="lang-name"`
 
-### Applicable line mods
+### Appliable line mods
 
 * Required: `lineModId="my-id"`
   * Referenced by attributes: applyInner, applyOuter

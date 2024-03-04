@@ -1,6 +1,6 @@
 import { MarktestSyntaxError } from '../util/errors.js';
 import { ConfigMod } from './config-mod.js';
-import { APPLICABLE_LINE_MOD_ATTRIBUTES, ATTR_KEY_EACH, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, CONFIG_MOD_ATTRIBUTES, GLOBAL_LINE_MOD_ATTRIBUTES, SNIPPET_ATTRIBUTES, SNIPPET_ATTRIBUTES_BODY_LABEL_INSERT, type Directive } from './directive.js';
+import { ATTRS_APPLIABLE_LINE_MOD, ATTR_KEY_EACH, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, ATTRS_CONFIG_MOD, ATTRS_GLOBAL_LINE_MOD, ATTRS_SNIPPET, ATTRS_SNIPPET_BODY_LABEL_INSERT, type Directive, ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT } from './directive.js';
 import { LineMod } from './line-mod.js';
 import { SingleSnippet } from './snippet.js';
 
@@ -13,11 +13,11 @@ const { stringify } = JSON;
 export function directiveToEntity(directive: Directive): null | ConfigMod | SingleSnippet | LineMod {
   switch (directive.bodyLabel) {
     case BODY_LABEL_CONFIG:
-      directive.checkAttributes(CONFIG_MOD_ATTRIBUTES);
+      directive.checkAttributes(ATTRS_CONFIG_MOD);
       return new ConfigMod(directive);
 
     case BODY_LABEL_BODY: {
-      directive.checkAttributes(SNIPPET_ATTRIBUTES);
+      directive.checkAttributes(ATTRS_SNIPPET);
       return SingleSnippet.createClosedFromBodyDirective(directive);
     }
 
@@ -26,48 +26,46 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     case BODY_LABEL_AROUND:
     case BODY_LABEL_INSERT:
     case null: {
-      if (directive.bodyLabel === null) {
-        // Open snippet without a local LineMod
-        directive.checkAttributes(SNIPPET_ATTRIBUTES);
-        return SingleSnippet.createOpen(directive);
-      } else {
-        // Either:
-        // - Global LineMod
-        // - Applicable LineMod
-        // - Open snippet with local LineMod
+      // Either:
+      // - Global LineMod
+      // - Appliable LineMod
+      // - Open snippet with local LineMod
 
-        const each = directive.getString(ATTR_KEY_EACH);
-        if (each !== null) {
-          // Global LineMod
-          directive.checkAttributes(GLOBAL_LINE_MOD_ATTRIBUTES);
-          return LineMod.parse(directive, {
-            tag: 'LineModKindGlobal',
-            targetLanguage: each,
-          });
-        }
-
-        const lineModId = directive.getString(ATTR_KEY_LINE_MOD_ID);
-        if (lineModId !== null) {
-          // Applicable LineMod
-          directive.checkAttributes(APPLICABLE_LINE_MOD_ATTRIBUTES);
-          return LineMod.parse(directive, {
-            tag: 'LineModKindApplicable',
-            lineModId,
-          });
-        }
-
-        // Open snippet with local LineMod
-        if (directive.bodyLabel === BODY_LABEL_INSERT) {
-          directive.checkAttributes(SNIPPET_ATTRIBUTES_BODY_LABEL_INSERT);
-        } else {
-          directive.checkAttributes(SNIPPET_ATTRIBUTES);
-        }
-        const snippet = SingleSnippet.createOpen(directive);
-        snippet.localLineMod = LineMod.parse(directive, {
-          tag: 'LineModKindLocal',
+      const each = directive.getString(ATTR_KEY_EACH);
+      if (each !== null) {
+        // Global LineMod
+        directive.checkAttributes(ATTRS_GLOBAL_LINE_MOD);
+        return LineMod.parse(directive, {
+          tag: 'LineModKindGlobal',
+          targetLanguage: each,
         });
-        return snippet;
       }
+
+      const lineModId = directive.getString(ATTR_KEY_LINE_MOD_ID);
+      if (lineModId !== null) {
+        // Appliable LineMod
+        if (directive.bodyLabel === BODY_LABEL_INSERT) {
+          directive.checkAttributes(ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT);
+        } else {
+          directive.checkAttributes(ATTRS_APPLIABLE_LINE_MOD);
+        }
+        return LineMod.parse(directive, {
+          tag: 'LineModKindAppliable',
+          lineModId,
+        });
+      }
+
+      // Open snippet with local LineMod
+      if (directive.bodyLabel === BODY_LABEL_INSERT) {
+        directive.checkAttributes(ATTRS_SNIPPET_BODY_LABEL_INSERT);
+      } else {
+        directive.checkAttributes(ATTRS_SNIPPET);
+      }
+      const snippet = SingleSnippet.createOpen(directive);
+      snippet.localLineMod = LineMod.parse(directive, {
+        tag: 'LineModKindLocal',
+      });
+      return snippet;
     }
 
     default: {
