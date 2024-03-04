@@ -7,7 +7,7 @@ import type { Translator } from '../translation/translation.js';
 import { MarktestSyntaxError, contextDescription, contextLineNumber, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, type Directive, type ExternalSpec, type SequenceNumber } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import { Heading } from './heading.js';
 import { LineMod } from './line-mod.js';
 
@@ -127,8 +127,8 @@ export abstract class Snippet {
   abstract get writeOuter(): null | string;
   abstract get externalSpecs(): Array<ExternalSpec>;
   //
-  abstract get stdoutId(): null | string;
-  abstract get stderrId(): null | string;
+  abstract get stdoutSpec(): null | StdStreamContentSpec;
+  abstract get stderrSpec(): null | StdStreamContentSpec;
 
   abstract getInternalFileName(langDef: LangDef): string;
   abstract isRun(globalVisitationMode: GlobalRunningMode): boolean;
@@ -226,8 +226,14 @@ export class SingleSnippet extends Snippet {
       }
     }
 
-    snippet.stdoutId = directive.getString(ATTR_KEY_STDOUT);
-    snippet.stderrId = directive.getString(ATTR_KEY_STDERR);
+    const stdoutSpecStr = directive.getString(ATTR_KEY_STDOUT);
+    if (stdoutSpecStr) {
+      snippet.stdoutSpec = parseStdStreamContentSpec(directive.lineNumber, ATTR_KEY_STDOUT, stdoutSpecStr);
+    }
+    const stderrSpecStr = directive.getString(ATTR_KEY_STDERR);
+    if (stderrSpecStr) {
+      snippet.stderrSpec = parseStdStreamContentSpec(directive.lineNumber, ATTR_KEY_STDERR, stderrSpecStr);
+    }
 
     return snippet;
   }
@@ -244,29 +250,29 @@ export class SingleSnippet extends Snippet {
   static createClosedFromCodeBlock(lineNumber: number, lang: string, lines: Array<string>): SingleSnippet {
     return new SingleSnippet(lineNumber).closeWithBody(lang, lines);
   }
-  lineNumber: number;
-  id: null | string = null;
+  override lineNumber: number;
+  override id: null | string = null;
   runningMode: RuningMode = RuningMode.Normal;
   //
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
   localLineMod: null | LineMod = null;
   applyInnerId: null | string = null;
-  applyOuterId: null | string = null;
-  onlyLocalLines = false;
+  override applyOuterId: null | string = null;
+  override onlyLocalLines = false;
   //
-  sameAsId: null | string = null;
-  containedInFile: null | string = null;
+  override sameAsId: null | string = null;
+  override containedInFile: null | string = null;
   //
   #lang: null | string = null;
   //
-  writeInner: null | string = null;
-  writeOuter: null | string = null;
+  override writeInner: null | string = null;
+  override writeOuter: null | string = null;
+  override externalSpecs = new Array<ExternalSpec>();
   #internalFileName: null | string = null;
-  externalSpecs = new Array<ExternalSpec>();
   //
-  stdoutId: null | string = null;
-  stderrId: null | string = null;
+  override stdoutSpec: null | StdStreamContentSpec = null;
+  override stderrSpec: null | StdStreamContentSpec = null;
   //
   isClosed = false;
   body = new Array<string>();
@@ -430,7 +436,8 @@ export class SingleSnippet extends Snippet {
       lang: this.lang,
       id: this.id,
       external: this.externalSpecs,
-      stdout: this.stdoutId,
+      stdout: this.stdoutSpec,
+      stderr: this.stderrSpec,
       body: this.body,
     };
   }
@@ -547,11 +554,11 @@ export class SequenceSnippet extends Snippet {
   override get externalSpecs(): Array<ExternalSpec> {
     return this.firstElement.externalSpecs;
   }
-  override get stdoutId(): null | string {
-    return this.firstElement.stdoutId;
+  override get stdoutSpec(): null | StdStreamContentSpec {
+    return this.firstElement.stdoutSpec;
   }
-  override get stderrId(): null | string {
-    return this.firstElement.stderrId;
+  override get stderrSpec(): null | StdStreamContentSpec {
+    return this.firstElement.stderrSpec;
   }
   toJson(): JsonValue {
     return this.elements.map(e => e.toJson());
@@ -585,7 +592,8 @@ export type SingleSnippetJson = {
   lang: string,
   id: null | string,
   external: Array<ExternalSpec>,
-  stdout: null | string,
+  stdout: null | StdStreamContentSpec,
+  stderr: null | StdStreamContentSpec,
   body: Array<string>,
 };
 
@@ -597,11 +605,30 @@ export function snippetJson(partial: Partial<SingleSnippetJson>): SingleSnippetJ
     id: partial.id ?? null,
     external: partial.external ?? [],
     stdout: partial.stdout ?? null,
+    stderr: partial.stderr ?? null,
     body: partial.body ?? [],
   };
 }
 
 //========== CliState ==========
+
+export type MockShellData = {
+  interceptedCommands: Array<string>,
+  commandResults: null | Array<CommandResult>,
+};
+export function emptyMockShellData(): MockShellData {
+  return {
+    interceptedCommands: new Array<string>(),
+    commandResults: null,
+  };
+}
+
+export type CommandResult = {
+  stdout: string;
+  stderr: string;
+  status: number | null;
+  signal: NodeJS.Signals | null;
+};
 
 export type CliState = {
   absFilePath: string;
@@ -612,7 +639,7 @@ export type CliState = {
   globalVisitationMode: GlobalRunningMode;
   globalLineMods: Map<string, Array<LineMod>>;
   statusCounts: StatusCounts;
-  interceptedShellCommands: null | Array<Array<string>>;
+  mockShellData: null | MockShellData;
 };
 
 export class StatusCounts {

@@ -2,7 +2,7 @@ import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync, ensureParentDirectory } from '@rauschma/helpers/nodejs/file.js';
 import { style } from '@rauschma/helpers/nodejs/text-style.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { assertTrue } from '@rauschma/helpers/ts/type.js';
+import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
@@ -13,7 +13,7 @@ import { ConfigMod } from '../entity/config-mod.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type MarktestEntity } from '../entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type CommandResult, type MarktestEntity, type MockShellData } from '../entity/snippet.js';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
 import { ConfigurationError, MarktestSyntaxError, Output, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
@@ -35,9 +35,9 @@ enum EntityKind {
   NonRunnable,
 }
 
-//#################### runFile() ####################
+//#################### runParsedMarkdown() ####################
 
-export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: LogLevel, parsedMarkdown: ParsedMarkdown, statusCounts: StatusCounts, interceptedShellCommands: null | Array<Array<string>> = null): void {
+export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: LogLevel, parsedMarkdown: ParsedMarkdown, statusCounts: StatusCounts, mockShellData: null | MockShellData = null): void {
   const marktestDir = findMarktestDir(absFilePath, parsedMarkdown.entities);
   out.writeLine(style.FgBrightBlack`Marktest directory: ${relPath(marktestDir)}`);
 
@@ -74,7 +74,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     globalVisitationMode,
     globalLineMods: new Map(),
     statusCounts,
-    interceptedShellCommands,
+    mockShellData,
   };
 
   let prevHeading: null | Heading = null;
@@ -103,7 +103,11 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
       }
     }
   }
+  checkSnippetIds(parsedMarkdown, out, statusCounts);
+  checkLineModIds(parsedMarkdown, out, statusCounts);
+}
 
+function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCounts: StatusCounts) {
   {
     const declaredIds = new Set<string>();
     const referencedIds = new Set<string>();
@@ -112,25 +116,25 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
         if (entity.id) {
           declaredIds.add(entity.id);
         }
-        entity.visitSingleSnippet((s) => {
-          for (const extSpec of s.externalSpecs) {
+        entity.visitSingleSnippet((snippet) => {
+          for (const extSpec of snippet.externalSpecs) {
             if (extSpec.id !== null) {
               referencedIds.add(extSpec.id);
             }
           }
-          if (s.sameAsId !== null) {
-            referencedIds.add(s.sameAsId);
+          if (snippet.sameAsId !== null) {
+            referencedIds.add(snippet.sameAsId);
           }
-          for (const inclId of s.includeIds) {
+          for (const inclId of snippet.includeIds) {
             if (inclId !== INCL_ID_THIS) {
               referencedIds.add(inclId);
             }
           }
-          if (s.stdoutId !== null) {
-            referencedIds.add(s.stdoutId);
+          if (snippet.stdoutSpec !== null) {
+            referencedIds.add(snippet.stdoutSpec.snippetId);
           }
-          if (s.stderrId !== null) {
-            referencedIds.add(s.stderrId);
+          if (snippet.stderrSpec !== null) {
+            referencedIds.add(snippet.stderrSpec.snippetId);
           }
         });
       }
@@ -141,33 +145,39 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
       statusCounts.warnings++;
     }
   }
+}
 
-  {
-    const declaredIds = new Set<string>();
-    const referencedIds = new Set<string>();
-    for (const entity of parsedMarkdown.entities) {
-      if (entity instanceof LineMod) {
-        const lineModId = entity.getLineModId();
-        if (lineModId) {
-          declaredIds.add(lineModId);
+function checkLineModIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCounts: StatusCounts) {
+  const declaredIds = new Set<string>();
+  const referencedIds = new Set<string>();
+  for (const entity of parsedMarkdown.entities) {
+    if (entity instanceof LineMod) {
+      const lineModId = entity.getLineModId();
+      if (lineModId) {
+        declaredIds.add(lineModId);
+      }
+    }
+    if (entity instanceof Snippet) {
+      entity.visitSingleSnippet((snippet) => {
+        if (snippet.applyInnerId !== null) {
+          referencedIds.add(snippet.applyInnerId);
         }
-      }
-      if (entity instanceof Snippet) {
-        entity.visitSingleSnippet((s) => {
-          if (s.applyInnerId !== null) {
-            referencedIds.add(s.applyInnerId);
-          }
-          if (s.applyOuterId !== null) {
-            referencedIds.add(s.applyOuterId);
-          }
-        });
-      }
+        if (snippet.applyOuterId !== null) {
+          referencedIds.add(snippet.applyOuterId);
+        }
+        if (snippet.stdoutSpec?.lineModId) {
+          referencedIds.add(snippet.stdoutSpec?.lineModId);
+        }
+        if (snippet.stderrSpec?.lineModId) {
+          referencedIds.add(snippet.stderrSpec?.lineModId);
+        }
+      });
     }
-    const unusedIds = setDifference(declaredIds, referencedIds);
-    if (unusedIds.size > 0) {
-      out.writeLine(`❌ Unused ${stringify(ATTR_KEY_LINE_MOD_ID)} values: ${Array.from(unusedIds).join(', ')}`);
-      statusCounts.warnings++;
-    }
+  }
+  const unusedIds = setDifference(declaredIds, referencedIds);
+  if (unusedIds.size > 0) {
+    out.writeLine(`❌ Unused ${stringify(ATTR_KEY_LINE_MOD_ID)} values: ${Array.from(unusedIds).join(', ')}`);
+    statusCounts.warnings++;
   }
 }
 
@@ -378,32 +388,39 @@ function runShellCommands(out: Output, cliState: CliState, config: Config, snipp
     [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });
-  if (cliState.interceptedShellCommands) {
-    cliState.interceptedShellCommands.push(
-      commands.map(commandParts => commandParts.join(' '))
-    );
-    return;
-  }
-  for (const commandParts of commands) {
+  for (const [index, commandParts] of commands.entries()) {
     if (cliState.logLevel === LogLevel.Verbose) {
       out.writeLine(commandParts.join(' '));
     }
-    const [command, ...args] = commandParts;
-    const result = child_process.spawnSync(command, args, {
-      shell: true,
-      cwd: cliState.tmpDir,
-      encoding: 'utf-8',
-    });
-    checkShellCommandResult(cliState, config, snippet, result);
+    let commandResult: null | CommandResult = null;
+    if (cliState.mockShellData) {
+      cliState.mockShellData.interceptedCommands.push(
+        commandParts.join(' ')
+      );
+      if (cliState.mockShellData.commandResults) {
+        commandResult = cliState.mockShellData.commandResults[index];
+        assertNonNullable(commandResult);
+      }
+    } else {
+      const [command, ...args] = commandParts;
+      const commandResult = child_process.spawnSync(command, args, {
+        shell: true,
+        cwd: cliState.tmpDir,
+        encoding: 'utf-8',
+      });
+      if (commandResult.error) {
+        // Spawning didn’t work
+        throw commandResult.error;
+      }
+    }
+    if (commandResult) {
+      const isLastCommand = (index === commands.length-1);
+      checkShellCommandResult(cliState, config, snippet, commandResult, isLastCommand);
+    }
   }
 }
 
-function checkShellCommandResult(cliState: CliState, config: Config, snippet: Snippet, commandResult: child_process.SpawnSyncReturns<string>): void {
-  if (commandResult.error) {
-    // Spawning didn’t work
-    throw commandResult.error;
-  }
-
+function checkShellCommandResult(cliState: CliState, config: Config, snippet: Snippet, commandResult: CommandResult, isLastCommand: boolean): void {
   const stdoutLines = splitLinesExclEol(commandResult.stdout);
   trimTrailingEmptyLines(stdoutLines);
   const stderrLines = splitLinesExclEol(commandResult.stderr);
@@ -427,16 +444,31 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
       }
     );
   }
+  // stdout & stderr content are only checked for the last command
+  if (!isLastCommand) return;
   if (commandResult.stderr.length > 0) {
-    if (snippet.stderrId) {
+    if (snippet.stderrSpec) {
       // We expected stderr output
-      const expectedStderrLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDERR, snippet.stderrId);
+      let actualStderrLines = stderrLines;
+      if (snippet.stderrSpec.lineModId) {
+        const lineMod = cliState.idToLineMod.get(snippet.stderrSpec.lineModId);
+        if (lineMod === undefined) {
+          throw new MarktestSyntaxError(
+            `Could not find LineMod with id ${stringify(snippet.stderrSpec.lineModId)} (attribute ${stringify(ATTR_KEY_STDERR)})`
+          );
+        }
+        const tmpLines = new Array<string>();
+        lineMod.pushModifiedBodyTo(snippet.lineNumber, actualStderrLines, undefined, tmpLines);
+        actualStderrLines = tmpLines;
+      }
+
+      const expectedStderrLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDERR, snippet.stderrSpec.snippetId);
       trimTrailingEmptyLines(expectedStderrLines);
-      if (!isOutputEqual(expectedStderrLines, stderrLines)) {
+      if (!isOutputEqual(expectedStderrLines, actualStderrLines)) {
         throw new TestFailure(
           'stderr was not as expected',
           {
-            stderrLines,
+            stderrLines: actualStderrLines,
             expectedStderrLines,
           }
         );
@@ -450,15 +482,28 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
       );
     }
   }
-  if (snippet.stdoutId) {
+  if (snippet.stdoutSpec) {
     // Normally stdout is ignored. But in this case, we examine it.
-    const expectedStdoutLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDOUT, snippet.stdoutId);
+    let actualStdoutLines = stdoutLines;
+    if (snippet.stdoutSpec.lineModId) {
+      const lineMod = cliState.idToLineMod.get(snippet.stdoutSpec.lineModId);
+      if (lineMod === undefined) {
+        throw new MarktestSyntaxError(
+          `Could not find LineMod with id ${stringify(snippet.stdoutSpec.lineModId)} (attribute ${stringify(ATTR_KEY_STDOUT)})`
+        );
+      }
+      const tmpLines = new Array<string>();
+      lineMod.pushModifiedBodyTo(snippet.lineNumber, actualStdoutLines, undefined, tmpLines);
+      actualStdoutLines = tmpLines;
+    }
+
+    const expectedStdoutLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDOUT, snippet.stdoutSpec.snippetId);
     trimTrailingEmptyLines(expectedStdoutLines);
-    if (!isOutputEqual(stdoutLines, expectedStdoutLines)) {
+    if (!isOutputEqual(expectedStdoutLines, actualStdoutLines)) {
       throw new TestFailure(
         'stdout was not as expected',
         {
-          stdoutLines,
+          stdoutLines: actualStdoutLines,
           expectedStdoutLines,
         }
       );

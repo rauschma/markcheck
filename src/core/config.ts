@@ -131,6 +131,7 @@ export class Config {
         defaultFileName: 'main.ts',
         commands: [
           ["npx", "@rauschma/expect-error", "--report-errors", CMD_VAR_ALL_FILE_NAMES],
+          // Snippets can only check stdout & stderr of last command
           ["npx", "tsx", CMD_VAR_FILE_NAME],
         ],
         beforeLines: [

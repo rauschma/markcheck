@@ -1,6 +1,6 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { assertTrue } from '@rauschma/helpers/ts/type.js';
+import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import { InternalError, MarktestSyntaxError, type LineNumber, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
@@ -90,6 +90,27 @@ export function parseExternalSpecs(lineNumber: number, str: string): Array<Exter
 
 export const ATTR_KEY_STDOUT = 'stdout';
 export const ATTR_KEY_STDERR = 'stderr';
+
+export type StdStreamContentSpec = {
+  lineModId: null | string;
+  snippetId: string;
+};
+const RE_SPEC = re`/^(\|(?<lineModId>${RE_LABEL})=)?(?<snippetId>${RE_LABEL})$/`;
+export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: string, str: string): StdStreamContentSpec {
+  const match = RE_SPEC.exec(str);
+  if (!match) {
+    throw new MarktestSyntaxError(
+      `Could not parse value of attribute ${stringify(attrKey)}: ${stringify(str)}`,
+      {lineNumber: directiveLineNumber}
+    );
+  }
+  assertNonNullable(match.groups);
+  assertNonNullable(match.groups.snippetId);
+  return {
+    lineModId: match.groups.lineModId ?? null,
+    snippetId: match.groups.snippetId, // never null
+  };
+}
 
 //----- Line mods -----
 
@@ -197,7 +218,6 @@ export const ATTRS_GLOBAL_LINE_MOD: ExpectedAttributeValues = new Map([
 
 export const ATTRS_CONFIG_MOD: ExpectedAttributeValues = new Map([
 ]);
-
 
 //#################### Directive ####################
 

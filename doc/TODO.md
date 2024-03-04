@@ -2,6 +2,11 @@
 
 * Attribute `applyLocal`
   * Switches off local LineMod: Error if it is non-empty?
+* Attribute: expect exit code.
+  * Use case: There were errors, but we don’t want to check stderr, only stdout.
+* Config..searchAndReplace: use same format as attributes?
+  * Downside: strings are not raw!
+  * Update `reference.md` as needed.
 
 
 * Go from `LineModKind` to subclasses?
@@ -53,12 +58,6 @@ function test(_name, callback) {
 •••
 test();
 -->
-
-## Attributes
-
-* Attribute: expect exit code.
-  * Use case: There were errors, but we don’t want to check stderr, only stdout.
-* How to check only part of stdout/stderr?
 
 ## Tests
 

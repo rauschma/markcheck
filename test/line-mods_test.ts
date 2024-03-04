@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
+import { emptyMockShellData } from '../src/entity/snippet.js';
 const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
 
 createSuite(import.meta.url);
@@ -17,7 +18,7 @@ test('Assemble lines with line mods', () => {
     // Global line mod AFTER
     -->
 
-    <!--marktest include="other" applyInner="inner-line-mod" applyOuter="outer-line-mod" around:
+    <!--marktest include="other" applyInner="inner-line-mod" applyOuter="outer-line-mod" internal="my-module.mjs" around:
     // Local line mod BEFORE
     •••
     // Local line mod AFTER
@@ -67,9 +68,9 @@ test('Assemble lines with line mods', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  const interceptedShellCommands = new Array<Array<string>>();
+  const mockShellData = emptyMockShellData();
   assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, interceptedShellCommands).getTotalCount(),
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, mockShellData).getTotalCount(),
     0
   );
   // Per file: config lines, global line mods
@@ -77,7 +78,7 @@ test('Assemble lines with line mods', () => {
   assert.deepEqual(
     dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
     {
-      'main.mjs': outdent`
+      'my-module.mjs': outdent`
         // Config line BEFORE
         // Global line mod BEFORE
         // Outer line mod BEFORE
@@ -95,9 +96,10 @@ test('Assemble lines with line mods', () => {
     }
   );
   assert.deepEqual(
-    interceptedShellCommands,
+    mockShellData.interceptedCommands,
     [
-      ['js-command1 main.mjs', 'js-command2 main.mjs'],
+      'js-command1 my-module.mjs',
+      'js-command2 my-module.mjs',
     ]
   );
 });

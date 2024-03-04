@@ -11,12 +11,12 @@ assert.equal(
 
 ### Checking standard output via `stdout`
 
-<!--marktest stdout="output-hello"-->
+<!--marktest stdout="stdout-hello"-->
 ```js
 console.log('Hello!');
 ```
 
-<!--marktest id="output-hello"-->
+<!--marktest id="stdout-hello"-->
 ```
 Hello!
 ```
@@ -105,7 +105,7 @@ export const GRINNING_FACE = '😀';
 
 Setting up an external file:
 
-<!--marktest write="some-file.txt" body:
+<!--marktest writeInner="some-file.txt" body:
 Content of some-file.txt
 -->
 
@@ -119,12 +119,12 @@ assert.equal(
 
 Checking output:
 
-<!--marktest stdout="output-how-are-you"-->
+<!--marktest stdout="stdout-how-are-you"-->
 ```js
 console.log('How are you?');
 ```
 
-<!--marktest id="output-how-are-you" body:
+<!--marktest id="stdout-how-are-you" body:
 How are you?
 -->
 
