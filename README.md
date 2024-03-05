@@ -8,7 +8,7 @@
 * Use fenced code blocks and tags to specify code and language (some tools use indented code blocks).
 * Various features: check stderr and/or stdout, concatenate blocks in any order, use code not shown to readers, set up files on disk, etc.
 
-## Trying out Marktest
+## Trying out Marktest without installing it
 
 ```
 cd marktest/demo

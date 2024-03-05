@@ -60,7 +60,7 @@ export function parseMarkdown(text: string): ParsedMarkdown {
         }
         if (entity.isClosed) {
           // The parsed directive is self-contained (a body directive)
-          pushSingleSnippet(state, entity);
+          pushSingleSnippet(result, state, entity);
         } else {
           state.openSingleSnippet = entity;
         }
@@ -74,13 +74,17 @@ export function parseMarkdown(text: string): ParsedMarkdown {
         if (state.openSingleSnippet) {
           // Code block follows a directive
           pushSingleSnippet(
-            state, state.openSingleSnippet.closeWithBody(lang, lines)
+            result,
+            state,
+            state.openSingleSnippet.closeWithBody(lang, lines)
           );
           state.openSingleSnippet = null;
         } else {
           // Code block without preceding directive
           pushSingleSnippet(
-            state, SingleSnippet.createClosedFromCodeBlock(lineNumber, lang, lines)
+            result,
+            state,
+            SingleSnippet.createClosedFromCodeBlock(lineNumber, lang, lines)
           );
         }
       } else if (token.type === 'inline' && state.prevType === 'heading_open') {
@@ -108,50 +112,51 @@ export function parseMarkdown(text: string): ParsedMarkdown {
     idToLineMod: createIdToLineMod(result),
   };
 
-  function pushSingleSnippet(
-    state: ParsingState, snippet: SingleSnippet
-  ): void {
-    // This function always sets state.prevHeading to `null` – so that we
-    // show each heading at most once.
+}
 
-    if (state.prevHeading) {
-      result.push(state.prevHeading);
-    }
+function pushSingleSnippet(result: Array<MarktestEntity>, state: ParsingState, snippet: SingleSnippet): void {
+  // This function always sets state.prevHeading to `null` – so that we
+  // show each heading at most once.
 
-    assertTrue(snippet.isClosed);
-    if (state.openSequence === null) {
-      // No active sequence
-      const num = snippet.sequenceNumber;
-      if (num === null) {
-        // Still no active sequence
-        result.push(snippet);
-        state.prevHeading = null;
-        state.openSequence = null;
-        return;
-      }
-      // Snippet starts a new sequence
-      state.openSequence = new SequenceSnippet(snippet);
-    } else {
-      // There is an active sequence
-      const num = snippet.sequenceNumber;
-      if (num === null) {
-        throw new MarktestSyntaxError(
-          `Snippet has no sequence number (expected: ${state.openSequence.nextSequenceNumber})`,
-          { lineNumber: snippet.lineNumber }
-        );
-      }
-      state.openSequence.pushElement(snippet, num);
-    }
-    if (state.openSequence.isComplete()) {
-      result.push(state.openSequence);
+  if (state.prevHeading) {
+    result.push(state.prevHeading);
+  }
+
+  assertTrue(snippet.isClosed);
+  if (state.openSequence === null) {
+    // No active sequence
+    const num = snippet.sequenceNumber;
+    if (num === null) {
+      // Still no active sequence
+      result.push(snippet);
       state.prevHeading = null;
       state.openSequence = null;
       return;
     }
+    // Snippet starts a new sequence
+    state.openSequence = new SequenceSnippet(snippet);
+  } else {
+    // There is an active sequence
+    const num = snippet.sequenceNumber;
+    if (num === null) {
+      throw new MarktestSyntaxError(
+        `Snippet has no sequence number (expected: ${state.openSequence.nextSequenceNumber})`,
+        { lineNumber: snippet.lineNumber }
+      );
+    }
+    state.openSequence.pushElement(snippet, num);
+  }
+  if (state.openSequence.isComplete()) {
+    result.push(state.openSequence);
     state.prevHeading = null;
+    state.openSequence = null;
     return;
   }
+  state.prevHeading = null;
+  return;
 }
+
+//#################### Comments ####################
 
 const RE_COMMENT_START = /^<!--/;
 const RE_COMMENT_END = /-->(\r?\n)?$/;
@@ -162,6 +167,8 @@ export function extractCommentContent(html: string): null | string {
   if (startMatch === null || endMatch === null) return null;
   return html.slice(startMatch[0].length, endMatch.index);
 }
+
+//#################### Indices into entities ####################
 
 function createIdToSnippet(entities: Array<MarktestEntity>): Map<string, Snippet> {
   const idToSnippet = new Map<string, Snippet>();
