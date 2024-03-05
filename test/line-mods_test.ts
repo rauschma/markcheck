@@ -12,13 +12,13 @@ createSuite(import.meta.url);
 
 test('Assemble lines with line mods', () => {
   const readme = outdent`
-    <!--marktest each="js" around:
+    <!--markcheck each="js" around:
     // Global line mod BEFORE
     •••
     // Global line mod AFTER
     -->
 
-    <!--marktest include="other" applyInner="inner-line-mod" applyOuter="outer-line-mod" internal="my-module.mjs" around:
+    <!--markcheck include="other" applyInner="inner-line-mod" applyOuter="outer-line-mod" internal="my-module.mjs" around:
     // Local line mod BEFORE
     •••
     // Local line mod AFTER
@@ -27,27 +27,27 @@ test('Assemble lines with line mods', () => {
     console.log('Main snippet');
     ▲▲▲
 
-    <!--marktest id="other"-->
+    <!--markcheck id="other"-->
     ▲▲▲js
     //
     console.log('Included snippet');
     //
     ▲▲▲
     
-    <!--marktest lineModId="inner-line-mod" around:
+    <!--markcheck lineModId="inner-line-mod" around:
     // Inner line mod BEFORE
     •••
     // Inner line mod AFTER
     -->
-    <!--marktest lineModId="outer-line-mod" around:
+    <!--markcheck lineModId="outer-line-mod" around:
     // Outer line mod BEFORE
     •••
     // Outer line mod AFTER
     -->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {
-      'marktest-config.jsonc': outdent`
+    '/tmp/markcheck-data': {
+      'markcheck-config.jsonc': outdent`
         {
           "lang": {
             "": "[skip]",
@@ -76,7 +76,7 @@ test('Assemble lines with line mods', () => {
   // Per file: config lines, global line mods
   // Per snippet: applied line mod, local line mod
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'my-module.mjs': outdent`
         // Config line BEFORE

@@ -11,19 +11,19 @@ createSuite(import.meta.url);
 
 test('Included snippet', () => {
   const readme = outdent`
-    <!--marktest include="helper"-->
+    <!--markcheck include="helper"-->
     ▲▲▲node-repl
     > twice('abc')
     'abcabc'
     ▲▲▲
     
-    <!--marktest id="helper"-->
+    <!--markcheck id="helper"-->
     ▲▲▲js
     function twice(str) { return str + str }
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -31,7 +31,7 @@ test('Included snippet', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
@@ -48,7 +48,7 @@ test('Included snippet', () => {
 
 test('Included snippet with `before:`', () => {
   const readme = outdent`
-    <!--marktest id="httpGet" before:
+    <!--markcheck id="httpGet" before:
     import {XMLHttpRequest} from 'some-lib';
     -->
     ▲▲▲js
@@ -57,7 +57,7 @@ test('Included snippet with `before:`', () => {
     }
     ▲▲▲
 
-    <!--marktest include="httpGet" before:
+    <!--markcheck include="httpGet" before:
     import nock from 'nock';
     -->
     ▲▲▲js
@@ -65,7 +65,7 @@ test('Included snippet with `before:`', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -73,7 +73,7 @@ test('Included snippet with `before:`', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
@@ -90,7 +90,7 @@ test('Included snippet with `before:`', () => {
 
 test('Assembling code fragments out of order', () => {
   const readme = outdent`
-    <!--marktest include="step1, step2, $THIS"-->
+    <!--markcheck include="step1, step2, $THIS"-->
     ▲▲▲js
     steps.push('Step 3');
 
@@ -100,19 +100,19 @@ test('Assembling code fragments out of order', () => {
     );
     ▲▲▲
 
-    <!--marktest id="step1"-->
+    <!--markcheck id="step1"-->
     ▲▲▲js
     const steps = [];
     steps.push('Step 1');
     ▲▲▲
 
-    <!--marktest id="step2"-->
+    <!--markcheck id="step2"-->
     ▲▲▲js
     steps.push('Step 2');
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -120,7 +120,7 @@ test('Assembling code fragments out of order', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';

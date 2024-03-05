@@ -11,7 +11,7 @@ createSuite(import.meta.url);
 
 test('ignoreLines: line numbers', () => {
   const readme = outdent`
-    <!--marktest onlyLocalLines ignoreLines="1..2, -1"-->
+    <!--markcheck onlyLocalLines ignoreLines="1..2, -1"-->
     ▲▲▲js
     // one
     // two
@@ -21,7 +21,7 @@ test('ignoreLines: line numbers', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -29,7 +29,7 @@ test('ignoreLines: line numbers', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         // three
@@ -41,7 +41,7 @@ test('ignoreLines: line numbers', () => {
 
 test('ignoreLines: text fragments', () => {
   const readme = outdent`
-    <!--marktest onlyLocalLines ignoreLines="'two', 'four'..'five'"-->
+    <!--markcheck onlyLocalLines ignoreLines="'two', 'four'..'five'"-->
     ▲▲▲js
     // one
     // two
@@ -51,7 +51,7 @@ test('ignoreLines: text fragments', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -59,7 +59,7 @@ test('ignoreLines: text fragments', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         // one

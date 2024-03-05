@@ -11,19 +11,19 @@ assert.equal(
 
 ### Checking standard output via `stdout`
 
-<!--marktest stdout="stdout-hello"-->
+<!--markcheck stdout="stdout-hello"-->
 ```js
 console.log('Hello!');
 ```
 
-<!--marktest id="stdout-hello"-->
+<!--markcheck id="stdout-hello"-->
 ```
 Hello!
 ```
 
 ## Hiding code via `before:`
 
-<!--marktest before:
+<!--markcheck before:
 function functionThatShouldThrow() {
   throw new Error();
 }
@@ -39,24 +39,24 @@ try {
 
 ### Assembling code fragments sequentially via `sequence`
 
-<!--marktest sequence="1/3" stdout="sequence-output"-->
+<!--markcheck sequence="1/3" stdout="sequence-output"-->
 ```js
 console.log("Snippet 1/3");
 ```
 
-<!--marktest sequence="2/3"-->
+<!--markcheck sequence="2/3"-->
 ```js
 console.log("Snippet 2/3");
 ```
 
-<!--marktest sequence="3/3"-->
+<!--markcheck sequence="3/3"-->
 ```js
 console.log("Snippet 3/3");
 ```
 
 Expected output:
 
-<!--marktest id="sequence-output"-->
+<!--markcheck id="sequence-output"-->
 ```
 Snippet 1/3
 Snippet 2/3
@@ -65,7 +65,7 @@ Snippet 3/3
 
 ## Assembling code fragments out of order
 
-<!--marktest include="step1, step2, $THIS"-->
+<!--markcheck include="step1, step2, $THIS"-->
 ```js
 steps.push('Step 3');
 
@@ -75,27 +75,27 @@ assert.deepEqual(
 );
 ```
 
-<!--marktest id="step1"-->
+<!--markcheck id="step1"-->
 ```js
 const steps = [];
 steps.push('Step 1');
 ```
 
-<!--marktest id="step2"-->
+<!--markcheck id="step2"-->
 ```js
 steps.push('Step 2');
 ```
 
 ## External files
 
-<!--marktest external="other>other.mjs"-->
+<!--markcheck external="other>other.mjs"-->
 ```js
 // main.mjs
 import { GRINNING_FACE } from './other.mjs';
 assert.equal(GRINNING_FACE, '😀');
 ```
 
-<!--marktest id="other"-->
+<!--markcheck id="other"-->
 ```js
 // other.mjs
 export const GRINNING_FACE = '😀';
@@ -105,7 +105,7 @@ export const GRINNING_FACE = '😀';
 
 Setting up an external file:
 
-<!--marktest writeInner="some-file.txt" body:
+<!--markcheck writeInner="some-file.txt" body:
 Content of some-file.txt
 -->
 
@@ -119,12 +119,12 @@ assert.equal(
 
 Checking output:
 
-<!--marktest stdout="stdout-how-are-you"-->
+<!--markcheck stdout="stdout-how-are-you"-->
 ```js
 console.log('How are you?');
 ```
 
-<!--marktest id="stdout-how-are-you" body:
+<!--markcheck id="stdout-how-are-you" body:
 How are you?
 -->
 

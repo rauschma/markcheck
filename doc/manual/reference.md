@@ -1,9 +1,9 @@
-# Marktest reference
+# Markcheck reference
 
 ## Command line options
 
 ```
-marktest «file1.md» «file2.md» ...
+markcheck «file1.md» «file2.md» ...
 
 Options:
 --help -h: get help
@@ -14,26 +14,26 @@ Options:
 
 ## File structure
 
-* `marktest-data/`: must exist, can be empty
+* `markcheck-data/`: must exist, can be empty
   * `tmp/`: created on demand, cleared before a file is run.
-  * `marktest-config.jsonc`: overrides the built-in defaults.
-    * Show built-in defaults via: `marktest --print-config`
+  * `markcheck-config.jsonc`: overrides the built-in defaults.
+    * Show built-in defaults via: `markcheck --print-config`
 
 ## Syntax
 
-Only two Markdown constructs are considered by Marktest:
+Only two Markdown constructs are considered by Markcheck:
 
-* _Directives_, Markdown comments that start with `<!--marktest`
+* _Directives_, Markdown comments that start with `<!--markcheck`
 * Code blocks (delimited by three or more backticks)
 
-A _directive_ is a Markdown comment that starts with `<!--marktest` – e.g.:
+A _directive_ is a Markdown comment that starts with `<!--markcheck` – e.g.:
 
 ``````md
-<!--marktest sequence="1/3" stdout="sequence-output"-->
+<!--markcheck sequence="1/3" stdout="sequence-output"-->
 ```js
 ```
 
-<!--marktest before:
+<!--markcheck before:
 function functionThatShouldThrow() {
   throw new Error();
 }
@@ -41,12 +41,12 @@ function functionThatShouldThrow() {
 ```js
 ```
 
-<!--marktest writeInner="some-file.txt" body:
+<!--markcheck writeInner="some-file.txt" body:
 Content of some-file.txt
 -->
 ``````
 
-After `marktest` there are zero or more attributes. The first line ends either with `-->` or with a _body label_ – a name followed by a colon. In the previous example, `before:` and `body:` are body labels.
+After `markcheck` there are zero or more attributes. The first line ends either with `-->` or with a _body label_ – a name followed by a colon. In the previous example, `before:` and `body:` are body labels.
 
 ### Kinds of directives
 
@@ -180,10 +180,10 @@ Running:
 
 ## Configuration
 
-See all defaults: `marktest --print-config`
+See all defaults: `markcheck --print-config`
 
 ```md
-<!--marktest config:
+<!--markcheck config:
 {
   "lang": {
     "": "[skip]",

@@ -19,7 +19,7 @@ test('searchAndReplace', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -27,7 +27,7 @@ test('searchAndReplace', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';

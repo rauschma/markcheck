@@ -11,7 +11,7 @@ createSuite(import.meta.url);
 
 test('Directive.parse()', () => {
   assert.deepEqual(
-    parseDirective(raw`<!--marktest noOuterLineMods-->`).toJson(),
+    parseDirective(raw`<!--markcheck noOuterLineMods-->`).toJson(),
     {
       lineNumber: 1,
       attributes: {
@@ -23,7 +23,7 @@ test('Directive.parse()', () => {
     'Valueless attribute'
   );
   assert.deepEqual(
-    parseDirective(raw`<!--marktest key="value \"with\" quotes"-->`).toJson(),
+    parseDirective(raw`<!--markcheck key="value \"with\" quotes"-->`).toJson(),
     {
       lineNumber: 1,
       attributes: {
@@ -35,7 +35,7 @@ test('Directive.parse()', () => {
     'Attribute value with escaped quotes (raw!)'
   );
   assert.deepEqual(
-    parseDirective(raw`<!--marktest key="a\\b\\c"-->`).toJson(),
+    parseDirective(raw`<!--markcheck key="a\\b\\c"-->`).toJson(),
     {
       lineNumber: 1,
       attributes: {
@@ -47,7 +47,7 @@ test('Directive.parse()', () => {
     'Attribute value with backslashes (raw!)'
   );
   assert.deepEqual(
-    parseDirective(raw`<!--marktest key=""-->`).toJson(),
+    parseDirective(raw`<!--markcheck key=""-->`).toJson(),
     {
       lineNumber: 1,
       attributes: {
@@ -59,7 +59,7 @@ test('Directive.parse()', () => {
     'Empty attribute value'
   );
   assert.throws(
-    () => parseDirective(raw`<!--marktest key="unclosed-->`),
+    () => parseDirective(raw`<!--markcheck key="unclosed-->`),
     {
       name: 'UserError',
       message: raw`Could not parse attributes: Stopped parsing before "=\"unclosed"`,

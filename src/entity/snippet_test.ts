@@ -8,7 +8,7 @@ createSuite(import.meta.url);
 test('singleSnippet.getAllFileNames', () => {
   const { entities } = parseMarkdown(
     [
-      '<!--marktest writeAndRun="file.js"-->',
+      '<!--markcheck writeAndRun="file.js"-->',
       '```js',
       'console.log();',
       '```',

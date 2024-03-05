@@ -12,22 +12,22 @@ createSuite(import.meta.url);
 
 test('stdout: success', () => {
   const readme = outdent`
-    <!--marktest stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
+    <!--markcheck stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
     ▲▲▲js
     console.log('red');
     console.log('green');
     console.log('blue');
     ▲▲▲
 
-    <!--marktest id="expected-stdout"-->
+    <!--markcheck id="expected-stdout"-->
     ▲▲▲
     🟢
     ▲▲▲
 
-    <!--marktest lineModId="modify-stdout" ignoreLines="'red', 'blue'" searchAndReplace="/green/🟢/"-->
+    <!--markcheck lineModId="modify-stdout" ignoreLines="'red', 'blue'" searchAndReplace="/green/🟢/"-->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -51,22 +51,22 @@ test('stdout: success', () => {
 
 test('stdout: failure', () => {
   const readme = outdent`
-    <!--marktest stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
+    <!--markcheck stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
     ▲▲▲js
     console.log('red');
     console.log('green');
     console.log('blue');
     ▲▲▲
 
-    <!--marktest id="expected-stdout"-->
+    <!--markcheck id="expected-stdout"-->
     ▲▲▲
     black
     ▲▲▲
 
-    <!--marktest lineModId="modify-stdout" ignoreLines="1, -1"-->
+    <!--markcheck lineModId="modify-stdout" ignoreLines="1, -1"-->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 

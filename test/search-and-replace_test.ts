@@ -11,14 +11,14 @@ createSuite(import.meta.url);
 
 test('searchAndReplace', () => {
   const readme = outdent`
-    <!--marktest searchAndReplace="/ \/\/ \([A-Z]\)//"-->
+    <!--markcheck searchAndReplace="/ \/\/ \([A-Z]\)//"-->
     ▲▲▲js
     console.log('First'); // (A)
     console.log('Second'); // (B)
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -26,7 +26,7 @@ test('searchAndReplace', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';

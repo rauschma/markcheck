@@ -11,12 +11,12 @@ createSuite(import.meta.url);
 
 test('Written snippet', () => {
   const readme = outdent`
-    <!--marktest writeInner="test-file.txt" body:
+    <!--markcheck writeInner="test-file.txt" body:
     Test file content
     -->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -24,7 +24,7 @@ test('Written snippet', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'test-file.txt': 'Test file content',
     }

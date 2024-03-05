@@ -1,5 +1,5 @@
 import { isEmptyLine } from '@rauschma/helpers/js/string.js';
-import { MarktestSyntaxError } from '../util/errors.js';
+import { MarkcheckSyntaxError } from '../util/errors.js';
 import { normalizeWhitespace } from '../util/string.js';
 import { type Translator } from './translation.js';
 
@@ -24,7 +24,7 @@ export const nodeReplToJs: Translator = {
 
       const match = RE_INPUT.exec(inputLine);
       if (!match) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `REPL line ${inputLineNumber} does not contain input (${RE_INPUT}): ${JSON.stringify(inputLine)}`,
           { lineNumber }
         )
@@ -40,7 +40,7 @@ export const nodeReplToJs: Translator = {
       const nextInputLineIndex = findNextInputLine(lines, index);
       const outputLen = nextInputLineIndex - index;
       if (outputLen === 0) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `No output after REPL line ${inputLineNumber}: ${JSON.stringify(inputLine)}`,
           { lineNumber }
         )

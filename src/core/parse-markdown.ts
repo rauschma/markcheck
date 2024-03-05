@@ -6,11 +6,11 @@ import { directiveToEntity } from '../entity/directive-to-entity.js';
 import { Directive } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
-import { SequenceSnippet, SingleSnippet, Snippet, type MarktestEntity } from '../entity/snippet.js';
-import { MarktestSyntaxError, describeUserErrorContext } from '../util/errors.js';
+import { SequenceSnippet, SingleSnippet, Snippet, type MarkcheckEntity } from '../entity/snippet.js';
+import { MarkcheckSyntaxError, describeUserErrorContext } from '../util/errors.js';
 
 export type ParsedMarkdown = {
-  entities: Array<MarktestEntity>,
+  entities: Array<MarkcheckEntity>,
   idToSnippet: Map<string, Snippet>,
   idToLineMod: Map<string, LineMod>,
 };
@@ -24,7 +24,7 @@ class ParsingState {
 
 export function parseMarkdown(text: string): ParsedMarkdown {
   const md = markdownit({ html: true });
-  const result = new Array<MarktestEntity>();
+  const result = new Array<MarkcheckEntity>();
   const tokens = md.parse(text, { html: true });
 
   let state = new ParsingState();
@@ -53,7 +53,7 @@ export function parseMarkdown(text: string): ParsedMarkdown {
 
         if (state.openSingleSnippet) {
           // An open snippet was unsuccessfully waiting for its code block
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Code block directive was not followed by a code block but by another directive`,
             { lineNumber: state.openSingleSnippet.lineNumber }
           );
@@ -97,12 +97,12 @@ export function parseMarkdown(text: string): ParsedMarkdown {
     }
   }
   if (state.openSingleSnippet) {
-    throw new MarktestSyntaxError(`Code block directive was not followed by a code block`, { lineNumber: state.openSingleSnippet.lineNumber });
+    throw new MarkcheckSyntaxError(`Code block directive was not followed by a code block`, { lineNumber: state.openSingleSnippet.lineNumber });
   }
   if (state.openSequence) {
     const first = state.openSequence.firstElement;
     const last = state.openSequence.lastElement;
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Sequence was not completed – first element: line ${first.sequenceNumber}, last element: line ${last.sequenceNumber}`
     );
   }
@@ -114,7 +114,7 @@ export function parseMarkdown(text: string): ParsedMarkdown {
 
 }
 
-function pushSingleSnippet(result: Array<MarktestEntity>, state: ParsingState, snippet: SingleSnippet): void {
+function pushSingleSnippet(result: Array<MarkcheckEntity>, state: ParsingState, snippet: SingleSnippet): void {
   // This function always sets state.prevHeading to `null` – so that we
   // show each heading at most once.
 
@@ -139,7 +139,7 @@ function pushSingleSnippet(result: Array<MarktestEntity>, state: ParsingState, s
     // There is an active sequence
     const num = snippet.sequenceNumber;
     if (num === null) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Snippet has no sequence number (expected: ${state.openSequence.nextSequenceNumber})`,
         { lineNumber: snippet.lineNumber }
       );
@@ -170,13 +170,13 @@ export function extractCommentContent(html: string): null | string {
 
 //#################### Indices into entities ####################
 
-function createIdToSnippet(entities: Array<MarktestEntity>): Map<string, Snippet> {
+function createIdToSnippet(entities: Array<MarkcheckEntity>): Map<string, Snippet> {
   const idToSnippet = new Map<string, Snippet>();
   for (const entity of entities) {
     if (entity instanceof Snippet && entity.id) {
       const other = idToSnippet.get(entity.id);
       if (other) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
           { lineNumber: entity.lineNumber }
         );
@@ -187,7 +187,7 @@ function createIdToSnippet(entities: Array<MarktestEntity>): Map<string, Snippet
   return idToSnippet;
 }
 
-function createIdToLineMod(entities: Array<MarktestEntity>): Map<string, LineMod> {
+function createIdToLineMod(entities: Array<MarkcheckEntity>): Map<string, LineMod> {
   const idToLineMod = new Map<string, LineMod>();
   for (const entity of entities) {
     if (entity instanceof LineMod) {
@@ -196,7 +196,7 @@ function createIdToLineMod(entities: Array<MarktestEntity>): Map<string, LineMod
         const other = idToLineMod.get(lineModId);
         if (other) {
           const description = describeUserErrorContext(other.context);
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Duplicate id ${JSON.stringify(entity)} (other usage is ${description})`,
             { entityContext: entity.context }
           );

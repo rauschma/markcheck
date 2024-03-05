@@ -1,12 +1,12 @@
 {
-  "name": "@rauschma/marktest",
+  "name": "markcheck",
   "version": "1.0.0",
   "author": "",
   "description": "",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "marktest": "./dist/src/marktest.js"
+    "markcheck": "./dist/src/markcheck.js"
   },
   "imports": {
     "#package_json": "./package.json",
@@ -16,11 +16,11 @@
     "build": "npm run clean && tsc && npm run chmod",
     "watch": "tsc --watch",
     "clean": "shx rm -rf ./dist/*",
-    "chmod": "chmod u+x ./dist/src/marktest.js",
+    "chmod": "chmod u+x ./dist/src/markcheck.js",
     "\n========== Testing ==========": "",
     "test": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning",
     "testall": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
-    "circular": "npx madge --circular src/marktest.ts"
+    "circular": "npx madge --circular src/markcheck.ts"
   },
   "dependencies": {
     "@rauschma/helpers": "file:../../libraries/helpers",

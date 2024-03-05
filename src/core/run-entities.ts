@@ -13,9 +13,9 @@ import { ConfigMod } from '../entity/config-mod.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type CommandResult, type MarktestEntity, type MockShellData } from '../entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type CommandResult, type MarkcheckEntity, type MockShellData } from '../entity/snippet.js';
 import { isOutputEqual, logDiff } from '../util/diffing.js';
-import { ConfigurationError, MarktestSyntaxError, Output, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
+import { ConfigurationError, MarkcheckSyntaxError, Output, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
@@ -25,9 +25,9 @@ import { parseMarkdown, type ParsedMarkdown } from './parse-markdown.js';
 import pkg from '#package_json' with { type: "json" };
 import { setDifference } from '@rauschma/helpers/collection/set.js';
 
-const MARKTEST_DIR_NAME = 'marktest-data';
+const MARKTEST_DIR_NAME = 'markcheck-data';
 const MARKTEST_TMP_DIR_NAME = 'tmp';
-const CONFIG_FILE_NAME = 'marktest-config.jsonc';
+const CONFIG_FILE_NAME = 'markcheck-config.jsonc';
 const { stringify } = JSON;
 
 enum EntityKind {
@@ -38,11 +38,11 @@ enum EntityKind {
 //#################### runParsedMarkdown() ####################
 
 export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: LogLevel, parsedMarkdown: ParsedMarkdown, statusCounts: StatusCounts, mockShellData: null | MockShellData = null): void {
-  const marktestDir = findMarktestDir(absFilePath, parsedMarkdown.entities);
-  out.writeLine(style.FgBrightBlack`Marktest directory: ${relPath(marktestDir)}`);
+  const markcheckDir = findMarkcheckDir(absFilePath, parsedMarkdown.entities);
+  out.writeLine(style.FgBrightBlack`Markcheck directory: ${relPath(markcheckDir)}`);
 
-  const tmpDir = path.resolve(marktestDir, MARKTEST_TMP_DIR_NAME);
-  // `marktest/` must exist, `marktest/tmp/` may not exist
+  const tmpDir = path.resolve(markcheckDir, MARKTEST_TMP_DIR_NAME);
+  // `markcheck/` must exist, `markcheck/tmp/` may not exist
   if (fs.existsSync(tmpDir)) {
     clearDirectorySync(tmpDir);
   } else {
@@ -55,7 +55,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
   }
 
   const config = new Config();
-  const configFilePath = path.resolve(marktestDir, CONFIG_FILE_NAME);
+  const configFilePath = path.resolve(markcheckDir, CONFIG_FILE_NAME);
   if (fs.existsSync(configFilePath)) {
     const json = json5.parse(fs.readFileSync(configFilePath, 'utf-8'));
     const configModJson = ConfigModJsonSchema.parse(json);
@@ -89,7 +89,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
         prevHeading = null; // clear
       }
     } catch (err) {
-      if (err instanceof MarktestSyntaxError) {
+      if (err instanceof MarkcheckSyntaxError) {
         cliState.statusCounts.syntaxErrors++;
         err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
       } else if (err instanceof TestFailure) {
@@ -181,10 +181,10 @@ function checkLineModIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
   }
 }
 
-function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): string {
+function findMarkcheckDir(absFilePath: string, entities: Array<MarkcheckEntity>): string {
   const firstConfigMod = entities.find((entity) => entity instanceof ConfigMod);
   if (firstConfigMod instanceof ConfigMod) {
-    const dir = firstConfigMod.configModJson.marktestDirectory;
+    const dir = firstConfigMod.configModJson.markcheckDirectory;
     if (dir) {
       return dir;
     }
@@ -208,7 +208,7 @@ function findMarktestDir(absFilePath: string, entities: Array<MarktestEntity>): 
   );
 }
 
-function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarktestEntity): EntityKind {
+function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarkcheckEntity): EntityKind {
   if (entity instanceof ConfigMod) {
     config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
     return EntityKind.NonRunnable;
@@ -241,7 +241,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     const innerLines = assembleInnerLines(cliState, config, snippet);
     const pathName = path.resolve(cliState.absFilePath, '..', snippet.containedInFile);
     if (!fs.existsSync(pathName)) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Path of attribute ${stringify(ATTR_KEY_CONTAINED_IN_FILE)} does not exist: ${stringify(pathName)}`,
         { lineNumber: snippet.lineNumber }
       );
@@ -288,7 +288,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
   }
   const langDef = config.getLang(snippet.lang);
   if (langDef === undefined) {
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Unknown language: ${JSON.stringify(snippet.lang)}`,
       { lineNumber: snippet.lineNumber }
     );
@@ -297,7 +297,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     return EntityKind.NonRunnable;
   }
   if (langDef.kind === 'LangDefErrorIfRun') {
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Language can’t be run: ${JSON.stringify(snippet.lang)}`,
       { lineNumber: snippet.lineNumber }
     );
@@ -311,7 +311,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
 
   assertTrue(langDef.kind === 'LangDefCommand');
   if (!langDef.commands) {
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Snippet is runnable but its language does not have ${stringify(PROP_KEY_COMMANDS)}`,
       { lineNumber: snippet.lineNumber }
     );
@@ -453,7 +453,7 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
       if (snippet.stderrSpec.lineModId) {
         const lineMod = cliState.idToLineMod.get(snippet.stderrSpec.lineModId);
         if (lineMod === undefined) {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Could not find LineMod with id ${stringify(snippet.stderrSpec.lineModId)} (attribute ${stringify(ATTR_KEY_STDERR)})`
           );
         }
@@ -488,7 +488,7 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
     if (snippet.stdoutSpec.lineModId) {
       const lineMod = cliState.idToLineMod.get(snippet.stdoutSpec.lineModId);
       if (lineMod === undefined) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `Could not find LineMod with id ${stringify(snippet.stdoutSpec.lineModId)} (attribute ${stringify(ATTR_KEY_STDOUT)})`
         );
       }
@@ -544,7 +544,7 @@ function relPath(absPath: string) {
 }
 //#################### main() ####################
 
-const BIN_NAME = 'marktest';
+const BIN_NAME = 'markcheck';
 
 const ARG_OPTIONS = {
   'help': {
@@ -606,7 +606,7 @@ export function cliEntry() {
       const parsedMarkdown = parseMarkdown(text);
       runParsedMarkdown(out, absFilePath, logLevel, parsedMarkdown, statusCounts);
     } catch (err) {
-      if (err instanceof MarktestSyntaxError) {
+      if (err instanceof MarkcheckSyntaxError) {
         statusCounts.syntaxErrors++;
         err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
       } else if (err instanceof TestFailure) {

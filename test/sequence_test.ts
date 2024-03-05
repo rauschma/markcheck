@@ -11,23 +11,23 @@ createSuite(import.meta.url);
 
 test('Assemble sequence', () => {
   const readme = outdent`
-    <!--marktest sequence="1/3"-->
+    <!--markcheck sequence="1/3"-->
     ▲▲▲js
     // Part 1
     ▲▲▲
     
-    <!--marktest sequence="2/3"-->
+    <!--markcheck sequence="2/3"-->
     ▲▲▲js
     // Part 2
     ▲▲▲
     
-    <!--marktest sequence="3/3"-->
+    <!--markcheck sequence="3/3"-->
     ▲▲▲js
     // Part 3
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -35,7 +35,7 @@ test('Assemble sequence', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';

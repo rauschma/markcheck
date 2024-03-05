@@ -1,6 +1,6 @@
-# Marktest
+# Markcheck
 
-## Why Marktest?
+## Why Markcheck?
 
 * It uses normal Markdown syntax – not a custom version of it: Everything custom happens in comments.
 * No external files: The Markdown file contains all the information that is needed to run it.
@@ -13,49 +13,49 @@
   * Write arbitrary files to disk.
   * Etc.
 
-## Trying out Marktest without installing it
+## Trying out Markcheck without installing it
 
-<!--marktest skip-->
+<!--markcheck skip-->
 ```
-cd marktest/demo
-npx @rauschma/marktest demo-javascript.md
-```
-
-* In this case, the `marktest-data` directory (for temporary files, see below) is `marktest/demo/marktest-data/`.
-* To try Marktest with one of your files, you only need to create a directory `marktest-data/` (which can be empty) in an ancestor directory of the file (i.e. in its parent directory – sitting next to it, etc.).
-* If you create a `marktest-data` directory in the directory (or an ancestor directory) of one of your Markdown files, you can try out Marktest, too.
-
-You can permanently install Marktest via:
-
-<!--marktest skip-->
-```
-npm install -g @rauschma/marktest
+cd markcheck/demo
+npx @rauschma/markcheck demo-javascript.md
 ```
 
-## The basics of using Marktest
+* In this case, the `markcheck-data` directory (for temporary files, see below) is `markcheck/demo/markcheck-data/`.
+* To try Markcheck with one of your files, you only need to create a directory `markcheck-data/` (which can be empty) in an ancestor directory of the file (i.e. in its parent directory – sitting next to it, etc.).
+* If you create a `markcheck-data` directory in the directory (or an ancestor directory) of one of your Markdown files, you can try out Markcheck, too.
 
-* The following sections explain the basics of using Marktest.
+You can permanently install Markcheck via:
+
+<!--markcheck skip-->
+```
+npm install -g @rauschma/markcheck
+```
+
+## The basics of using Markcheck
+
+* The following sections explain the basics of using Markcheck.
 * For more information, check [`doc/manual/`](doc/manual) and [`demo/`](demo).
 
-## The `marktest-data` directory
+## The `markcheck-data` directory
 
-* The search for `marktest-data/` starts in the directory of the Markdown file, then progresses to the parent directory, etc.
+* The search for `markcheck-data/` starts in the directory of the Markdown file, then progresses to the parent directory, etc.
   * Its location can also be specified in the first `config:` directive in a Markdown file.
-* To test Markdown code blocks, files are written to `marktest-data/tmp/`.
-* Therefore, `marktest-data/` is a good location for non-temporary data that code blocks should have access to, such as:
+* To test Markdown code blocks, files are written to `markcheck-data/tmp/`.
+* Therefore, `markcheck-data/` is a good location for non-temporary data that code blocks should have access to, such as:
   * Modules with helper functions
   * `node_modules` with installed npm packages
 
-## How does Marktest know what to do with code blocks?
+## How does Markcheck know what to do with code blocks?
 
-Marktest writes each code block to disk and applies shell commands to it. The commands are determined by the language of the code block:
+Markcheck writes each code block to disk and applies shell commands to it. The commands are determined by the language of the code block:
 
-* You can check out the defaults via `marktest --print-config`.
-* The defaults can be changed inside Markdown files and via `marktest-data/marktest-config.jsonc`
+* You can check out the defaults via `markcheck --print-config`.
+* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.jsonc`
 
 The defaults look like this:
 
-<!--marktest skip-->
+<!--markcheck skip-->
 ```jsonc
 {
   "lang": {
@@ -89,7 +89,7 @@ These commands are the default for TypeScript:
 You can install the commands `ts-expect-error` and `tsx` in several ways:
 
 * Globally via `npm install -g`
-* Locally, e.g. inside `marktest-data/node_modules/`
+* Locally, e.g. inside `markcheck-data/node_modules/`
 * Automatically, on demand, cached locally by `npx`
 
 ## Markdown examples
@@ -98,7 +98,7 @@ You can install the commands `ts-expect-error` and `tsx` in several ways:
 
 The Node.js `assert.*` methods are available by default:
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
 ```js
 assert.equal(
@@ -110,14 +110,14 @@ assert.equal(
 
 ### Checking standard output via `stdout`
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest stdout="stdout-hello"-->
+<!--markcheck stdout="stdout-hello"-->
 ```js
 console.log('Hello!');
 ```
 
-<!--marktest id="stdout-hello"-->
+<!--markcheck id="stdout-hello"-->
 ```
 Hello!
 ```
@@ -125,9 +125,9 @@ Hello!
 
 ### Hiding code via `before:`
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest before:
+<!--markcheck before:
 function functionThatShouldThrow() {
   throw new Error();
 }
@@ -144,26 +144,26 @@ try {
 
 ### Assembling code fragments sequentially via `sequence`
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest sequence="1/3" stdout="sequence-output"-->
+<!--markcheck sequence="1/3" stdout="sequence-output"-->
 ```js
 console.log("Snippet 1/3");
 ```
 
-<!--marktest sequence="2/3"-->
+<!--markcheck sequence="2/3"-->
 ```js
 console.log("Snippet 2/3");
 ```
 
-<!--marktest sequence="3/3"-->
+<!--markcheck sequence="3/3"-->
 ```js
 console.log("Snippet 3/3");
 ```
 
 Expected output:
 
-<!--marktest id="sequence-output"-->
+<!--markcheck id="sequence-output"-->
 ```
 Snippet 1/3
 Snippet 2/3
@@ -173,9 +173,9 @@ Snippet 3/3
 
 ### Assembling code fragments out of order
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest include="step1, step2, $THIS"-->
+<!--markcheck include="step1, step2, $THIS"-->
 ```js
 steps.push('Step 3');
 
@@ -185,13 +185,13 @@ assert.deepEqual(
 );
 ```
 
-<!--marktest id="step1"-->
+<!--markcheck id="step1"-->
 ```js
 const steps = [];
 steps.push('Step 1');
 ```
 
-<!--marktest id="step2"-->
+<!--markcheck id="step2"-->
 ```js
 steps.push('Step 2');
 ```
@@ -199,16 +199,16 @@ steps.push('Step 2');
 
 ### External files
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest external="other>other.mjs"-->
+<!--markcheck external="other>other.mjs"-->
 ```js
 // main.mjs
 import { GRINNING_FACE } from './other.mjs';
 assert.equal(GRINNING_FACE, '😀');
 ```
 
-<!--marktest id="other"-->
+<!--markcheck id="other"-->
 ```js
 // other.mjs
 export const GRINNING_FACE = '😀';
@@ -221,9 +221,9 @@ Sometimes readers should not see how a file is set up or that the output is chec
 
 Setting up an external file:
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest writeInner="some-file.txt" body:
+<!--markcheck writeInner="some-file.txt" body:
 Content of some-file.txt
 -->
 
@@ -238,21 +238,21 @@ assert.equal(
 
 Checking output:
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest stdout="stdout-how-are-you"-->
+<!--markcheck stdout="stdout-how-are-you"-->
 ```js
 console.log('How are you?');
 ```
 
-<!--marktest id="stdout-how-are-you" body:
+<!--markcheck id="stdout-how-are-you" body:
 How are you?
 -->
 ``````
 
 ### Asynchronous code and hiding test code via ⎡half-brackets⎤
 
-<!--marktest containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
 ```js
 ⎡await ⎤Promise.allSettled([
@@ -274,4 +274,4 @@ How are you?
 The ⎡half-brackets⎤ are used for hiding test code from readers:
 
 * The program that processes the Markdown (e.g., converts it to HTML) must remove the half-brackets and what’s inside them.
-* Marktest only removes individual half-brackets.
+* Markcheck only removes individual half-brackets.

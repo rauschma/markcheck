@@ -1,7 +1,7 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
-import { InternalError, MarktestSyntaxError, type LineNumber, type EntityContext } from '../util/errors.js';
+import { InternalError, MarkcheckSyntaxError, type LineNumber, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 const { raw } = String;
@@ -75,7 +75,7 @@ export function parseExternalSpecs(lineNumber: number, str: string): Array<Exter
   for (const part of parts) {
     const match = RE_EXTERNAL_SPEC.exec(part);
     if (!match || !match.groups || !match.groups.fileName) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Could not parse value of attribute ${ATTR_KEY_EXTERNAL}: ${JSON.stringify(part)}`,
         { lineNumber }
       );
@@ -99,7 +99,7 @@ const RE_SPEC = re`/^(\|(?<lineModId>${RE_LABEL})=)?(?<snippetId>${RE_LABEL})$/`
 export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: string, str: string): StdStreamContentSpec {
   const match = RE_SPEC.exec(str);
   if (!match) {
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Could not parse value of attribute ${stringify(attrKey)}: ${stringify(str)}`,
       {lineNumber: directiveLineNumber}
     );
@@ -226,7 +226,7 @@ export const ATTRS_CONFIG_MOD: ExpectedAttributeValues = new Map([
 // - Use case – body label `insert:`: `at="before:'Don\'t do it!'"`
 // - Use case: `searchAndReplace="/ \/\/ \([A-Z]\)//"`
 
-const MARKTEST_MARKER = 'marktest';
+const MARKTEST_MARKER = 'markcheck';
 const RE_BODY_LABEL = re`/(?<bodyLabel>${RE_LABEL}:)/`;
 const RE_QUOTED_VALUE = re`/"(?<value>(\\.|[^"])*)"/`;
 const RE_KEY_VALUE = re`/(?<key>${RE_LABEL})([ \t]*=[ \t]*${RE_QUOTED_VALUE})?/`;
@@ -254,7 +254,7 @@ export class Directive {
       const match = RE_TOKEN.exec(firstLine);
       if (!match) {
         if (lastIndex !== firstLine.length) {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Could not parse attributes: Stopped parsing before ${stringify(firstLine.slice(lastIndex))}`,
             { lineNumber }
           );
@@ -262,7 +262,7 @@ export class Directive {
         break;
       }
       if (directive.bodyLabel !== null) {
-        throw new MarktestSyntaxError(`Body label ${JSON.stringify(directive.bodyLabel)} must come after all attributes`, { lineNumber });
+        throw new MarkcheckSyntaxError(`Body label ${JSON.stringify(directive.bodyLabel)} must come after all attributes`, { lineNumber });
       }
       assertTrue(match.groups !== undefined);
       if (match.groups.key) {
@@ -304,7 +304,7 @@ export class Directive {
     };
   }
   toString(): string {
-    let result = '<!--marktest';
+    let result = '<!--markcheck';
     for (const [k, v] of this.#attributes) {
       if (v === Valueless) {
         result += ' ' + k;
@@ -332,7 +332,7 @@ export class Directive {
   getString(key: string): null | string {
     const value = this.getAttribute(key) ?? null;
     if (value === Valueless) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Attribute ${stringify(key)} should be missing or a string but was valueless`
       );
     }
@@ -342,7 +342,7 @@ export class Directive {
     const value = this.getAttribute(key);
     if (value === undefined) return false;
     if (value === Valueless) return true;
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Attribute ${stringify(key)} should be missing or valueless but was ${stringify(value)}`
     );
   }
@@ -353,28 +353,28 @@ export class Directive {
     for (const [k, v] of this.#attributes) {
       const expectedValue = expectedAttributes.get(k);
       if (expectedValue === undefined) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `Unknown directive attribute key ${stringify(k)} (allowed are: ${Array.from(expectedAttributes.keys()).join(', ')})`,
           { lineNumber: this.lineNumber }
         );
       }
       if (expectedValue === AttrValue.Valueless) {
         if (v !== Valueless) {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Directive attribute ${stringify(k)} must be valueless`,
             { lineNumber: this.lineNumber }
           );
         }
       } else if (expectedValue === AttrValue.String) {
         if (typeof v !== 'string') {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Directive attribute ${stringify(k)} must have a string value`,
             { lineNumber: this.lineNumber }
           );
         }
       } else if (expectedValue instanceof RegExp) {
         if (typeof v !== 'string' || !expectedValue.test(v)) {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Directive attribute ${stringify(k)} has an illegal value (must be string and match ${expectedValue})`,
             { lineNumber: this.lineNumber }
           );
@@ -426,7 +426,7 @@ export class SearchAndReplaceSpec {
   static fromString(context: EntityContext, str: string): SearchAndReplaceSpec {
     const match = RE_SEARCH_AND_REPLACE.exec(str);
     if (!match) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Not a valid searchAndReplace string: ${stringify(str)}`,
         { entityContext: context }
       );

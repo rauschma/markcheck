@@ -4,7 +4,7 @@ import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { MarktestSyntaxError, contextDescription, contextLineNumber, type EntityContext } from '../util/errors.js';
+import { MarkcheckSyntaxError, contextDescription, contextLineNumber, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
@@ -13,8 +13,8 @@ import { LineMod } from './line-mod.js';
 
 const { stringify } = JSON;
 
-export type MarktestEntity = ConfigMod | Snippet | LineMod | Heading;
-export function getUserErrorContext(entity: MarktestEntity): EntityContext {
+export type MarkcheckEntity = ConfigMod | Snippet | LineMod | Heading;
+export function getUserErrorContext(entity: MarkcheckEntity): EntityContext {
   if (entity instanceof ConfigMod || entity instanceof Snippet || entity instanceof Heading) {
     return contextLineNumber(entity.lineNumber);
   } else if (entity instanceof LineMod) {
@@ -29,7 +29,7 @@ export function getUserErrorContext(entity: MarktestEntity): EntityContext {
 export function getTargetSnippet(cliState: CliState, sourceLineNumber: number, attrKey: string, targetId: string): Snippet {
   const targetSnippet = cliState.idToSnippet.get(targetId);
   if (!targetSnippet) {
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Unknown ID ${JSON.stringify(targetId)} (attribute ${stringify(attrKey)})`,
       { lineNumber: sourceLineNumber }
     );
@@ -96,7 +96,7 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
     if (applyOuterId) {
       const applyLineMod = cliState.idToLineMod.get(applyOuterId);
       if (applyLineMod === undefined) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `Attribute ${ATTR_KEY_APPLY_OUTER} contains an ID that either doesn’t exist or does not refer to a line mod`,
           { lineNumber: snippet.lineNumber }
         );
@@ -177,7 +177,7 @@ export class SingleSnippet extends Snippet {
       }
       if (runningAttributes > 1) {
         const attrs = [ATTR_KEY_SKIP, ATTR_ALWAYS_RUN, ATTR_KEY_ONLY];
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `Snippet has more than one of these attributes: ${attrs.join(', ')}`,
           { lineNumber: directive.lineNumber }
         );
@@ -294,7 +294,7 @@ export class SingleSnippet extends Snippet {
     if (langDef.kind === 'LangDefCommand' && langDef.defaultFileName !== undefined) {
       return langDef.defaultFileName;
     }
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Snippet does not have a filename: neither via config (${stringify(CONFIG_KEY_LANG)} property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}) nor via attribute ${stringify(ATTR_KEY_INTERNAL)}`,
       { lineNumber: this.lineNumber }
     );
@@ -366,11 +366,11 @@ export class SingleSnippet extends Snippet {
   #assembleOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
     if (pathOfIncludeIds.has(includeId)) {
       const idPath = [...pathOfIncludeIds, includeId];
-      throw new MarktestSyntaxError(`Cycle of includedIds ` + JSON.stringify(idPath));
+      throw new MarkcheckSyntaxError(`Cycle of includedIds ` + JSON.stringify(idPath));
     }
     const snippet = idToSnippet.get(includeId);
     if (snippet === undefined) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Snippet includes the unknown ID ${JSON.stringify(includeId)}`,
         { lineNumber: this.lineNumber }
       );
@@ -404,7 +404,7 @@ export class SingleSnippet extends Snippet {
     if (this.applyInnerId) {
       const lineMod = idToLineMod.get(this.applyInnerId);
       if (lineMod === undefined) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `Attribute ${ATTR_KEY_APPLY_INNER} contains an ID that either doesn’t exist or does not refer to a line mod`,
           { lineNumber: this.lineNumber }
         );
@@ -457,7 +457,7 @@ export class SequenceSnippet extends Snippet {
     const num = singleSnippet.sequenceNumber;
     assertNonNullable(num);
     if (num.pos !== 1) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         'First snippet in a sequence must have position 1 (1/*): ' + num,
         { lineNumber: singleSnippet.lineNumber }
       );
@@ -472,13 +472,13 @@ export class SequenceSnippet extends Snippet {
   pushElement(singleSnippet: SingleSnippet, num: SequenceNumber): void {
     assertNonNullable(num);
     if (num.total !== this.total) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Snippet has different total than current sequence (${this.total}): ${num}`,
         { lineNumber: singleSnippet.lineNumber }
       );
     }
     if (num.pos !== (this.elements.length + 1)) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Expected sequence position ${this.elements.length}, but snippet has: ${num}`,
         { lineNumber: singleSnippet.lineNumber }
       );

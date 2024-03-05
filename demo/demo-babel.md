@@ -2,7 +2,7 @@
 
 ## Installing Babel and plugins
 
-<!--marktest skip-->
+<!--markcheck skip-->
 ```json
 // package.json
 {
@@ -13,9 +13,9 @@
 }
 ```
 
-## Setting up Marktest
+## Setting up Markcheck
 
-<!--marktest config:
+<!--markcheck config:
 {
   "lang": {
     "js": {
@@ -27,11 +27,11 @@
 
 ## Configuring Babel
 
-We need to configure Babel. We use the “project-wide” configuration file `babel.config.json` because it works with both files and stdin (which Marktest may use in the future).
+We need to configure Babel. We use the “project-wide” configuration file `babel.config.json` because it works with both files and stdin (which Markcheck may use in the future).
 
 More information on Babel configuration files: https://babeljs.io/docs/en/config-files
 
-<!--marktest writeInner="babel.config.json" body:
+<!--markcheck writeInner="babel.config.json" body:
 {
   "plugins": [
     ["@babel/plugin-proposal-decorators", {"version": "2022-03"}]

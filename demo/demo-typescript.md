@@ -1,6 +1,6 @@
 # TypeScript
 
-By default, Marktest uses the following tools (which must be installed – e.g. in `marktest-data/node_modules/`):
+By default, Markcheck uses the following tools (which must be installed – e.g. in `markcheck-data/node_modules/`):
 
 * Running TypeScript: [CLI tool `tsx`](https://github.com/privatenumber/tsx)
   * Does not perform any static checks!

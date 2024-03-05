@@ -11,7 +11,7 @@ createSuite(import.meta.url);
 
 test('Insert single line at line numbers', () => {
   const readme = outdent`
-    <!--marktest at="before:2" insert:
+    <!--markcheck at="before:2" insert:
     err.stack = beautifyStackTrace(err.stack);
     -->
     ▲▲▲js
@@ -20,7 +20,7 @@ test('Insert single line at line numbers', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -28,7 +28,7 @@ test('Insert single line at line numbers', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
@@ -42,7 +42,7 @@ test('Insert single line at line numbers', () => {
 
 test('Insert multiple lines at line numbers', () => {
   const readme = outdent`
-    <!--marktest at="before:1, after:1, after:-1" insert:
+    <!--markcheck at="before:1, after:1, after:-1" insert:
     // START
     •••
     // MIDDLE
@@ -55,7 +55,7 @@ test('Insert multiple lines at line numbers', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -63,7 +63,7 @@ test('Insert multiple lines at line numbers', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
@@ -80,7 +80,7 @@ test('Insert multiple lines at line numbers', () => {
 
 test('Insert multiple lines at text fragments', () => {
   const readme = outdent`
-    <!--marktest at="before:'first', after:'first', after:'second'" insert:
+    <!--markcheck at="before:'first', after:'first', after:'second'" insert:
     // START
     •••
     // MIDDLE
@@ -93,7 +93,7 @@ test('Insert multiple lines at text fragments', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
@@ -101,7 +101,7 @@ test('Insert multiple lines at text fragments', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';

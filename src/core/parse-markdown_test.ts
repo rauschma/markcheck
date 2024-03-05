@@ -19,7 +19,7 @@ test('extractCommentContent', () => {
 
 test.only('Parsing a line mod', () => {
   const {entities} = parseMarkdown(outdent`
-    <!--marktest each="js" around:
+    <!--markcheck each="js" around:
     Line before
     •••
     Line after

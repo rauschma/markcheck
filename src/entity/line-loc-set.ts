@@ -1,7 +1,7 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
-import { InternalError, MarktestSyntaxError, type EntityContext } from '../util/errors.js';
+import { InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { ATTR_KEY_IGNORE_LINES } from './directive.js';
 import { insertParsingPos, stringifySingleQuoted, unescapeBackslashes } from './entity-helpers.js';
 
@@ -56,7 +56,7 @@ export function parseLineLocSet(directiveLineNumber: number, str: string): LineL
     const lastIndex = RE_ELEMENT.lastIndex;
     const match = RE_ELEMENT.exec(str);
     if (!match) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Could not parse line location set (attribute ${stringify(ATTR_KEY_IGNORE_LINES)}): ${insertParsingPos(str, lastIndex)}`,
         { lineNumber: directiveLineNumber }
       );
@@ -81,7 +81,7 @@ export function parseLineLocSet(directiveLineNumber: number, str: string): LineL
       if (RE_ELEMENT.lastIndex >= str.length) {
         break;
       }
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Expected a comma after an insertion condition (attribute ${stringify(ATTR_KEY_IGNORE_LINES)}): ${insertParsingPos(str, RE_ELEMENT.lastIndex)}`,
         { lineNumber: directiveLineNumber }
       );
@@ -116,7 +116,7 @@ export function lineLocSetToLineNumberSet(entityContext: EntityContext, lineLocS
       const start = lineLocToPositiveLineNumber(entityContext, lines, elem.start);
       const end = lineLocToPositiveLineNumber(entityContext, lines, elem.end);
       if (!(start <= end || start < 1 || end > lines.length)) {
-        throw new MarktestSyntaxError(
+        throw new MarkcheckSyntaxError(
           `Illegal range (attribute ${stringify(ATTR_KEY_IGNORE_LINES)}): ${lineRangeToString(elem)}`,
           { entityContext }
         );
@@ -138,7 +138,7 @@ function lineLocToPositiveLineNumber(entityContext: EntityContext, lines: Array<
     const loc = lineLoc.loc;
     const index = lines.findIndex(line => line.includes(loc));
     if (index < 0) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Could not find text fragment in lines (attribute ${stringify(ATTR_KEY_IGNORE_LINES)}): ${stringify(lineLoc.loc)}`,
         { entityContext }
       );
@@ -161,7 +161,7 @@ export function ensurePositiveLineNumber(entityContext: EntityContext, lastLineN
   }
   if (!(1 <= posLineNumber && posLineNumber <= lastLineNumber)) {
     // FIXME: mention attribute key and line number
-    throw new MarktestSyntaxError(
+    throw new MarkcheckSyntaxError(
       `Line number must be within the range [1, ${lastLineNumber}]. -1 means ${lastLineNumber} etc. (attribute ${stringify(attrKey)}): ${origLineNumber}`,
       { entityContext }
     );

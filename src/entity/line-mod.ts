@@ -2,7 +2,7 @@ import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/ts/type.js';
 import type { Translator } from '../translation/translation.js';
-import { contextLineNumber, InternalError, MarktestSyntaxError, type EntityContext } from '../util/errors.js';
+import { contextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, SearchAndReplaceSpec, type Directive } from './directive.js';
 import { parseLineLocSet, type LineLocSet, lineLocSetToLineNumberSet } from './line-loc-set.js';
@@ -69,7 +69,7 @@ export class LineMod {
     const body = trimTrailingEmptyLines(directive.body.slice());
     switch (directive.bodyLabel) {
       case null:
-        // No body label – e.g.: <!--marktest ignoreLines="1-3, 5"-->
+        // No body label – e.g.: <!--markcheck ignoreLines="1-3, 5"-->
         break;
       case BODY_LABEL_BEFORE: {
         props.beforeLines = body;
@@ -87,14 +87,14 @@ export class LineMod {
       }
       case BODY_LABEL_INSERT: {
         if (kind.tag !== 'LineModKindLocal') {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for local line mods`
           );
         }
 
         const atStr = directive.getString(ATTR_KEY_AT);
         if (atStr === null) {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but not attribute ${stringify(ATTR_KEY_AT)}`,
             { lineNumber: directive.lineNumber }
           );
@@ -102,7 +102,7 @@ export class LineMod {
         const conditions = parseInsertionConditions(directive.lineNumber, atStr);
         const lineGroups = splitInsertedLines(body);
         if (conditions.length !== lineGroups.length) {
-          throw new MarktestSyntaxError(
+          throw new MarkcheckSyntaxError(
             `Attribute ${stringify(ATTR_KEY_AT)} mentions ${conditions.length} condition(s) but the body after ${stringify(BODY_LABEL_INSERT)} has ${lineGroups.length} line group(s) (separated by ${stringify(STR_AROUND_MARKER)})`,
             { lineNumber: directive.lineNumber }
           );
@@ -263,7 +263,7 @@ export class LineMod {
 export function splitAroundLines(lineNumber: number, lines: Array<string>): { beforeLines: Array<string>; afterLines: Array<string>; } {
   const markerIndex = lines.findIndex(line => RE_AROUND_MARKER.test(line));
   if (markerIndex < 0) {
-    throw new MarktestSyntaxError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber });
+    throw new MarkcheckSyntaxError(`Missing around marker ${STR_AROUND_MARKER} in ${BODY_LABEL_AROUND} body`, { lineNumber });
   }
   return {
     beforeLines: lines.slice(0, markerIndex),

@@ -89,18 +89,18 @@ export class TestFailure extends Error {
     }
   }
 }
-//#################### MarktestSyntaxError ####################
+//#################### MarkcheckSyntaxError ####################
 
-export interface MarktestSyntaxErrorOptions {
+export interface MarkcheckSyntaxErrorOptions {
   entityContext?: EntityContext;
   lineNumber?: number;
   cause?: any;
 }
 
-export class MarktestSyntaxError extends Error {
+export class MarkcheckSyntaxError extends Error {
   override name = this.constructor.name;
   context: undefined | EntityContext;
-  constructor(message: string, opts: MarktestSyntaxErrorOptions = {}) {
+  constructor(message: string, opts: MarkcheckSyntaxErrorOptions = {}) {
     super(
       message,
       (opts.cause ? { cause: opts.cause } : undefined)

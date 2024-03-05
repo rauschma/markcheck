@@ -11,14 +11,14 @@ createSuite(import.meta.url);
 
 test('containedInFile: success', () => {
   const readme = outdent`
-    <!--marktest containedInFile="other.js" skip-->
+    <!--markcheck containedInFile="other.js" skip-->
     ▲▲▲js
     // green
     // blue
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
     '/tmp/markdown/other.js': outdent`
       // red
@@ -31,7 +31,7 @@ test('containedInFile: success', () => {
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
     }
   );
@@ -40,13 +40,13 @@ test('containedInFile: success', () => {
 
 test('containedInFile: failure', () => {
   const readme = outdent`
-    <!--marktest containedInFile="other.js" skip-->
+    <!--markcheck containedInFile="other.js" skip-->
     ▲▲▲js
     // black
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
     '/tmp/markdown/other.js': outdent`
       // red

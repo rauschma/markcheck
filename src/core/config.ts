@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
-import { ConfigurationError, MarktestSyntaxError, type EntityContext } from '../util/errors.js';
+import { ConfigurationError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -284,10 +284,10 @@ export function fillInCommandVariables(commands: Array<Array<string>>, vars: Rec
 export type ConfigModJson = {
   /**
    * Ignored by class `Config`. The first ConfigMod in a file can set the
-   * Marktest directory. By including it here, we don’t need an extra
+   * Markcheck directory. By including it here, we don’t need an extra
    * type+schema for parsing in that case.
    */
-  marktestDirectory?: string,
+  markcheckDirectory?: string,
   searchAndReplace?: Record<string, string>,
   lang?: Record<string, LangDefPartialJson>,
 };
@@ -326,7 +326,7 @@ function langDefFromJson(context: EntityContext, langDefJson: LangDefPartialJson
   if (langDefJson.translator) {
     translator = TRANSLATOR_MAP.get(langDefJson.translator);
     if (translator === undefined) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Unknown translator: ${stringify(langDefJson.translator)}`,
         { entityContext: context }
       );
@@ -383,7 +383,7 @@ export const LangDefPartialJsonSchema = z.union([
 ]);
 
 export const ConfigModJsonSchema = z.object({
-  marktestDirectory: z.optional(z.string()),
+  markcheckDirectory: z.optional(z.string()),
   searchAndReplace: z.optional(z.record(z.string())),
   lang: z.optional(
     z.record(

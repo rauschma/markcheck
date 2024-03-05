@@ -1,4 +1,4 @@
-import { MarktestSyntaxError } from '../util/errors.js';
+import { MarkcheckSyntaxError } from '../util/errors.js';
 import { ConfigMod } from './config-mod.js';
 import { ATTRS_APPLIABLE_LINE_MOD, ATTR_KEY_EACH, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, ATTRS_CONFIG_MOD, ATTRS_GLOBAL_LINE_MOD, ATTRS_SNIPPET, ATTRS_SNIPPET_BODY_LABEL_INSERT, type Directive, ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT } from './directive.js';
 import { LineMod } from './line-mod.js';
@@ -69,7 +69,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
     }
 
     default: {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Unsupported body label: ${stringify(directive.bodyLabel)}`,
         { lineNumber: directive.lineNumber }
       );

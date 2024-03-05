@@ -11,7 +11,7 @@ createSuite(import.meta.url);
 
 test('before', () => {
   const readme = outdent`
-    <!--marktest onlyLocalLines before:
+    <!--markcheck onlyLocalLines before:
     // BEFORE
     -->
     ▲▲▲js
@@ -19,14 +19,14 @@ test('before', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         // BEFORE
@@ -38,7 +38,7 @@ test('before', () => {
 
 test('after', () => {
   const readme = outdent`
-    <!--marktest onlyLocalLines after:
+    <!--markcheck onlyLocalLines after:
     // AFTER
     -->
     ▲▲▲js
@@ -46,14 +46,14 @@ test('after', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         console.log('body');
@@ -65,7 +65,7 @@ test('after', () => {
 
 test('around', () => {
   const readme = outdent`
-    <!--marktest around:
+    <!--markcheck around:
     assert.throws(
       () => {
         •••
@@ -77,14 +77,14 @@ test('around', () => {
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
-    '/tmp/marktest-data': {},
+    '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/marktest-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';

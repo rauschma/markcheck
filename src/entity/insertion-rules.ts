@@ -1,7 +1,7 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
-import { InternalError, MarktestSyntaxError, type EntityContext } from '../util/errors.js';
+import { InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { ATTR_KEY_AT } from './directive.js';
 import { insertParsingPos, unescapeBackslashes } from './entity-helpers.js';
 import { KEY_LINE_NUMBER, KEY_TEXT_FRAGMENT, RE_LINE_LOC, ensurePositiveLineNumber } from './line-loc-set.js';
@@ -65,7 +65,7 @@ export function parseInsertionConditions(directiveLineNumber: number, str: strin
     const lastIndex = RE_PART.lastIndex;
     const match = RE_PART.exec(str);
     if (!match) {
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Could not parse insertion conditions (attribute ${stringify(ATTR_KEY_AT)}): ${insertParsingPos(str, lastIndex)}`,
         {lineNumber: directiveLineNumber}
       );
@@ -96,7 +96,7 @@ export function parseInsertionConditions(directiveLineNumber: number, str: strin
       if (RE_PART.lastIndex >= str.length) {
         break;
       }
-      throw new MarktestSyntaxError(
+      throw new MarkcheckSyntaxError(
         `Expected a comma after an insertion condition (attribute ${stringify(ATTR_KEY_AT)}): ${insertParsingPos(str, RE_PART.lastIndex)}`,
         {lineNumber: directiveLineNumber}
       );
