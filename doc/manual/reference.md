@@ -180,6 +180,12 @@ Running:
 
 ## Configuration
 
+Locations:
+
+* Defaults
+* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.jsonc`
+
+
 See all defaults: `markcheck --print-config`
 
 ```md

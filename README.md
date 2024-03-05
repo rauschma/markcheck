@@ -4,7 +4,7 @@
 
 * It uses normal Markdown syntax – not a custom version of it: Everything custom happens in comments.
 * No external files: The Markdown file contains all the information that is needed to run it.
-* Works for any programming language
+* Works for any programming language.
 * You use fenced code blocks (tagged with languages) to specify code and languages.
 * Various features (all used from within Markdown files):
   * Check stderr and/or stdout.
@@ -15,36 +15,80 @@
 
 ## Trying out Markcheck without installing it
 
-<!--markcheck skip-->
+```txt
+cd markcheck/
+npx markcheck demo/demo-javascript.md
+npx markcheck demo/demo-node-repl.md
 ```
+
+For `demo-babel.md` and `demo-typescript.md`, you need to install the packages inside `markcheck/demo`:
+
+```txt
 cd markcheck/demo
-npx @rauschma/markcheck demo-javascript.md
+npm install
 ```
 
-* In this case, the `markcheck-data` directory (for temporary files, see below) is `markcheck/demo/markcheck-data/`.
-* To try Markcheck with one of your files, you only need to create a directory `markcheck-data/` (which can be empty) in an ancestor directory of the file (i.e. in its parent directory – sitting next to it, etc.).
-* If you create a `markcheck-data` directory in the directory (or an ancestor directory) of one of your Markdown files, you can try out Markcheck, too.
+## Using Markcheck for your own files
 
-You can permanently install Markcheck via:
-
-<!--markcheck skip-->
-```
-npm install -g @rauschma/markcheck
-```
-
-## The basics of using Markcheck
-
-* The following sections explain the basics of using Markcheck.
+* The remainder of this readme explains the basics of using Markcheck.
 * For more information, check [`doc/manual/`](doc/manual) and [`demo/`](demo).
 
-## The `markcheck-data` directory
+### Step 1: Creating a Markdown file
 
-* The search for `markcheck-data/` starts in the directory of the Markdown file, then progresses to the parent directory, etc.
-  * Its location can also be specified in the first `config:` directive in a Markdown file.
-* To test Markdown code blocks, files are written to `markcheck-data/tmp/`.
-* Therefore, `markcheck-data/` is a good location for non-temporary data that code blocks should have access to, such as:
-  * Modules with helper functions
-  * `node_modules` with installed npm packages
+We create the following Markdown file that we want to check with Markcheck:
+
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
+``````md
+```js
+assert.equal(
+  'abc' + 'abc',
+  'abcabc'
+);
+```
+``````
+
+* The Node.js `assert.*` methods are available by default.
+* We put the file at `/home/robin/proj/md/readme.md`
+
+### Step 2: directory `markcheck-data/`
+
+Markcheck stores the code in Markdown files in temporary files and feeds them to various shell commands. Therefore, to use it, we must provide a location for these files:
+
+* Per Markdown file, Markcheck searches for a directory `markcheck-data/`: First the file’s parent directory, then in the grand-parent directory, etc.
+* The temporary files are stored in `markcheck-data/tmp/`.
+
+Thus, for our example file, there needs to be a directory in one of these locations:
+
+```txt
+/home/robin/proj/md/markcheck-data/
+/home/robin/proj/markcheck-data/
+/home/robin/markcheck-data/
+/home/markcheck-data/
+/markcheck-data/
+```
+
+Since the code is run inside `markcheck-data/tmp/`, `markcheck-data/` itself is a good location for non-temporary data that code blocks should have access to, such as:
+
+* Modules with helper functions
+* `node_modules/` with installed npm packages
+
+### Step 3: run Markcheck
+
+Now we can run Markcheck:
+
+```txt
+npx run markcheck /home/robin/proj/md/readme.md
+```
+
+If we don’t want to use npx (which installs packages on demand and caches them locally), we can also install Markcheck somewhere:
+
+```txt
+# Local installation (e.g. inside a repository)
+npm install --save-dev markcheck
+
+# Global installation
+npm install --global markcheck
+```
 
 ## How does Markcheck know what to do with code blocks?
 
@@ -86,27 +130,13 @@ These commands are the default for TypeScript:
 ]
 ```
 
-You can install the commands `ts-expect-error` and `tsx` in several ways:
+We can install the commands `ts-expect-error` and `tsx` in several ways:
 
-* Globally via `npm install -g`
+* Automatically, cached locally by `npx`
 * Locally, e.g. inside `markcheck-data/node_modules/`
-* Automatically, on demand, cached locally by `npx`
+* Globally via `npm install -g`
 
 ## Markdown examples
-
-### Assertions
-
-The Node.js `assert.*` methods are available by default:
-
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
-``````md
-```js
-assert.equal(
-  'abc' + 'abc',
-  'abcabc'
-);
-```
-``````
 
 ### Checking standard output via `stdout`
 
