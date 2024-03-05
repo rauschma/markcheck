@@ -75,6 +75,12 @@ export class Config {
         kind: 'LangDefErrorIfRun'
       }
     );
+    this.#lang.set(
+      'md',
+      {
+        kind: 'LangDefSkip'
+      }
+    );
     // txt code blocks are always skipped
     this.#lang.set(
       'txt',
@@ -130,7 +136,7 @@ export class Config {
         kind: 'LangDefCommand',
         defaultFileName: 'main.ts',
         commands: [
-          ["npx", "@rauschma/expect-error", "--report-errors", CMD_VAR_ALL_FILE_NAMES],
+          ["npx", "ts-expect-error", "--unexpected-errors", CMD_VAR_ALL_FILE_NAMES],
           // Snippets can only check stdout & stderr of last command
           ["npx", "tsx", CMD_VAR_FILE_NAME],
         ],

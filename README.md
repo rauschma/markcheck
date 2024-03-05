@@ -2,14 +2,20 @@
 
 ## Why Marktest?
 
-* Doesn’t change Markdown syntax: Everything custom happens in comments.
+* It uses normal Markdown syntax – not a custom version of it: Everything custom happens in comments.
 * No external files: The Markdown file contains all the information that is needed to run it.
 * Works for any programming language
-* Use fenced code blocks and tags to specify code and language (some tools use indented code blocks).
-* Various features: check stderr and/or stdout, concatenate blocks in any order, use code not shown to readers, set up files on disk, etc.
+* You use fenced code blocks (tagged with languages) to specify code and languages.
+* Various features (all used from within Markdown files):
+  * Check stderr and/or stdout.
+  * Concatenate blocks in any order.
+  * Use code hidden from readers.
+  * Write arbitrary files to disk.
+  * Etc.
 
 ## Trying out Marktest without installing it
 
+<!--marktest skip-->
 ```
 cd marktest/demo
 npx @rauschma/marktest demo-javascript.md
@@ -21,6 +27,7 @@ npx @rauschma/marktest demo-javascript.md
 
 You can permanently install Marktest via:
 
+<!--marktest skip-->
 ```
 npm install -g @rauschma/marktest
 ```
@@ -32,10 +39,12 @@ npm install -g @rauschma/marktest
 
 ## The `marktest-data` directory
 
-* Search for it starts in the directory of the Markdown file, then progresses to the parent directory, etc.
+* The search for `marktest-data/` starts in the directory of the Markdown file, then progresses to the parent directory, etc.
   * Its location can also be specified in the first `config:` directive in a Markdown file.
 * To test Markdown code blocks, files are written to `marktest-data/tmp/`.
-* Therefore, `marktest-data/` is a good location of non-temporary data that code blocks should have access to, such as modules with helper functions or `node_modules` with installed npm packages.
+* Therefore, `marktest-data/` is a good location for non-temporary data that code blocks should have access to, such as:
+  * Modules with helper functions
+  * `node_modules` with installed npm packages
 
 ## How does Marktest know what to do with code blocks?
 
@@ -46,6 +55,7 @@ Marktest writes each code block to disk and applies shell commands to it. The co
 
 The defaults look like this:
 
+<!--marktest skip-->
 ```jsonc
 {
   "lang": {
@@ -65,12 +75,30 @@ The defaults look like this:
 
 `before` contains lines that are inserted at the beginning of each file that is written to disk.
 
+### How to install shell commands that are invoked via `npx`?
+
+These commands are the default for TypeScript:
+
+```json
+[
+  ["npx", "ts-expect-error", "--unexpected-errors", "$ALL_FILE_NAMES"],
+  ["npx", "tsx", "$FILE_NAME"],
+]
+```
+
+You can install the commands `ts-expect-error` and `tsx` in several ways:
+
+* Globally via `npm install -g`
+* Locally, e.g. inside `marktest-data/node_modules/`
+* Automatically, on demand, cached locally by `npx`
+
 ## Markdown examples
 
 ### Assertions
 
 The Node.js `assert.*` methods are available by default:
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
 ```js
 assert.equal(
@@ -82,13 +110,14 @@ assert.equal(
 
 ### Checking standard output via `stdout`
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest stdout="output"-->
+<!--marktest stdout="stdout-hello"-->
 ```js
 console.log('Hello!');
 ```
 
-<!--marktest id="output"-->
+<!--marktest id="stdout-hello"-->
 ```
 Hello!
 ```
@@ -96,6 +125,7 @@ Hello!
 
 ### Hiding code via `before:`
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
 <!--marktest before:
 function functionThatShouldThrow() {
@@ -114,6 +144,7 @@ try {
 
 ### Assembling code fragments sequentially via `sequence`
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
 <!--marktest sequence="1/3" stdout="sequence-output"-->
 ```js
@@ -142,6 +173,7 @@ Snippet 3/3
 
 ### Assembling code fragments out of order
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
 <!--marktest include="step1, step2, $THIS"-->
 ```js
@@ -167,6 +199,7 @@ steps.push('Step 2');
 
 ### External files
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
 <!--marktest external="other>other.mjs"-->
 ```js
@@ -188,6 +221,7 @@ Sometimes readers should not see how a file is set up or that the output is chec
 
 Setting up an external file:
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
 <!--marktest writeInner="some-file.txt" body:
 Content of some-file.txt
@@ -204,19 +238,21 @@ assert.equal(
 
 Checking output:
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--marktest stdout="output-how-are-you"-->
+<!--marktest stdout="stdout-how-are-you"-->
 ```js
 console.log('How are you?');
 ```
 
-<!--marktest id="output-how-are-you" body:
+<!--marktest id="stdout-how-are-you" body:
 How are you?
 -->
 ``````
 
 ### Asynchronous code and hiding test code via ⎡half-brackets⎤
 
+<!--marktest containedInFile="demo/demo-javascript.md"-->
 ``````md
 ```js
 ⎡await ⎤Promise.allSettled([
@@ -237,5 +273,5 @@ How are you?
 
 The ⎡half-brackets⎤ are used for hiding test code from readers:
 
-* The program that publishes the Markdown must remove the half-brackets and what’s inside them.
+* The program that processes the Markdown (e.g., converts it to HTML) must remove the half-brackets and what’s inside them.
 * Marktest only removes individual half-brackets.

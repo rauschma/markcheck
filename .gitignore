@@ -1,5 +1,5 @@
 dist
-# Also matches demo/marktest-data/node_modules
+# Also matches marktest-data/node_modules
 node_modules
 .DS_Store
-demo/marktest-data/tmp
+marktest-data/tmp
