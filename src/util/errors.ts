@@ -10,37 +10,51 @@ export const STATUS_EMOJI_FAILURE = '❌';
 
 export type LineNumber = number;
 
-export type EntityContext = EntityContextLineNumber | EntityContextDescription;
-export function describeUserErrorContext(context: EntityContext): string {
-  switch (context.kind) {
-    case 'EntityContextDescription':
-      return context.description;
-    case 'EntityContextLineNumber':
-      return `line ${context.lineNumber}`;
-    default:
-      throw new UnsupportedValueError(context);
-  }
-}
-
+export type EntityContext = EntityContextSnippet | EntityContextLineNumber | EntityContextDescription;
+export type EntityContextSnippet = {
+  kind: 'EntityContextSnippet',
+  lineNumber: number,
+  lang: string,
+};
 export type EntityContextLineNumber = {
   kind: 'EntityContextLineNumber',
   lineNumber: number,
 };
+export type EntityContextDescription = {
+  kind: 'EntityContextDescription',
+  description: string,
+};
+
+export function contextSnippet(lineNumber: number, lang: string): EntityContextSnippet {
+  return {
+    kind: 'EntityContextSnippet',
+    lineNumber,
+    lang,
+  };
+}
 export function contextLineNumber(lineNumber: number): EntityContextLineNumber {
   return {
     kind: 'EntityContextLineNumber',
     lineNumber,
   };
 }
-export type EntityContextDescription = {
-  kind: 'EntityContextDescription',
-  description: string,
-};
 export function contextDescription(description: string): EntityContextDescription {
   return {
     kind: 'EntityContextDescription',
     description,
   };
+}
+export function describeEntityContext(context: EntityContext): string {
+  switch (context.kind) {
+    case 'EntityContextDescription':
+      return context.description;
+    case 'EntityContextLineNumber':
+      return `L${context.lineNumber}`;
+    case 'EntityContextSnippet':
+      return `L${context.lineNumber} (${context.lang})`;
+    default:
+      throw new UnsupportedValueError(context);
+  }
 }
 
 //#################### TestFailure ####################
@@ -84,21 +98,12 @@ export class TestFailure extends Error {
     this.actualStderrLines = opts[PROP_STDERR]?.actualLines;
     this.expectedStderrLines = opts[PROP_STDERR]?.expectedLines;
   }
-  logTo(out: Output, prefix = ''): void {
-    const description = (
-      this.context
-        ? describeUserErrorContext(this.context)
-        : 'unknown context'
-    );
-    out.writeLine(`${prefix}[${description}] ${this.message}`);
-    if (this.stack) {
-      out.writeLine(this.stack);
-    }
-  }
 }
+
 //#################### MarkcheckSyntaxError ####################
 
 export interface MarkcheckSyntaxErrorOptions {
+  entity?: { getEntityContext(): EntityContext };
   entityContext?: EntityContext;
   lineNumber?: number;
   cause?: any;
@@ -112,7 +117,9 @@ export class MarkcheckSyntaxError extends Error {
       message,
       (opts.cause ? { cause: opts.cause } : undefined)
     );
-    if (opts.entityContext) {
+    if (opts.entity) {
+      this.context = opts.entity.getEntityContext();
+    } else if (opts.entityContext) {
       this.context = opts.entityContext;
     } else if (opts.lineNumber) {
       this.context = {
@@ -124,7 +131,7 @@ export class MarkcheckSyntaxError extends Error {
   logTo(out: Output, prefix = ''): void {
     const description = (
       this.context
-        ? describeUserErrorContext(this.context)
+        ? describeEntityContext(this.context)
         : 'unknown context'
     );
     out.writeLine(`${prefix}[${description}] ${this.message}`);
@@ -158,7 +165,7 @@ export class Output {
     return new Output((str) => writeStream.write(str));
   }
   static ignore(): Output {
-    return new Output((_str) => {});
+    return new Output((_str) => { });
   }
   #write;
   constructor(write: (str: string) => void) {

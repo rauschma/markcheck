@@ -4,30 +4,18 @@ import { type JsonValue } from '@rauschma/helpers/ts/json.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { MarkcheckSyntaxError, contextDescription, contextLineNumber, type EntityContext } from '../util/errors.js';
+import { MarkcheckSyntaxError, contextDescription, contextSnippet, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
-import { ConfigMod } from './config-mod.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
-import { Heading } from './heading.js';
 import { LineMod } from './line-mod.js';
+import { MarkcheckEntity } from './markcheck-entity.js';
 
 const { stringify } = JSON;
 
-export type MarkcheckEntity = ConfigMod | Snippet | LineMod | Heading;
-export function getUserErrorContext(entity: MarkcheckEntity): EntityContext {
-  if (entity instanceof ConfigMod || entity instanceof Snippet || entity instanceof Heading) {
-    return contextLineNumber(entity.lineNumber);
-  } else if (entity instanceof LineMod) {
-    return entity.context;
-  } else {
-    throw new UnsupportedValueError(entity);
-  }
-}
-
 //#################### Assembling lines ####################
 
-export function getTargetSnippet(cliState: CliState, sourceLineNumber: number, attrKey: string, targetId: string): Snippet {
-  const targetSnippet = cliState.idToSnippet.get(targetId);
+export function getTargetSnippet(fileState: FileState, sourceLineNumber: number, attrKey: string, targetId: string): Snippet {
+  const targetSnippet = fileState.idToSnippet.get(targetId);
   if (!targetSnippet) {
     throw new MarkcheckSyntaxError(
       `Unknown ID ${JSON.stringify(targetId)} (attribute ${stringify(attrKey)})`,
@@ -37,14 +25,14 @@ export function getTargetSnippet(cliState: CliState, sourceLineNumber: number, a
   return targetSnippet;
 }
 
-export function assembleOuterLinesForId(cliState: CliState, config: Config, sourceLineNumber: number, attrKey: string, targetId: string): Array<string> {
-  const targetSnippet = getTargetSnippet(cliState, sourceLineNumber, attrKey, targetId);
-  return assembleOuterLines(cliState, config, targetSnippet);
+export function assembleOuterLinesForId(fileState: FileState, config: Config, sourceLineNumber: number, attrKey: string, targetId: string): Array<string> {
+  const targetSnippet = getTargetSnippet(fileState, sourceLineNumber, attrKey, targetId);
+  return assembleOuterLines(fileState, config, targetSnippet);
 }
 
-export function assembleInnerLines(cliState: CliState, config: Config, snippet: Snippet): Array<string> {
+export function assembleInnerLines(fileState: FileState, config: Config, snippet: Snippet): Array<string> {
   const lines = new Array<string>();
-  snippet.assembleInnerLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
+  snippet.assembleInnerLines(config, fileState.idToSnippet, fileState.idToLineMod, lines, new Set());
   return lines;
 }
 
@@ -54,7 +42,7 @@ export function assembleInnerLines(cliState: CliState, config: Config, snippet: 
  * - Language LineMod
  * - Config before lines
  */
-export function assembleOuterLines(cliState: CliState, config: Config, snippet: Snippet) {
+export function assembleOuterLines(fileState: FileState, config: Config, snippet: Snippet) {
   const lines = new Array<string>();
 
   const outerLineMods = collectOuterLineMods(snippet.onlyLocalLines);
@@ -69,7 +57,7 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
   //   - Includes
   // - SequenceSnippet:
   //   - Lines of sequence elements, concatenated
-  snippet.assembleInnerLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
+  snippet.assembleInnerLines(config, fileState.idToSnippet, fileState.idToLineMod, lines, new Set());
   for (let i = outerLineMods.length - 1; i >= 0; i--) {
     outerLineMods[i].pushAfterLines(lines);
   }
@@ -91,7 +79,7 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
           );
         }
       }
-      const languageLineMods = cliState.languageLineMods.get(snippet.lang);
+      const languageLineMods = fileState.languageLineMods.get(snippet.lang);
       if (languageLineMods) {
         outerLineMods.push(...languageLineMods);
       }
@@ -101,7 +89,7 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
     // the snippet)
     const applyOuterId = snippet.applyToOuterId;
     if (applyOuterId) {
-      const applyLineMod = cliState.idToLineMod.get(applyOuterId);
+      const applyLineMod = fileState.idToLineMod.get(applyOuterId);
       if (applyLineMod === undefined) {
         throw new MarkcheckSyntaxError(
           `Attribute ${ATTR_KEY_APPLY_TO_OUTER} contains an ID that either doesn’t exist or does not refer to a line mod`,
@@ -116,7 +104,11 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
 
 //#################### Snippet ####################
 
-export abstract class Snippet {
+export abstract class Snippet extends MarkcheckEntity {
+  override getEntityContext(): EntityContext {
+    return contextSnippet(this.lineNumber, this.lang);
+  }
+
   abstract get lineNumber(): number;
   //
   abstract get id(): null | string;
@@ -636,7 +628,7 @@ export function snippetJson(partial: Partial<SingleSnippetJson>): SingleSnippetJ
   };
 }
 
-//========== CliState ==========
+//========== FileState ==========
 
 export type MockShellData = {
   interceptedCommands: Array<string>,
@@ -656,7 +648,7 @@ export type CommandResult = {
   signal: NodeJS.Signals | null,
 };
 
-export type CliState = {
+export type FileState = {
   absFilePath: string;
   tmpDir: string;
   logLevel: LogLevel;

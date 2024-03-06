@@ -1,8 +1,7 @@
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync, ensureParentDirectory } from '@rauschma/helpers/nodejs/file.js';
 import { style } from '@rauschma/helpers/nodejs/text-style.js';
-import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import { assertTrue } from '@rauschma/helpers/ts/type.js';
 import json5 from 'json5';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
@@ -13,9 +12,10 @@ import { ConfigMod } from '../entity/config-mod.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, type StdStreamContentSpec } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type CommandResult, type MarkcheckEntity, type MockShellData } from '../entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, type CommandResult, type FileState, type MockShellData } from '../entity/snippet.js';
+import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
-import { ConfigurationError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
+import { ConfigurationError, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
@@ -29,11 +29,6 @@ const MARKTEST_DIR_NAME = 'markcheck-data';
 const MARKTEST_TMP_DIR_NAME = 'tmp';
 const CONFIG_FILE_NAME = 'markcheck-config.jsonc';
 const { stringify } = JSON;
-
-enum EntityKind {
-  Runnable,
-  NonRunnable,
-}
 
 //#################### runParsedMarkdown() ####################
 
@@ -65,7 +60,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     );
   }
 
-  const cliState: CliState = {
+  const fileState: FileState = {
     absFilePath,
     tmpDir,
     logLevel,
@@ -80,26 +75,51 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
   let prevHeading: null | Heading = null;
   for (const entity of parsedMarkdown.entities) {
     try {
-      const entityKind = handleOneEntity(out, cliState, config, prevHeading, entity);
+      const snippetState: SnippetState = {
+        checksWerePerformed: false,
+        verboseLines: []
+      };
+      handleOneEntity(out, fileState, config, snippetState, entity);
       if (entity instanceof Heading) {
         prevHeading = entity; // update
-      } else if (entityKind === EntityKind.Runnable) {
-        // If an entity was run, it printed the most recent heading,
-        // therefore “using it up”.
-        prevHeading = null; // clear
+      } else {
+        if (snippetState.checksWerePerformed) {
+          if (prevHeading) {
+            out.writeLine(style.Bold(prevHeading.content));
+            prevHeading = null; // used, not write again
+          }
+          const description = describeEntityContext(entity.getEntityContext());
+          out.writeLine(`${description} ${STATUS_EMOJI_SUCCESS}`);
+        }
+        if (snippetState.verboseLines.length > 0) {
+          for (const line of snippetState.verboseLines) {
+            out.writeLine(line);
+          }
+        }
       }
     } catch (err) {
+      if (prevHeading) {
+        out.writeLine(style.Bold(prevHeading.content));
+        prevHeading = null; // used, not write again
+      }
+      const description = describeEntityContext(entity.getEntityContext());
+      out.writeLine(`${description} ${STATUS_EMOJI_FAILURE}`);
+
       if (err instanceof MarkcheckSyntaxError) {
-        cliState.statusCounts.syntaxErrors++;
-        err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
+        fileState.statusCounts.syntaxErrors++;
+        out.writeLine(err.message);
       } else if (err instanceof TestFailure) {
-        cliState.statusCounts.testFailures++;
-        err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
+        fileState.statusCounts.testFailures++;
+        out.writeLine(err.message);
+        if (err.actualStdoutLines) {
+          logStd(out, 'stdout', err.actualStdoutLines, err.expectedStdoutLines);
+        }
+        if (err.actualStderrLines) {
+          logStd(out, 'stderr', err.actualStderrLines, err.expectedStderrLines);
+        }
       } else {
-        const description = describeUserErrorContext(
-          getUserErrorContext(entity)
-        );
-        throw new Error(`Unexpected error in entity (${description})`, { cause: err });
+        const description = describeEntityContext(entity.getEntityContext());
+        throw new Error(`Unexpected error in an entity (${description})`, { cause: err });
       }
     }
   }
@@ -107,7 +127,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
   checkLineModIds(parsedMarkdown, out, statusCounts);
 }
 
-function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCounts: StatusCounts) {
+function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCounts: StatusCounts): void {
   {
     const declaredIds = new Set<string>();
     const referencedIds = new Set<string>();
@@ -208,38 +228,36 @@ function findMarkcheckDir(absFilePath: string, entities: Array<MarkcheckEntity>)
   );
 }
 
-function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, entity: MarkcheckEntity): EntityKind {
+function handleOneEntity(out: Output, fileState: FileState, config: Config, snippetState: SnippetState, entity: MarkcheckEntity): void {
   if (entity instanceof ConfigMod) {
     config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
-    return EntityKind.NonRunnable;
   } else if (entity instanceof LineMod) {
     const targetLanguage = entity.getTargetLanguage();
     if (targetLanguage !== undefined) {
-      let lineModArr = cliState.languageLineMods.get(targetLanguage);
+      let lineModArr = fileState.languageLineMods.get(targetLanguage);
       if (!lineModArr) {
         lineModArr = [];
-        cliState.languageLineMods.set(targetLanguage, lineModArr);
+        fileState.languageLineMods.set(targetLanguage, lineModArr);
       }
       lineModArr.push(entity);
     }
-    return EntityKind.NonRunnable;
   } else if (entity instanceof Snippet) {
-    return handleSnippet(out, cliState, config, prevHeading, entity);
+    handleSnippet(fileState, config, snippetState, entity);
   } else if (entity instanceof Heading) {
     // Ignore
-    return EntityKind.NonRunnable;
   } else {
-    throw new UnsupportedValueError(entity);
+    throw new InternalError();
   }
 }
 
-function handleSnippet(out: Output, cliState: CliState, config: Config, prevHeading: null | Heading, snippet: Snippet): EntityKind {
+function handleSnippet(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet): void {
 
   //----- Checks -----
 
   if (snippet.containedInFile) {
-    const innerLines = assembleInnerLines(cliState, config, snippet);
-    const pathName = path.resolve(cliState.absFilePath, '..', snippet.containedInFile);
+    snippetState.checksWerePerformed = true;
+    const innerLines = assembleInnerLines(fileState, config, snippet);
+    const pathName = path.resolve(fileState.absFilePath, '..', snippet.containedInFile);
     if (!fs.existsSync(pathName)) {
       throw new MarkcheckSyntaxError(
         `Path of attribute ${stringify(ATTR_KEY_CONTAINED_IN_FILE)} does not exist: ${stringify(pathName)}`,
@@ -256,9 +274,10 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
   }
 
   if (snippet.sameAsId) {
-    const innerLines = assembleInnerLines(cliState, config, snippet);
-    const otherSnippet = getTargetSnippet(cliState, snippet.lineNumber, ATTR_KEY_SAME_AS_ID, snippet.sameAsId);
-    const otherLines = assembleInnerLines(cliState, config, otherSnippet);
+    snippetState.checksWerePerformed = true;
+    const innerLines = assembleInnerLines(fileState, config, snippet);
+    const otherSnippet = getTargetSnippet(fileState, snippet.lineNumber, ATTR_KEY_SAME_AS_ID, snippet.sameAsId);
+    const otherLines = assembleInnerLines(fileState, config, otherSnippet);
     if (!linesAreSame(innerLines, otherLines)) {
       throw new TestFailure(
         `Content of snippet is not same as content of snippet ${stringify(snippet.sameAsId)} (line ${otherSnippet.lineNumber})`,
@@ -271,22 +290,22 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
 
   const writeOuter: null | string = snippet.writeOuter;
   if (writeOuter) {
-    const lines = assembleOuterLines(cliState, config, snippet);
-    writeOneFile(out, cliState, config, writeOuter, lines);
-    return EntityKind.NonRunnable;
+    const lines = assembleOuterLines(fileState, config, snippet);
+    writeOneFile(fileState, config, snippetState, writeOuter, lines);
+    return;
   }
   const writeInner: null | string = snippet.writeInner;
   if (writeInner) {
-    const lines = assembleOuterLines(cliState, config, snippet);
-    writeOneFile(out, cliState, config, writeInner, lines);
-    return EntityKind.NonRunnable;
+    const lines = assembleOuterLines(fileState, config, snippet);
+    writeOneFile(fileState, config, snippetState, writeInner, lines);
+    return;
   }
 
   //----- Skipping -----
 
   // Explicitly skipped
-  if (!snippet.isRun(cliState.globalRunningMode)) {
-    return EntityKind.NonRunnable;
+  if (!snippet.isRun(fileState.globalRunningMode)) {
+    return;
   }
   const langDef = config.getLang(snippet.lang);
   if (langDef === undefined) {
@@ -296,7 +315,7 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     );
   }
   if (langDef.kind === 'LangDefSkip') {
-    return EntityKind.NonRunnable;
+    return;
   }
   if (langDef.kind === 'LangDefErrorIfRun') {
     throw new MarkcheckSyntaxError(
@@ -308,8 +327,8 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
   //----- Running -----
 
   const fileName = snippet.getInternalFileName(langDef);
-  const lines = assembleOuterLines(cliState, config, snippet);
-  writeFiles(out, cliState, config, snippet, fileName, lines);
+  const lines = assembleOuterLines(fileState, config, snippet);
+  writeFilesForRunning(fileState, config, snippetState, snippet, fileName, lines);
 
   assertTrue(langDef.kind === 'LangDefCommand');
   if (!langDef.commands) {
@@ -319,28 +338,28 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
     );
   }
   if (langDef.commands.length > 0) {
-    handleSnippetWithCommands(out, config, cliState, prevHeading, snippet, langDef, fileName, langDef.commands);
-    return EntityKind.Runnable;
+    // Running a file is at least one check.
+    snippetState.checksWerePerformed = true;
+    runShellCommands(fileState, config, snippetState, snippet, langDef, fileName, langDef.commands);
   }
-  return EntityKind.NonRunnable;
 }
 
 //#################### writeFiles() ####################
 
-function writeFiles(out: Output, cliState: CliState, config: Config, snippet: Snippet, fileName: string, lines: Array<string>): void {
-  writeOneFile(out, cliState, config, fileName, lines);
+function writeFilesForRunning(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, fileName: string, lines: Array<string>): void {
+  writeOneFile(fileState, config, snippetState, fileName, lines);
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
-    const lines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL, id);
-    writeOneFile(out, cliState, config, fileName, lines);
+    const lines = assembleOuterLinesForId(fileState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL, id);
+    writeOneFile(fileState, config, snippetState, fileName, lines);
   }
 }
 
-function writeOneFile(out: Output, cliState: CliState, config: Config, fileName: string, lines: Array<string>) {
-  const filePath = path.resolve(cliState.tmpDir, fileName);
-  if (cliState.logLevel === LogLevel.Verbose) {
-    out.writeLine('Write ' + filePath);
+function writeOneFile(fileState: FileState, config: Config, snippetState: SnippetState, fileName: string, lines: Array<string>) {
+  const filePath = path.resolve(fileState.tmpDir, fileName);
+  if (fileState.logLevel === LogLevel.Verbose) {
+    snippetState.verboseLines.push('Write ' + filePath);
   }
   let content = lines.join(os.EOL);
   content = config.searchAndReplaceFunc(content);
@@ -348,79 +367,44 @@ function writeOneFile(out: Output, cliState: CliState, config: Config, fileName:
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-//#################### handleSnippetWithCommands() ####################
+//#################### runShellCommands() ####################
 
-function handleSnippetWithCommands(out: Output, config: Config, cliState: CliState, prevHeading: Heading | null, snippet: Snippet, langDef: LangDefCommand, fileName: string, commands: Array<Array<string>>) {
-  if (prevHeading) {
-    out.writeLine(style.Bold(prevHeading.content));
-  }
-  // With verbose output, there will be printed text before we could
-  // print the status emoji. That is, it wouldn’t appear in the same line.
-  // That’s why we don’t print it at all in this case.
-  const printStatusEmoji = (cliState.logLevel === LogLevel.Normal);
-  out.write(`L${snippet.lineNumber} (${snippet.lang})`);
-  if (!printStatusEmoji) {
-    out.writeLine();
-  }
-  try {
-    runShellCommands(out, cliState, config, snippet, langDef, fileName, commands);
-    if (printStatusEmoji) {
-      out.writeLine(' ' + STATUS_EMOJI_SUCCESS);
-    }
-  } catch (err) {
-    if (err instanceof TestFailure) {
-      cliState.statusCounts.testFailures++;
-      if (printStatusEmoji) {
-        out.writeLine(' ' + STATUS_EMOJI_FAILURE);
-      }
-      if (err.actualStdoutLines) {
-        logStdout(out, err.actualStdoutLines, err.expectedStdoutLines);
-      }
-      if (err.actualStderrLines) {
-        logStderr(out, err.actualStderrLines, err.expectedStderrLines);
-      }
-    } else {
-      throw err;
-    }
-  }
-}
-
-function runShellCommands(out: Output, cliState: CliState, config: Config, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
+function runShellCommands(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
   const commands: Array<Array<string>> = fillInCommandVariables(commandsWithVars, {
     [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });
   for (const [index, commandParts] of commands.entries()) {
     const isLastCommand = (index === commands.length - 1);
-    if (cliState.logLevel === LogLevel.Verbose) {
-      out.writeLine(commandParts.join(' '));
+    if (fileState.logLevel === LogLevel.Verbose) {
+      snippetState.verboseLines.push(commandParts.join(' '));
     }
 
-    if (cliState.mockShellData) {
-      cliState.mockShellData.interceptedCommands.push(
+    if (fileState.mockShellData) {
+      fileState.mockShellData.interceptedCommands.push(
         commandParts.join(' ')
       );
-      const lastCommandResult = cliState.mockShellData.lastCommandResult;
+      const lastCommandResult = fileState.mockShellData.lastCommandResult;
       if (isLastCommand && lastCommandResult) {
-        checkShellCommandResult(cliState, config, snippet, lastCommandResult, isLastCommand);
+        checkShellCommandResult(fileState, config, snippet, lastCommandResult, isLastCommand);
       }
     } else {
       const [command, ...args] = commandParts;
       const spawnResult = child_process.spawnSync(command, args, {
         shell: true,
-        cwd: cliState.tmpDir,
+        cwd: fileState.tmpDir,
         encoding: 'utf-8',
       });
       if (spawnResult.error) {
         // Spawning didn’t work
         throw spawnResult.error;
       }
-      checkShellCommandResult(cliState, config, snippet, spawnResult, isLastCommand);
+      checkShellCommandResult(fileState, config, snippet, spawnResult, isLastCommand);
     }
   }
 }
 
-function checkShellCommandResult(cliState: CliState, config: Config, snippet: Snippet, commandResult: CommandResult, isLastCommand: boolean): void {
+function checkShellCommandResult(fileState: FileState, config: Config, snippet: Snippet, commandResult: CommandResult, isLastCommand: boolean): void {
   const stdoutLines = splitLinesExclEol(commandResult.stdout);
   trimTrailingEmptyLines(stdoutLines);
   const stderrLines = splitLinesExclEol(commandResult.stderr);
@@ -446,31 +430,31 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
   // stdout & stderr content are only checked for the last command
   if (!isLastCommand) return;
 
-  if (snippet.exitStatus) {
-    if (snippet.exitStatus === 'nonzero' && commandResult.status === 0) {
-      throw new TestFailure(
-        'Expected nonzero exit status but it was zero',
-        testFailureProps
-      );
-    }
-    if (typeof snippet.exitStatus === 'number' && snippet.exitStatus !== commandResult.status) {
-      throw new TestFailure(
-        `Expected exit status ${snippet.exitStatus} but it was ${commandResult.status}`,
-        testFailureProps
-      );
-    }
+  const expectedExitStatus = snippet.exitStatus ?? 0;
+  if (expectedExitStatus === 'nonzero' && commandResult.status === 0) {
+    throw new TestFailure(
+      'Expected nonzero exit status but it was zero',
+      testFailureProps
+    );
   }
+  if (typeof expectedExitStatus === 'number' && expectedExitStatus !== commandResult.status) {
+    throw new TestFailure(
+      `Expected exit status ${expectedExitStatus} but it was ${commandResult.status}`,
+      testFailureProps
+    );
+  }
+
   if (snippet.stdoutSpec) {
-    compareStdStreamLines('Stdout', config, cliState, snippet, snippet.stdoutSpec, stdoutLines, ATTR_KEY_STDOUT, PROP_STDOUT);
+    compareStdStreamLines('Stdout', config, fileState, snippet, snippet.stdoutSpec, stdoutLines, ATTR_KEY_STDOUT, PROP_STDOUT);
   }
   if (snippet.stderrSpec) {
-    compareStdStreamLines('Stderr', config, cliState, snippet, snippet.stderrSpec, stderrLines, ATTR_KEY_STDERR, PROP_STDERR);
+    compareStdStreamLines('Stderr', config, fileState, snippet, snippet.stderrSpec, stderrLines, ATTR_KEY_STDERR, PROP_STDERR);
   }
 }
 
-function compareStdStreamLines(stdStreamName: string, config: Config, cliState: CliState, snippet: Snippet, expectedContentSpec: StdStreamContentSpec, actualLines: Array<string>, attrKey: typeof ATTR_KEY_STDOUT | typeof ATTR_KEY_STDERR, failurePropKey: typeof PROP_STDERR | typeof PROP_STDOUT): void {
+function compareStdStreamLines(stdStreamName: string, config: Config, fileState: FileState, snippet: Snippet, expectedContentSpec: StdStreamContentSpec, actualLines: Array<string>, attrKey: typeof ATTR_KEY_STDOUT | typeof ATTR_KEY_STDERR, failurePropKey: typeof PROP_STDERR | typeof PROP_STDOUT): void {
   if (expectedContentSpec.lineModId) {
-    const lineMod = cliState.idToLineMod.get(expectedContentSpec.lineModId);
+    const lineMod = fileState.idToLineMod.get(expectedContentSpec.lineModId);
     if (lineMod === undefined) {
       throw new MarkcheckSyntaxError(
         `Could not find LineMod with id ${stringify(expectedContentSpec.lineModId)} (attribute ${stringify(attrKey)})`
@@ -481,7 +465,7 @@ function compareStdStreamLines(stdStreamName: string, config: Config, cliState: 
     actualLines = tmpLines;
   }
 
-  const expectedLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, attrKey, expectedContentSpec.snippetId);
+  const expectedLines = assembleOuterLinesForId(fileState, config, snippet.lineNumber, attrKey, expectedContentSpec.snippetId);
   trimTrailingEmptyLines(expectedLines);
   if (!areLinesEqual(expectedLines, actualLines)) {
     throw new TestFailure(
@@ -496,14 +480,16 @@ function compareStdStreamLines(stdStreamName: string, config: Config, cliState: 
   }
 }
 
+//#################### Helpers ####################
+
+type SnippetState = {
+  checksWerePerformed: boolean,
+  verboseLines: Array<string>,
+};
+
+
 //#################### Logging helpers ####################
 
-function logStdout(out: Output, stdoutLines: Array<string>, expectedLines?: Array<string>): void {
-  logStd(out, 'stdout', stdoutLines, expectedLines);
-}
-function logStderr(out: Output, stderrLines: Array<string>, expectedLines?: Array<string>): void {
-  logStd(out, 'stderr', stderrLines, expectedLines);
-}
 function logStd(out: Output, name: string, actualLines: Array<string>, expectedLines?: Array<string>): void {
   if (expectedLines === undefined && actualLines.length === 0) {
     return;
@@ -593,9 +579,6 @@ export function cliEntry() {
     } catch (err) {
       if (err instanceof MarkcheckSyntaxError) {
         statusCounts.syntaxErrors++;
-        err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
-      } else if (err instanceof TestFailure) {
-        statusCounts.testFailures++;
         err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
       } else {
         throw new Error(`Unexpected error in file ${stringify(relFilePath)}`, { cause: err });

@@ -6,8 +6,9 @@ import { directiveToEntity } from '../entity/directive-to-entity.js';
 import { Directive } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
-import { SequenceSnippet, SingleSnippet, Snippet, type MarkcheckEntity } from '../entity/snippet.js';
-import { MarkcheckSyntaxError, describeUserErrorContext } from '../util/errors.js';
+import { SequenceSnippet, SingleSnippet, Snippet } from '../entity/snippet.js';
+import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
+import { MarkcheckSyntaxError, describeEntityContext } from '../util/errors.js';
 
 export type ParsedMarkdown = {
   entities: Array<MarkcheckEntity>,
@@ -195,7 +196,7 @@ function createIdToLineMod(entities: Array<MarkcheckEntity>): Map<string, LineMo
       if (lineModId) {
         const other = idToLineMod.get(lineModId);
         if (other) {
-          const description = describeUserErrorContext(other.context);
+          const description = describeEntityContext(other.context);
           throw new MarkcheckSyntaxError(
             `Duplicate id ${JSON.stringify(entity)} (other usage is ${description})`,
             { entityContext: entity.context }

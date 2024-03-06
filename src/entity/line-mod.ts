@@ -5,8 +5,9 @@ import type { Translator } from '../translation/translation.js';
 import { contextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, SearchAndReplaceSpec, type Directive } from './directive.js';
-import { parseLineLocSet, type LineLocSet, lineLocSetToLineNumberSet } from './line-loc-set.js';
 import { InsertionRules, LineLocModifier, parseInsertionConditions } from './insertion-rules.js';
+import { lineLocSetToLineNumberSet, parseLineLocSet, type LineLocSet } from './line-loc-set.js';
+import { MarkcheckEntity } from './markcheck-entity.js';
 
 const { stringify } = JSON;
 
@@ -50,7 +51,7 @@ function emptyLineModProps(context: EntityContext): LineModProps {
   };
 }
 
-export class LineMod {
+export class LineMod extends MarkcheckEntity {
   static parse(directive: Directive, kind: LineModKind): LineMod {
     const context = contextLineNumber(directive.lineNumber);
     const props = emptyLineModProps(context);
@@ -142,6 +143,7 @@ export class LineMod {
   afterLines: Array<string>;
 
   private constructor(kind: LineModKind, props: LineModProps) {
+    super();
     this.#kind = kind;
     this.context = props.context;
     //
@@ -151,6 +153,9 @@ export class LineMod {
     this.insertionRules = props.insertionRules;
     this.beforeLines = props.beforeLines;
     this.afterLines = props.afterLines;
+  }
+  override getEntityContext(): EntityContext {
+    return this.context;
   }
   isEmpty(): boolean {
     return (
