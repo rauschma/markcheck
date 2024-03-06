@@ -63,7 +63,7 @@ test('Assemble snippet with body LineMod', () => {
 
   const mockShellData = emptyMockShellData();
   assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, mockShellData).getTotalCount(),
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
     0
   );
   // Per file: config lines, language LineMods
@@ -147,7 +147,7 @@ test('Assemble snippet with applyToBody LineMod', () => {
 
   const mockShellData = emptyMockShellData();
   assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, mockShellData).getTotalCount(),
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
     0
   );
   // Per file: config lines, language LineMods

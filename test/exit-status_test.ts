@@ -10,21 +10,12 @@ const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('stdout: success', () => {
+test('exitStatus: expecting 0 fails if actual is 1', () => {
   const readme = outdent`
-    <!--markcheck stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
+    <!--markcheck exitStatus="0" onlyLocalLines-->
     ▲▲▲js
-    console.log('red');
-    console.log('green');
-    console.log('blue');
+    process.exit(1);
     ▲▲▲
-
-    <!--markcheck id="expected-stdout"-->
-    ▲▲▲
-    🟢
-    ▲▲▲
-
-    <!--markcheck lineModId="modify-stdout" ignoreLines="'red', 'blue'" searchAndReplace="/green/🟢/"-->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
@@ -36,54 +27,43 @@ test('stdout: success', () => {
   const mockShellData: MockShellData = {
     interceptedCommands: [],
     lastCommandResult: {
-      stdout: 'red\ngreen\nblue',
+      stdout: '',
       stderr: '',
-      status: 0,
+      status: 1,
       signal: null,
     },
   };
-  assert.ok(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).hasSucceeded()
+  assert.equal(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).testFailures,
+    1
   );
 });
 
-test('stdout: failure', () => {
+test('exitStatus: expecting "nonzero" succeeds if actual is 1', () => {
   const readme = outdent`
-    <!--markcheck stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
+    <!--markcheck exitStatus="nonzero" onlyLocalLines-->
     ▲▲▲js
-    console.log('red');
-    console.log('green');
-    console.log('blue');
+    process.exit(1);
     ▲▲▲
-
-    <!--markcheck id="expected-stdout"-->
-    ▲▲▲
-    black
-    ▲▲▲
-
-    <!--markcheck lineModId="modify-stdout" ignoreLines="1, -1"-->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
 
+  // We don’t actually run the code, we only state what its output would be
+  // – if it were to run!
   const mockShellData: MockShellData = {
     interceptedCommands: [],
     lastCommandResult: {
-      stdout: 'red\ngreen\nblue',
+      stdout: '',
       stderr: '',
-      status: 0,
+      status: 1,
       signal: null,
     },
   };
-  assert.deepEqual(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).toJson(),
-    {
-      relFilePath: '/tmp/markdown/readme.md',
-      syntaxErrors: 0,
-      testFailures: 1,
-      warnings: 0,
-    }
+  assert.equal(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).testFailures,
+    0
   );
 });
