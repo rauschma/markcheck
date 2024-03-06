@@ -70,58 +70,11 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     languageLineMods: new Map(),
     statusCounts,
     mockShellData,
+    prevHeading: null,
   };
 
-  let prevHeading: null | Heading = null;
   for (const entity of parsedMarkdown.entities) {
-    try {
-      const snippetState: SnippetState = {
-        checksWerePerformed: false,
-        verboseLines: []
-      };
-      handleOneEntity(out, fileState, config, snippetState, entity);
-      if (entity instanceof Heading) {
-        prevHeading = entity; // update
-      } else {
-        if (snippetState.checksWerePerformed) {
-          if (prevHeading) {
-            out.writeLine(style.Bold(prevHeading.content));
-            prevHeading = null; // used, not write again
-          }
-          const description = describeEntityContext(entity.getEntityContext());
-          out.writeLine(`${description} ${STATUS_EMOJI_SUCCESS}`);
-        }
-        if (snippetState.verboseLines.length > 0) {
-          for (const line of snippetState.verboseLines) {
-            out.writeLine(line);
-          }
-        }
-      }
-    } catch (err) {
-      if (prevHeading) {
-        out.writeLine(style.Bold(prevHeading.content));
-        prevHeading = null; // used, not write again
-      }
-      const description = describeEntityContext(entity.getEntityContext());
-      out.writeLine(`${description} ${STATUS_EMOJI_FAILURE}`);
-
-      if (err instanceof MarkcheckSyntaxError) {
-        fileState.statusCounts.syntaxErrors++;
-        out.writeLine(err.message);
-      } else if (err instanceof TestFailure) {
-        fileState.statusCounts.testFailures++;
-        out.writeLine(err.message);
-        if (err.actualStdoutLines) {
-          logStd(out, 'stdout', err.actualStdoutLines, err.expectedStdoutLines);
-        }
-        if (err.actualStderrLines) {
-          logStd(out, 'stderr', err.actualStderrLines, err.expectedStderrLines);
-        }
-      } else {
-        const description = describeEntityContext(entity.getEntityContext());
-        throw new Error(`Unexpected error in an entity (${description})`, { cause: err });
-      }
-    }
+    handleOneEntity(out, fileState, config, entity);
   }
   checkSnippetIds(parsedMarkdown, out, statusCounts);
   checkLineModIds(parsedMarkdown, out, statusCounts);
@@ -228,27 +181,77 @@ function findMarkcheckDir(absFilePath: string, entities: Array<MarkcheckEntity>)
   );
 }
 
-function handleOneEntity(out: Output, fileState: FileState, config: Config, snippetState: SnippetState, entity: MarkcheckEntity): void {
-  if (entity instanceof ConfigMod) {
-    config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
-  } else if (entity instanceof LineMod) {
-    const targetLanguage = entity.getTargetLanguage();
-    if (targetLanguage !== undefined) {
-      let lineModArr = fileState.languageLineMods.get(targetLanguage);
-      if (!lineModArr) {
-        lineModArr = [];
-        fileState.languageLineMods.set(targetLanguage, lineModArr);
+//#################### handleOneEntity() ####################
+
+function handleOneEntity(out: Output, fileState: FileState, config: Config, entity: MarkcheckEntity) {
+  try {
+    const snippetState: SnippetState = {
+      checksWerePerformed: false,
+      verboseLines: []
+    };
+
+    if (entity instanceof ConfigMod) {
+      config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
+    } else if (entity instanceof LineMod) {
+      const targetLanguage = entity.getTargetLanguage();
+      if (targetLanguage !== undefined) {
+        let lineModArr = fileState.languageLineMods.get(targetLanguage);
+        if (!lineModArr) {
+          lineModArr = [];
+          fileState.languageLineMods.set(targetLanguage, lineModArr);
+        }
+        lineModArr.push(entity);
       }
-      lineModArr.push(entity);
+    } else if (entity instanceof Snippet) {
+      handleSnippet(fileState, config, snippetState, entity);
+
+    } else if (entity instanceof Heading) {
+      fileState.prevHeading = entity; // update
+    } else {
+      throw new InternalError();
     }
-  } else if (entity instanceof Snippet) {
-    handleSnippet(fileState, config, snippetState, entity);
-  } else if (entity instanceof Heading) {
-    // Ignore
-  } else {
-    throw new InternalError();
+
+    if (snippetState.checksWerePerformed) {
+      if (fileState.prevHeading) {
+        out.writeLine(style.Bold(fileState.prevHeading.content));
+        fileState.prevHeading = null; // used, not write again
+      }
+      const description = describeEntityContext(entity.getEntityContext());
+      out.writeLine(`${description} ${STATUS_EMOJI_SUCCESS}`);
+    }
+    if (snippetState.verboseLines.length > 0) {
+      for (const line of snippetState.verboseLines) {
+        out.writeLine(line);
+      }
+    }
+  } catch (err) {
+    if (fileState.prevHeading) {
+      out.writeLine(style.Bold(fileState.prevHeading.content));
+      fileState.prevHeading = null; // used, not write again
+    }
+    const description = describeEntityContext(entity.getEntityContext());
+    out.writeLine(`${description} ${STATUS_EMOJI_FAILURE}`);
+
+    if (err instanceof MarkcheckSyntaxError) {
+      fileState.statusCounts.syntaxErrors++;
+      out.writeLine(err.message);
+    } else if (err instanceof TestFailure) {
+      fileState.statusCounts.testFailures++;
+      out.writeLine(err.message);
+      if (err.actualStdoutLines) {
+        writeStdStream(out, 'stdout', err.actualStdoutLines, err.expectedStdoutLines);
+      }
+      if (err.actualStderrLines) {
+        writeStdStream(out, 'stderr', err.actualStderrLines, err.expectedStderrLines);
+      }
+    } else {
+      const description = describeEntityContext(entity.getEntityContext());
+      throw new Error(`Unexpected error in an entity (${description})`, { cause: err });
+    }
   }
 }
+
+//#################### handleSnippet() ####################
 
 function handleSnippet(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet): void {
 
@@ -344,7 +347,7 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
   }
 }
 
-//#################### writeFiles() ####################
+//========== Write files ==========
 
 function writeFilesForRunning(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, fileName: string, lines: Array<string>): void {
   writeOneFile(fileState, config, snippetState, fileName, lines);
@@ -367,7 +370,7 @@ function writeOneFile(fileState: FileState, config: Config, snippetState: Snippe
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
-//#################### runShellCommands() ####################
+//========== runShellCommands() ==========
 
 function runShellCommands(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
   const commands: Array<Array<string>> = fillInCommandVariables(commandsWithVars, {
@@ -488,15 +491,15 @@ type SnippetState = {
 };
 
 
-//#################### Logging helpers ####################
+//========== Logging helpers ==========
 
-function logStd(out: Output, name: string, actualLines: Array<string>, expectedLines?: Array<string>): void {
+function writeStdStream(out: Output, name: string, actualLines: Array<string>, expectedLines?: Array<string>): void {
   if (expectedLines === undefined && actualLines.length === 0) {
     return;
   }
   const title = `----- ${name} -----`;
   out.writeLine(title);
-  logAll(out, actualLines);
+  writeAllLines(out, actualLines);
   out.writeLine('-'.repeat(title.length));
   if (expectedLines) {
     logDiff(out, expectedLines, actualLines);
@@ -504,7 +507,7 @@ function logStd(out: Output, name: string, actualLines: Array<string>, expectedL
   }
 }
 
-function logAll(out: Output, lines: Array<string>) {
+function writeAllLines(out: Output, lines: Array<string>) {
   for (const line of lines) {
     out.writeLine(line);
   }
@@ -513,6 +516,7 @@ function logAll(out: Output, lines: Array<string>) {
 function relPath(absPath: string) {
   return path.relative(process.cwd(), absPath);
 }
+
 //#################### main() ####################
 
 const BIN_NAME = 'markcheck';

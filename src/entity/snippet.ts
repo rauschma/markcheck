@@ -7,6 +7,7 @@ import type { Translator } from '../translation/translation.js';
 import { MarkcheckSyntaxError, contextDescription, contextSnippet, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
+import type { Heading } from './heading.js';
 import { LineMod } from './line-mod.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
 
@@ -658,6 +659,7 @@ export type FileState = {
   languageLineMods: Map<string, Array<LineMod>>;
   statusCounts: StatusCounts;
   mockShellData: null | MockShellData;
+  prevHeading: null | Heading;
 };
 
 export class StatusCounts {
