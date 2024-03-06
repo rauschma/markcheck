@@ -1,4 +1,4 @@
-# TypeScript
+# Markcheck demo: TypeScript
 
 By default, Markcheck uses the following tools (which must be installed – e.g. in `markcheck-data/node_modules/`):
 

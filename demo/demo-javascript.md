@@ -1,4 +1,4 @@
-# JavaScript
+# Markcheck demo: JavaScript
 
 ## Assertions
 
