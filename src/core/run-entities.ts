@@ -1,3 +1,4 @@
+import { setDifference } from '@rauschma/helpers/collection/set.js';
 import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { clearDirectorySync, ensureParentDirectory } from '@rauschma/helpers/nodejs/file.js';
 import { style } from '@rauschma/helpers/nodejs/text-style.js';
@@ -7,23 +8,19 @@ import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { ConfigMod } from '../entity/config-mod.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, type StdStreamContentSpec } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, type CommandResult, type FileState, type MockShellData } from '../entity/snippet.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, type CommandResult, type FileState, type MockShellData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
 import { ConfigurationError, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
+import { relPath } from '../util/path-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
-import { parseMarkdown, type ParsedMarkdown } from './parse-markdown.js';
-
-//@ts-expect-error: Module '#package_json' has no default export.
-import pkg from '#package_json' with { type: "json" };
-import { setDifference } from '@rauschma/helpers/collection/set.js';
+import { type ParsedMarkdown } from './parse-markdown.js';
 
 const MARKTEST_DIR_NAME = 'markcheck-data';
 const MARKTEST_TMP_DIR_NAME = 'tmp';
@@ -490,7 +487,6 @@ type SnippetState = {
   verboseLines: Array<string>,
 };
 
-
 //========== Logging helpers ==========
 
 function writeStdStream(out: Output, name: string, actualLines: Array<string>, expectedLines?: Array<string>): void {
@@ -510,109 +506,5 @@ function writeStdStream(out: Output, name: string, actualLines: Array<string>, e
 function writeAllLines(out: Output, lines: Array<string>) {
   for (const line of lines) {
     out.writeLine(line);
-  }
-}
-
-function relPath(absPath: string) {
-  return path.relative(process.cwd(), absPath);
-}
-
-//#################### main() ####################
-
-const BIN_NAME = 'markcheck';
-
-const ARG_OPTIONS = {
-  'help': {
-    type: 'boolean',
-    short: 'h',
-  },
-  'version': {
-    type: 'boolean',
-  },
-  'print-config': {
-    type: 'boolean',
-    short: 'c',
-  },
-  'verbose': {
-    type: 'boolean',
-    short: 'v',
-  },
-} satisfies ParseArgsConfig['options'];
-
-export function cliEntry() {
-  const out = Output.fromStdout();
-  const args = parseArgs({ allowPositionals: true, options: ARG_OPTIONS });
-
-  if (args.values.version) {
-    out.writeLine(pkg.version);
-    return;
-  }
-  if (args.values['print-config']) {
-    out.writeLine(JSON.stringify(new Config().toJson(), null, 2));
-    return;
-  }
-  if (args.values.help || args.positionals.length === 0) {
-    const helpLines = [
-      `${BIN_NAME} «file1.md» «file2.md» ...`,
-      '',
-      'Options:',
-      '--help -h: get help',
-      '--version -v: print version',
-      '--print-config: print built-in configuration',
-      '--verbose -v: show more information (e.g. which shell commands are run)',
-    ];
-    for (const line of helpLines) {
-      out.writeLine(line);
-    }
-    return;
-  }
-  const logLevel = (args.values.verbose ? LogLevel.Verbose : LogLevel.Normal);
-  const failedFiles = new Array<StatusCounts>();
-
-  assertTrue(args.positionals.length > 0);
-  for (const filePath of args.positionals) {
-    const absFilePath = path.resolve(filePath);
-    const relFilePath = relPath(absFilePath);
-    out.writeLine();
-    out.writeLine(style.FgBlue.Bold`===== ${relFilePath} =====`);
-    const statusCounts = new StatusCounts(relFilePath);
-    const text = fs.readFileSync(absFilePath, 'utf-8');
-    try {
-      const parsedMarkdown = parseMarkdown(text);
-      runParsedMarkdown(out, absFilePath, logLevel, parsedMarkdown, statusCounts);
-    } catch (err) {
-      if (err instanceof MarkcheckSyntaxError) {
-        statusCounts.syntaxErrors++;
-        err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
-      } else {
-        throw new Error(`Unexpected error in file ${stringify(relFilePath)}`, { cause: err });
-      }
-    }
-    const headingStyle = (
-      statusCounts.hasFailed() ? style.FgRed.Bold : style.FgGreen.Bold
-    );
-    out.writeLine(headingStyle`--- Summary ${stringify(relFilePath)} ---`);
-    out.writeLine(statusCounts.describe());
-    if (statusCounts.hasFailed()) {
-      failedFiles.push(statusCounts);
-    }
-  }
-
-  const headingStyle = (
-    failedFiles.length === 0 ? style.FgGreen.Bold : style.FgRed.Bold
-  );
-  out.writeLine();
-  out.writeLine(headingStyle`===== TOTAL SUMMARY =====`);
-  const totalFileCount = args.positionals.length;
-  const totalString = totalFileCount + (
-    totalFileCount === 1 ? ' file' : ' files'
-  );
-  if (failedFiles.length === 0) {
-    out.writeLine(`✅ All succeeded: ${totalString}`);
-  } else {
-    out.writeLine(`❌ Failures: ${failedFiles.length} of ${totalString}`);
-    for (const failedFile of failedFiles) {
-      out.writeLine(`• ${failedFile}`);
-    }
   }
 }
