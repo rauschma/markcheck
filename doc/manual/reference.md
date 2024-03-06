@@ -23,10 +23,10 @@ Options:
 
 Only two Markdown constructs are considered by Markcheck:
 
+* Code blocks: delimited by three or more backticks, with or without a language tag such as `js`
 * _Directives_, Markdown comments that start with `<!--markcheck`
-* Code blocks (delimited by three or more backticks)
 
-A _directive_ is a Markdown comment that starts with `<!--markcheck` – e.g.:
+The following Markdown contains both constructs:
 
 ``````md
 <!--markcheck sequence="1/3" stdout="sequence-output"-->
@@ -46,23 +46,37 @@ Content of some-file.txt
 -->
 ``````
 
-After `markcheck` there are zero or more attributes. The first line ends either with `-->` or with a _body label_ – a name followed by a colon. In the previous example, `before:` and `body:` are body labels.
+The syntax within a directive is inspired by HTML and Python:
+
+* `<!--markcheck` is followed by zero or more _attributes_. Those look similar to HTML.
+* If the directive is more than one line long, the first line ends with a _body label_: a name followed by a colon. That is inspired by Python.
+  * In the previous example, `before:` and `body:` are body labels.
+* A single-line directive ends with `-->`.
 
 ### Kinds of directives
 
-* A directive without a body label is a _code block directive_ and must be followed by a code block.
-* Body label `body:`: _body directive_. Such a directive is self-contained.
-* Body label `config:`: _config directive_. Such a directive is self-contained.
-* Body label `before:` or `after:`: A _line mod_ directive. Such a directive is used in three ways:
-  * Attribute `each="some-lang"` defines a _global line mod_. Its modifications are applied to all code blocks with the specified language.
-  * Attribute `lineModId="some-id"` defines an _appliable line mod_: A code block directive can apply it to its code via `applyInner="some-id"` and  `applyOuter="some-id"`.
-  * Neither `each` nor `lineModId`: The directive defines two entities:
-    * A local line mod
-    * A snippet that uses the line mod locally
-* Body label `around:` combines `before:` and `after:`. Two groups of lines are separated by the line `•••`.
-* Body label `insert:`: Only supported for local line mods.
-  * One or more groups of lines. Same separator as for `around:`
-  * Required attribute: `at`
+* Body directive: body label `body:`
+* Config directive: body label `config:`
+* LineMod directive:
+  * No body label or one of the body labels `before:`, `after:`, `around:`, `insert:`
+  * Body label `around:`:
+    * A combination of `before:` and `after:`.
+    * Two groups of lines are separated by the line `•••`.
+  * Body label `insert:`: requires attribute `at`
+    * One or more groups of lines. Same separator as for `around:`
+    * Required attribute: `at`
+  * Attributes: `ignoreLines`, `searchAndReplace`
+
+There are several kinds of LineMods:
+
+* Language LineMod: `each="some-lang"`
+  * Its modifications are applied to all code blocks with the specified language.
+  * It cannot use `insert:`
+* Appliable LineMod: `lineModId="lm-id"`
+  * Can be applied to snippets via `wrapOuter="lm-id"` or `applyInner="lm-id"`
+* Local LineMod: neither `each` nor `lineModId`
+  * The LineMod attributes define a _local LineMod_
+  * The remaining attributes apply to the following code block and produce a snippet that has the given local LineMod.
 
 ## Entities
 
@@ -70,14 +84,14 @@ After directories were paired with code blocks, we get the following entities:
 
 * Snippets:
   * Created by code block directive + code block or by a code block on its own.
-  * Can be executed and/or written to disk.
+  * Can be written to disk and/or executed.
 * Config mods:
   * Created by config directives.
   * Change the configuration data (which commands to run for a given language, etc.).
 * Line mods:
   * Created by line mod directives that are not also code block directives.
   * Kinds of line mods:
-    * Global line mod (attribute `each`): Can be activated globally.
+    * Language LineMod (attribute `each`): Can be activated globally.
     * Appliable line mod (attribute `id`): Can be applied by snippets via the attributes `applyInner` and `applyOuter`.
 
 ## Snippet modes: What can be done with snippets?
@@ -100,17 +114,51 @@ Running:
   * `only`: Affects the whole file. Only snippets with this attribute are run.
   * Visitation mode `normal` (not an attribute): active if none of the previous attributes are present.
 * `id` sets running mode to `skip`.
-  * Override via `alwaysRun`
-* ❌ `writeInner`, `writeOuter`
+  * Override via `alwaysRun` or `only`
+* `writeInner`, `writeOuter` always prevent running. Alternatives:
+  * `internal="file-name"` changes the filename that is used when running a snippet
+  * `onlyLocalLines` excludes global lines when writing to disk.
 
 ### How lines are assembled
 
-* Outer lines – once per file:
-  * Configuration `before` lines
-  * Global line mod
-  * Outer applied line mod
-* Inner lines – each snippet (solo, included, part of a sequence, etc.):
-  * TODO ❌
+For assembling lines, two dimensions are important:
+
+* Inner vs. outer:
+  * Inner are the lines of each snippet. Multiple snippets can exist per file that is written to disk (via sequences and includes).
+  * Outer are lines that exist once per file.
+* Local vs. global:
+  * Local are the lines that are controlled by the snippet itself.
+  * Global are the lines that are contributed from elsewhere:
+    * By the config file: the “before” lines for a language.
+    * Via a language LineMod – e.g.: `<!--markcheck each="js" before:`
+
+All global lines are outer lines. But snippets can also contribute local outer lines. This is an exhaustive list:
+
+* Inner lines from SingleSnippet
+  * Body
+  * Body LineMod
+  * Applied LineMod: `applyToBody`
+  * Includes
+* Inner lines from SequenceSnippet:
+  * Lines of sequence elements, concatenated
+* Outer lines from Snippet (either a SequenceSnippet or a SingleSnippet)
+  * Applied LineMod: `applyToOuter` (e.g. a function around a multi-part snippet)
+* Global lines (always outer):
+  * Language LineMod
+  * Config lines
+
+❌ TODO: translator (not translated: before, after, around), outer LineMods only wrap, only one of them is used: Body LineMod, applyToBody LineMod
+
+
+
+
+
+
+
+
+
+
+
 
 ## Attributes
 
@@ -131,7 +179,7 @@ Running:
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
   * `applyInner="id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
   * `applyOuter="id"`: applies an appliable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
-  * `onlyLocalLines`: when a snippet is self-contained and does not need config lines and global LineMod lines.
+  * `onlyLocalLines`: when a snippet is self-contained and does not need config lines and language LineMod lines.
 * Additional checks:
   * `sameAsId="id"`
   * `containedInFile="filePath"`:
@@ -154,7 +202,7 @@ Running:
   * A range includes start and end – i.e.: `1..3` is equivalent to `1,2,3`.
 * `searchAndReplace="/[a-z]/-/i"`
 
-### Global line mods
+### Language LineMods
 
 * Required: `each="lang-name"`
 

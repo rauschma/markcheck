@@ -7,7 +7,7 @@ import type { Translator } from '../translation/translation.js';
 import { MarkcheckSyntaxError, contextDescription, contextLineNumber, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_INNER, ATTR_KEY_APPLY_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import { Heading } from './heading.js';
 import { LineMod } from './line-mod.js';
 
@@ -44,10 +44,16 @@ export function assembleOuterLinesForId(cliState: CliState, config: Config, sour
 
 export function assembleInnerLines(cliState: CliState, config: Config, snippet: Snippet): Array<string> {
   const lines = new Array<string>();
-  snippet.assembleLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
+  snippet.assembleInnerLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
   return lines;
 }
 
+/**
+ * Outer lines (once per file):
+ * - `applyToOuter` LineMod
+ * - Language LineMod
+ * - Config before lines
+ */
 export function assembleOuterLines(cliState: CliState, config: Config, snippet: Snippet) {
   const lines = new Array<string>();
 
@@ -56,20 +62,20 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
   for (let i = 0; i < outerLineMods.length; i++) {
     outerLineMods[i].pushBeforeLines(lines);
   }
-  // Once per snippet (in sequences, includes, etc.):
-  // - Inner appliable line mod
-  // - Local line mod (before, after, inserted lines)
-  snippet.assembleLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
+  // Once per snippet:
+  // - SingleSnippet:
+  //   - Body LineMod (before, after, inserted lines)
+  //   - `applyToBody` LineMod
+  //   - Includes
+  // - SequenceSnippet:
+  //   - Lines of sequence elements, concatenated
+  snippet.assembleInnerLines(config, cliState.idToSnippet, cliState.idToLineMod, lines, new Set());
   for (let i = outerLineMods.length - 1; i >= 0; i--) {
     outerLineMods[i].pushAfterLines(lines);
   }
   return lines;
 
   function collectOuterLineMods(onlyLocalLines: boolean): Array<LineMod> {
-    // Once per file:
-    // - Config before lines
-    // - Global line mod
-    // - Outer appliable line mod
     const outerLineMods = new Array<LineMod>();
 
     if (!onlyLocalLines) {
@@ -85,19 +91,20 @@ export function assembleOuterLines(cliState: CliState, config: Config, snippet: 
           );
         }
       }
-      const globalLineMods = cliState.globalLineMods.get(snippet.lang);
-      if (globalLineMods) {
-        outerLineMods.push(...globalLineMods);
+      const languageLineMods = cliState.languageLineMods.get(snippet.lang);
+      if (languageLineMods) {
+        outerLineMods.push(...languageLineMods);
       }
     }
 
-    // `applyOuter` contributes outer lines but is applied locally
-    const applyOuterId = snippet.applyOuterId;
+    // `applyToOuter` contributes outer lines but is applied locally (by
+    // the snippet)
+    const applyOuterId = snippet.applyToOuterId;
     if (applyOuterId) {
       const applyLineMod = cliState.idToLineMod.get(applyOuterId);
       if (applyLineMod === undefined) {
         throw new MarkcheckSyntaxError(
-          `Attribute ${ATTR_KEY_APPLY_OUTER} contains an ID that either doesn’t exist or does not refer to a line mod`,
+          `Attribute ${ATTR_KEY_APPLY_TO_OUTER} contains an ID that either doesn’t exist or does not refer to a line mod`,
           { lineNumber: snippet.lineNumber }
         );
       }
@@ -118,7 +125,7 @@ export abstract class Snippet {
   abstract get lang(): string;
   //
   abstract get onlyLocalLines(): boolean;
-  abstract get applyOuterId(): null | string;
+  abstract get applyToOuterId(): null | string;
   //
   abstract get sameAsId(): null | string;
   abstract get containedInFile(): null | string;
@@ -131,8 +138,8 @@ export abstract class Snippet {
   abstract get stderrSpec(): null | StdStreamContentSpec;
 
   abstract getInternalFileName(langDef: LangDef): string;
-  abstract isRun(globalVisitationMode: GlobalRunningMode): boolean;
-  abstract assembleLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
+  abstract isRun(globalRunningMode: GlobalRunningMode): boolean;
+  abstract assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
   abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
 
   abstract toJson(): JsonValue;
@@ -153,12 +160,6 @@ export class SingleSnippet extends Snippet {
         // Initial default value:
         // - By default, snippets with IDs are not run.
         //   - Rationale: included somewhere and run there.
-        // - To still run such a snippet, use `only` or `alwaysRun`.
-        snippet.runningMode = RuningMode.Skip;
-      }
-      if (directive.hasAttribute(ATTR_KEY_WRITE_INNER) || directive.hasAttribute(ATTR_KEY_WRITE_OUTER)) {
-        // Initial default value:
-        // - By default, written snippets are not run.
         // - To still run such a snippet, use `only` or `alwaysRun`.
         snippet.runningMode = RuningMode.Skip;
       }
@@ -195,8 +196,8 @@ export class SingleSnippet extends Snippet {
         snippet.includeIds = include.split(/ *, */);
       }
 
-      snippet.applyInnerId = directive.getString(ATTR_KEY_APPLY_INNER);
-      snippet.applyOuterId = directive.getString(ATTR_KEY_APPLY_OUTER);
+      snippet.applyToBodyId = directive.getString(ATTR_KEY_APPLY_TO_BODY);
+      snippet.applyToOuterId = directive.getString(ATTR_KEY_APPLY_TO_OUTER);
       snippet.onlyLocalLines = directive.getBoolean(ATTR_KEY_ONLY_LOCAL_LINES);
     }
 
@@ -256,9 +257,9 @@ export class SingleSnippet extends Snippet {
   //
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
-  localLineMod: null | LineMod = null;
-  applyInnerId: null | string = null;
-  override applyOuterId: null | string = null;
+  bodyLineMod: null | LineMod = null;
+  applyToBodyId: null | string = null;
+  override applyToOuterId: null | string = null;
   override onlyLocalLines = false;
   //
   override sameAsId: null | string = null;
@@ -300,10 +301,10 @@ export class SingleSnippet extends Snippet {
     );
   }
 
-  override isRun(globalVisitationMode: GlobalRunningMode): boolean {
+  override isRun(globalRunningMode: GlobalRunningMode): boolean {
     // this.visitationMode is set up by factory methods where `id` etc. are
     // considered.
-    switch (globalVisitationMode) {
+    switch (globalRunningMode) {
       case GlobalRunningMode.Normal:
         switch (this.runningMode) {
           case RuningMode.Normal:
@@ -327,7 +328,7 @@ export class SingleSnippet extends Snippet {
             throw new UnsupportedValueError(this.runningMode);
         }
       default:
-        throw new UnsupportedValueError(globalVisitationMode);
+        throw new UnsupportedValueError(globalRunningMode);
     }
   }
 
@@ -347,7 +348,7 @@ export class SingleSnippet extends Snippet {
     return this;
   }
 
-  override assembleLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     let thisWasIncluded = false;
     for (const includeId of this.includeIds) {
       if (includeId === INCL_ID_THIS) {
@@ -376,18 +377,26 @@ export class SingleSnippet extends Snippet {
       );
     }
     pathOfIncludeIds.add(includeId);
-    snippet.assembleLines(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds);
+    snippet.assembleInnerLines(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds);
     pathOfIncludeIds.delete(includeId);
   }
 
   #assembleThis(config: Config, idToLineMod: Map<string, LineMod>, linesOut: Array<string>) {
-    const innerAppliedLineMod = this.#getInnerAppliedLineMod(idToLineMod);
-    if (innerAppliedLineMod) {
-      innerAppliedLineMod.pushBeforeLines(linesOut);
+    let applyToBodyLineMod = this.#getApplyToBodyLineMod(idToLineMod);
+    if (applyToBodyLineMod) {
+      if (this.bodyLineMod && !this.bodyLineMod.isEmpty()) {
+        throw new MarkcheckSyntaxError(
+          `If there is a ${stringify(ATTR_KEY_APPLY_TO_BODY)} then the body LineMod must be empty: No attributes ${stringify(ATTR_KEY_IGNORE_LINES)}, ${stringify(ATTR_KEY_SEARCH_AND_REPLACE)}. No body labels ${stringify(BODY_LABEL_BEFORE)}, ${stringify(BODY_LABEL_AFTER)}, ${stringify(BODY_LABEL_AROUND)}, ${stringify(BODY_LABEL_INSERT)}`,
+          { lineNumber: this.lineNumber }
+        );
+      }
+    } else {
+      applyToBodyLineMod = this.bodyLineMod;
     }
+
     const translator = this.#getTranslator(config);
-    if (this.localLineMod) {
-      this.localLineMod.pushModifiedBodyTo(this.lineNumber, this.body, translator, linesOut);
+    if (applyToBodyLineMod) {
+      applyToBodyLineMod.pushModifiedBodyTo(this.lineNumber, this.body, translator, linesOut);
     } else {
       let body = this.body;
       if (translator) {
@@ -395,23 +404,21 @@ export class SingleSnippet extends Snippet {
       }
       linesOut.push(...body);
     }
-    if (innerAppliedLineMod) {
-      innerAppliedLineMod.pushAfterLines(linesOut);
-    }
   }
 
-  #getInnerAppliedLineMod(idToLineMod: Map<string, LineMod>): undefined | LineMod {
-    if (this.applyInnerId) {
-      const lineMod = idToLineMod.get(this.applyInnerId);
-      if (lineMod === undefined) {
-        throw new MarkcheckSyntaxError(
-          `Attribute ${ATTR_KEY_APPLY_INNER} contains an ID that either doesn’t exist or does not refer to a line mod`,
-          { lineNumber: this.lineNumber }
-        );
-      }
-      return lineMod;
+  #getApplyToBodyLineMod(idToLineMod: Map<string, LineMod>): null | LineMod {
+    const id = this.applyToBodyId;
+    if (!id) {
+      return null;
     }
-    return undefined;
+    const lineMod = idToLineMod.get(id);
+    if (lineMod === undefined) {
+      throw new MarkcheckSyntaxError(
+        `Attribute ${ATTR_KEY_APPLY_TO_BODY} contains an ID that either doesn’t exist or does not refer to a line mod`,
+        { lineNumber: this.lineNumber }
+      );
+    }
+    return lineMod;
   }
 
   #getTranslator(config: Config): undefined | Translator {
@@ -496,9 +503,9 @@ export class SequenceSnippet extends Snippet {
     return num.total;
   }
 
-  override assembleLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     for (const element of this.elements) {
-      element.assembleLines(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds);
+      element.assembleInnerLines(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds);
     }
   }
   get firstElement(): SingleSnippet {
@@ -521,14 +528,14 @@ export class SequenceSnippet extends Snippet {
   override get runningMode(): RuningMode {
     return this.firstElement.runningMode;
   }
-  override isRun(globalVisitationMode: GlobalRunningMode): boolean {
-    return this.firstElement.isRun(globalVisitationMode);
+  override isRun(globalRunningMode: GlobalRunningMode): boolean {
+    return this.firstElement.isRun(globalRunningMode);
   }
   override get lang(): string {
     return this.firstElement.lang;
   }
-  override get applyOuterId(): null | string {
-    return this.firstElement.applyOuterId;
+  override get applyToOuterId(): null | string {
+    return this.firstElement.applyToOuterId;
   }
   override get onlyLocalLines(): boolean {
     return this.firstElement.onlyLocalLines;
@@ -636,8 +643,8 @@ export type CliState = {
   logLevel: LogLevel;
   idToSnippet: Map<string, Snippet>;
   idToLineMod: Map<string, LineMod>;
-  globalVisitationMode: GlobalRunningMode;
-  globalLineMods: Map<string, Array<LineMod>>;
+  globalRunningMode: GlobalRunningMode;
+  languageLineMods: Map<string, Array<LineMod>>;
   statusCounts: StatusCounts;
   mockShellData: null | MockShellData;
 };

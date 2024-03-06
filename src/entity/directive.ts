@@ -34,9 +34,9 @@ export const ATTR_KEY_LANG = 'lang';
 
 export const ATTR_KEY_SEQUENCE = 'sequence';
 export const ATTR_KEY_INCLUDE = 'include';
-export const ATTR_KEY_APPLY_INNER = 'applyInner';
-export const ATTR_KEY_APPLY_OUTER = 'applyOuter';
-/** Exclude config lines and global LineMods */
+export const ATTR_KEY_APPLY_TO_BODY = 'applyToBody';
+export const ATTR_KEY_APPLY_TO_OUTER = 'applyToOuter';
+/** Exclude config lines and language LineMods */
 export const ATTR_KEY_ONLY_LOCAL_LINES = 'onlyLocalLines';
 export const ATTR_KEY_IGNORE_LINES = 'ignoreLines';
 export const ATTR_KEY_SEARCH_AND_REPLACE = 'searchAndReplace';
@@ -114,7 +114,7 @@ export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: 
 
 //----- Line mods -----
 
-// Global line mods
+// Language LineMods
 export const ATTR_KEY_EACH = 'each';
 
 // Appliable line mods
@@ -179,8 +179,8 @@ export const ATTRS_SNIPPET: ExpectedAttributeValues = new Map<string, AttrValue 
   //
   [ATTR_KEY_SEQUENCE, AttrValue.String],
   [ATTR_KEY_INCLUDE, AttrValue.String],
-  [ATTR_KEY_APPLY_INNER, AttrValue.String],
-  [ATTR_KEY_APPLY_OUTER, AttrValue.String],
+  [ATTR_KEY_APPLY_TO_BODY, AttrValue.String],
+  [ATTR_KEY_APPLY_TO_OUTER, AttrValue.String],
   [ATTR_KEY_ONLY_LOCAL_LINES, AttrValue.Valueless],
   //
   [ATTR_KEY_SAME_AS_ID, AttrValue.String],
@@ -212,7 +212,7 @@ export const ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT: ExpectedAttributeValues
   [ATTR_KEY_AT, AttrValue.String],
 ]);
 
-export const ATTRS_GLOBAL_LINE_MOD: ExpectedAttributeValues = new Map([
+export const ATTRS_LANGUAGE_LINE_MOD: ExpectedAttributeValues = new Map([
   [ATTR_KEY_EACH, AttrValue.String],
 ]);
 

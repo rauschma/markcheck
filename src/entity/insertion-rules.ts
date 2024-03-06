@@ -22,6 +22,10 @@ function lineLocationModifierToString(modifier: LineLocModifier): string {
 export class InsertionRules {
   #rules = new Array<InsertionRule>();
 
+  isEmpty(): boolean {
+    return this.#rules.length === 0;
+  }
+
   toJson(): JsonValue {
     return this.#rules.map(
       rule => [rule.condition.toJson(), rule.lineGroup]

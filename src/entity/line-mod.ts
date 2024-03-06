@@ -16,22 +16,22 @@ const RE_AROUND_MARKER = /^[ \t]*•••[ \t]*$/;
 const STR_AROUND_MARKER = '•••';
 
 export type LineModKind = LineModKindConfig |
-  LineModKindGlobal |
+  LineModKindLanguage |
   LineModKindAppliable |
-  LineModKindLocal;
+  LineModKindBody;
 export type LineModKindConfig = {
   tag: 'LineModKindConfig';
 };
-export type LineModKindGlobal = {
-  tag: 'LineModKindGlobal';
+export type LineModKindLanguage = {
+  tag: 'LineModKindLanguage';
   targetLanguage: string;
 };
 export type LineModKindAppliable = {
   tag: 'LineModKindAppliable';
   lineModId: string;
 };
-export type LineModKindLocal = {
-  tag: 'LineModKindLocal';
+export type LineModKindBody = {
+  tag: 'LineModKindBody';
 };
 
 //#################### LineMod ####################
@@ -86,7 +86,7 @@ export class LineMod {
         break;
       }
       case BODY_LABEL_INSERT: {
-        if (kind.tag !== 'LineModKindLocal') {
+        if (kind.tag !== 'LineModKindBody') {
           throw new MarkcheckSyntaxError(
             `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for local line mods`
           );
@@ -130,7 +130,7 @@ export class LineMod {
 
   /**
    * LineMods can be created from line in Config. Then they don’t have a
-   * line number. Thus, the more general UserErrorContext is needed.
+   * line number. Thus, the more general EntityContext is needed.
    */
   context: EntityContext;
   //
@@ -152,15 +152,24 @@ export class LineMod {
     this.beforeLines = props.beforeLines;
     this.afterLines = props.afterLines;
   }
+  isEmpty(): boolean {
+    return (
+      this.ignoreLines.length === 0 &&
+      this.searchAndReplace === null &&
+      this.insertionRules.isEmpty() &&
+      this.beforeLines.length === 0 &&
+      this.afterLines.length === 0
+    );
+  }
   getLineModId(): undefined | string {
     switch (this.#kind.tag) {
       case 'LineModKindAppliable':
         return this.#kind.lineModId;
-      case 'LineModKindGlobal':
+      case 'LineModKindLanguage':
         return undefined;
       // Not among entities
       case 'LineModKindConfig': // created on-demand from Config
-      case 'LineModKindLocal': // inside a SingleSnippet
+      case 'LineModKindBody': // inside a SingleSnippet
         throw new InternalError('Unsupported operation');
       default:
         throw new UnsupportedValueError(this.#kind);
@@ -168,13 +177,13 @@ export class LineMod {
   }
   getTargetLanguage(): undefined | string {
     switch (this.#kind.tag) {
-      case 'LineModKindGlobal':
+      case 'LineModKindLanguage':
         return this.#kind.targetLanguage;
       case 'LineModKindAppliable':
         return undefined;
       // Not among entities
       case 'LineModKindConfig': // created on-demand from Config
-      case 'LineModKindLocal': // inside a SingleSnippet
+      case 'LineModKindBody': // inside a SingleSnippet
         throw new InternalError('Unsupported operation');
       default:
         throw new UnsupportedValueError(this.#kind);
@@ -183,9 +192,9 @@ export class LineMod {
 
   pushModifiedBodyTo(lineNumber: number, body: Array<string>, translator: Translator | undefined, linesOut: Array<string>) {
     // - Line-ignoring clashes with line insertion because both change line
-    //   indices.
+    //   numbers.
     // - However, ignored line numbers would make no sense at all after
-    //   inserting lines, which is why ignore first.
+    //   inserting lines, which is why we ignore first.
     const lineNumberSet = lineLocSetToLineNumberSet(this.context, this.ignoreLines, body);
     body = body.filter(
       (_line, index) => !lineNumberSet.has(index + 1)
@@ -229,7 +238,7 @@ export class LineMod {
   toJson(): JsonValue {
     let props;
     switch (this.#kind.tag) {
-      case 'LineModKindGlobal':
+      case 'LineModKindLanguage':
         props = {
           targetLanguage: this.#kind.targetLanguage,
         };
@@ -242,7 +251,7 @@ export class LineMod {
       case 'LineModKindConfig':
         props = {};
         break;
-      case 'LineModKindLocal':
+      case 'LineModKindBody':
         props = {
           insertionRules: this.insertionRules.toJson(),
         };

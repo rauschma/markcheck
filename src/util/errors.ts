@@ -6,7 +6,7 @@ import * as tty from 'node:tty';
 export const STATUS_EMOJI_SUCCESS = style.FgGreen`✔︎`;
 export const STATUS_EMOJI_FAILURE = '❌';
 
-//#################### UserErrorContext ####################
+//#################### EntityContext ####################
 
 export type LineNumber = number;
 

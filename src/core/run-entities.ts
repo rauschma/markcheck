@@ -49,9 +49,9 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     fs.mkdirSync(tmpDir);
   }
 
-  let globalVisitationMode = GlobalRunningMode.Normal;
+  let globalRunningMode = GlobalRunningMode.Normal;
   if (parsedMarkdown.entities.some((e) => e instanceof Snippet && e.runningMode === RuningMode.Only)) {
-    globalVisitationMode = GlobalRunningMode.Only;
+    globalRunningMode = GlobalRunningMode.Only;
   }
 
   const config = new Config();
@@ -71,8 +71,8 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     logLevel,
     idToSnippet: parsedMarkdown.idToSnippet,
     idToLineMod: parsedMarkdown.idToLineMod,
-    globalVisitationMode,
-    globalLineMods: new Map(),
+    globalRunningMode,
+    languageLineMods: new Map(),
     statusCounts,
     mockShellData,
   };
@@ -159,11 +159,11 @@ function checkLineModIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
     }
     if (entity instanceof Snippet) {
       entity.visitSingleSnippet((snippet) => {
-        if (snippet.applyInnerId !== null) {
-          referencedIds.add(snippet.applyInnerId);
+        if (snippet.applyToBodyId !== null) {
+          referencedIds.add(snippet.applyToBodyId);
         }
-        if (snippet.applyOuterId !== null) {
-          referencedIds.add(snippet.applyOuterId);
+        if (snippet.applyToOuterId !== null) {
+          referencedIds.add(snippet.applyToOuterId);
         }
         if (snippet.stdoutSpec?.lineModId) {
           referencedIds.add(snippet.stdoutSpec?.lineModId);
@@ -215,10 +215,10 @@ function handleOneEntity(out: Output, cliState: CliState, config: Config, prevHe
   } else if (entity instanceof LineMod) {
     const targetLanguage = entity.getTargetLanguage();
     if (targetLanguage !== undefined) {
-      let lineModArr = cliState.globalLineMods.get(targetLanguage);
+      let lineModArr = cliState.languageLineMods.get(targetLanguage);
       if (!lineModArr) {
         lineModArr = [];
-        cliState.globalLineMods.set(targetLanguage, lineModArr);
+        cliState.languageLineMods.set(targetLanguage, lineModArr);
       }
       lineModArr.push(entity);
     }
@@ -273,17 +273,19 @@ function handleSnippet(out: Output, cliState: CliState, config: Config, prevHead
   if (writeOuter) {
     const lines = assembleOuterLines(cliState, config, snippet);
     writeOneFile(out, cliState, config, writeOuter, lines);
+    return EntityKind.NonRunnable;
   }
   const writeInner: null | string = snippet.writeInner;
   if (writeInner) {
     const lines = assembleOuterLines(cliState, config, snippet);
     writeOneFile(out, cliState, config, writeInner, lines);
+    return EntityKind.NonRunnable;
   }
 
   //----- Skipping -----
 
   // Explicitly skipped
-  if (!snippet.isRun(cliState.globalVisitationMode)) {
+  if (!snippet.isRun(cliState.globalRunningMode)) {
     return EntityKind.NonRunnable;
   }
   const langDef = config.getLang(snippet.lang);
