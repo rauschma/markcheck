@@ -88,9 +88,9 @@ After directories were paired with code blocks, we get the following entities:
 * Config mods:
   * Created by config directives.
   * Change the configuration data (which commands to run for a given language, etc.).
-* Line mods:
+* LineMods:
   * Created by line mod directives that are not also code block directives.
-  * Kinds of line mods:
+  * Kinds of LineMods:
     * Language LineMod (attribute `each`): Can be activated globally.
     * Appliable line mod (attribute `id`): Can be applied by snippets via the attributes `applyInner` and `applyOuter`.
 
@@ -194,7 +194,7 @@ All global lines are outer lines. But snippets can also contribute local outer l
   * `stdout="|lineModId=id"`
   * `stderr="id"`
 
-### Local line mods
+### Body LineMods and applyToBody LineMods
 
 * Required for body label `insert:`: `at="before:1, after:-1, before:'console.log'"`
   * `-1` is the last line (etc.)
@@ -206,7 +206,7 @@ All global lines are outer lines. But snippets can also contribute local outer l
 
 * Required: `each="lang-name"`
 
-### Appliable line mods
+### Appliable LineMods
 
 * Required: `lineModId="my-id"`
   * Referenced by attributes: applyInner, applyOuter
@@ -270,9 +270,9 @@ Property `"lang"`:
 
 ```json
 {
-  "searchAndReplace": {
-    "[⎡⎤]": ""
-  },
+  "searchAndReplace": [
+    { search: "[⎡⎤]", replace: "" },
+  ],
 }
 ```
 

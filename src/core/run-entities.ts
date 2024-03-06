@@ -218,6 +218,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
     }
     if (snippetState.verboseLines.length > 0) {
       for (const line of snippetState.verboseLines) {
+        out.write('• ');
         out.writeLine(line);
       }
     }
@@ -359,7 +360,7 @@ function writeFilesForRunning(fileState: FileState, config: Config, snippetState
 function writeOneFile(fileState: FileState, config: Config, snippetState: SnippetState, fileName: string, lines: Array<string>) {
   const filePath = path.resolve(fileState.tmpDir, fileName);
   if (fileState.logLevel === LogLevel.Verbose) {
-    snippetState.verboseLines.push('Write ' + filePath);
+    snippetState.verboseLines.push('Write: ' + relPath(filePath));
   }
   let content = lines.join(os.EOL);
   content = config.searchAndReplaceFunc(content);
@@ -377,7 +378,7 @@ function runShellCommands(fileState: FileState, config: Config, snippetState: Sn
   for (const [index, commandParts] of commands.entries()) {
     const isLastCommand = (index === commands.length - 1);
     if (fileState.logLevel === LogLevel.Verbose) {
-      snippetState.verboseLines.push(commandParts.join(' '));
+      snippetState.verboseLines.push('Run: ' + commandParts.join(' '));
     }
 
     if (fileState.mockShellData) {
