@@ -26,7 +26,7 @@ export function logDiff(out: Output, expectedLines: Array<string>, actualLines: 
   }
 }
 
-export function isOutputEqual(expectedLines: Array<string>, actualLines: Array<string>): boolean {
+export function areLinesEqual(expectedLines: Array<string>, actualLines: Array<string>): boolean {
   const expectedLen = expectedLines.length;
   const actualLen = actualLines.length;
   if (expectedLen !== actualLen) {
@@ -41,6 +41,8 @@ export function isOutputEqual(expectedLines: Array<string>, actualLines: Array<s
 }
 
 if (isEntryModule(import.meta)) {
+  // Show what the output looks like
+  
   const oldStr = outdent`
     Hello world!
     More text

@@ -10,12 +10,12 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 import { ConfigMod } from '../entity/config-mod.js';
-import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS } from '../entity/directive.js';
+import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, type StdStreamContentSpec } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, getUserErrorContext, type CliState, type CommandResult, type MarkcheckEntity, type MockShellData } from '../entity/snippet.js';
-import { isOutputEqual, logDiff } from '../util/diffing.js';
-import { ConfigurationError, MarkcheckSyntaxError, Output, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
+import { areLinesEqual, logDiff } from '../util/diffing.js';
+import { ConfigurationError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeUserErrorContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
@@ -373,11 +373,11 @@ function handleSnippetWithCommands(out: Output, config: Config, cliState: CliSta
       if (printStatusEmoji) {
         out.writeLine(' ' + STATUS_EMOJI_FAILURE);
       }
-      if (err.stdoutLines) {
-        logStdout(out, err.stdoutLines, err.expectedStdoutLines);
+      if (err.actualStdoutLines) {
+        logStdout(out, err.actualStdoutLines, err.expectedStdoutLines);
       }
-      if (err.stderrLines) {
-        logStderr(out, err.stderrLines, err.expectedStderrLines);
+      if (err.actualStderrLines) {
+        logStderr(out, err.actualStderrLines, err.expectedStderrLines);
       }
     } else {
       throw err;
@@ -391,33 +391,31 @@ function runShellCommands(out: Output, cliState: CliState, config: Config, snipp
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
   });
   for (const [index, commandParts] of commands.entries()) {
+    const isLastCommand = (index === commands.length - 1);
     if (cliState.logLevel === LogLevel.Verbose) {
       out.writeLine(commandParts.join(' '));
     }
-    let commandResult: null | CommandResult = null;
+
     if (cliState.mockShellData) {
       cliState.mockShellData.interceptedCommands.push(
         commandParts.join(' ')
       );
-      if (cliState.mockShellData.commandResults) {
-        commandResult = cliState.mockShellData.commandResults[index];
-        assertNonNullable(commandResult);
+      const lastCommandResult = cliState.mockShellData.lastCommandResult;
+      if (isLastCommand && lastCommandResult) {
+        checkShellCommandResult(cliState, config, snippet, lastCommandResult, isLastCommand);
       }
     } else {
       const [command, ...args] = commandParts;
-      const commandResult = child_process.spawnSync(command, args, {
+      const spawnResult = child_process.spawnSync(command, args, {
         shell: true,
         cwd: cliState.tmpDir,
         encoding: 'utf-8',
       });
-      if (commandResult.error) {
+      if (spawnResult.error) {
         // Spawning didn’t work
-        throw commandResult.error;
+        throw spawnResult.error;
       }
-    }
-    if (commandResult) {
-      const isLastCommand = (index === commands.length-1);
-      checkShellCommandResult(cliState, config, snippet, commandResult, isLastCommand);
+      checkShellCommandResult(cliState, config, snippet, spawnResult, isLastCommand);
     }
   }
 }
@@ -427,89 +425,74 @@ function checkShellCommandResult(cliState: CliState, config: Config, snippet: Sn
   trimTrailingEmptyLines(stdoutLines);
   const stderrLines = splitLinesExclEol(commandResult.stderr);
   trimTrailingEmptyLines(stderrLines);
+  const testFailureProps = {
+    stdout: { actualLines: stdoutLines },
+    stderr: { actualLines: stderrLines, },
+  };
 
-  if (commandResult.status !== null && commandResult.status !== 0) {
-    throw new TestFailure(
-      `Snippet exited with non-zero code ${commandResult.status}`,
-      {
-        stdoutLines,
-        stderrLines,
-      }
-    );
-  }
   if (commandResult.signal !== null) {
     throw new TestFailure(
       `Snippet was terminated by signal ${commandResult.signal}`,
-      {
-        stdoutLines,
-        stderrLines,
-      }
+      testFailureProps
+    );
+  }
+  assertTrue(commandResult.status !== null);
+  if (!isLastCommand && commandResult.status !== 0) {
+    throw new TestFailure(
+      `Snippet exited with non-zero code ${commandResult.status}`,
+      testFailureProps
     );
   }
   // stdout & stderr content are only checked for the last command
   if (!isLastCommand) return;
-  if (commandResult.stderr.length > 0) {
-    if (snippet.stderrSpec) {
-      // We expected stderr output
-      let actualStderrLines = stderrLines;
-      if (snippet.stderrSpec.lineModId) {
-        const lineMod = cliState.idToLineMod.get(snippet.stderrSpec.lineModId);
-        if (lineMod === undefined) {
-          throw new MarkcheckSyntaxError(
-            `Could not find LineMod with id ${stringify(snippet.stderrSpec.lineModId)} (attribute ${stringify(ATTR_KEY_STDERR)})`
-          );
-        }
-        const tmpLines = new Array<string>();
-        lineMod.pushModifiedBodyTo(snippet.lineNumber, actualStderrLines, undefined, tmpLines);
-        actualStderrLines = tmpLines;
-      }
 
-      const expectedStderrLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDERR, snippet.stderrSpec.snippetId);
-      trimTrailingEmptyLines(expectedStderrLines);
-      if (!isOutputEqual(expectedStderrLines, actualStderrLines)) {
-        throw new TestFailure(
-          'stderr was not as expected',
-          {
-            stderrLines: actualStderrLines,
-            expectedStderrLines,
-          }
-        );
-      }
-    } else {
+  if (snippet.exitStatus) {
+    if (snippet.exitStatus === 'nonzero' && commandResult.status === 0) {
       throw new TestFailure(
-        'There was unexpected stderr output',
-        {
-          stderrLines,
-        }
+        'Expected nonzero exit status but it was zero',
+        testFailureProps
+      );
+    }
+    if (typeof snippet.exitStatus === 'number' && snippet.exitStatus !== commandResult.status) {
+      throw new TestFailure(
+        `Expected exit status ${snippet.exitStatus} but it was ${commandResult.status}`,
+        testFailureProps
       );
     }
   }
   if (snippet.stdoutSpec) {
-    // Normally stdout is ignored. But in this case, we examine it.
-    let actualStdoutLines = stdoutLines;
-    if (snippet.stdoutSpec.lineModId) {
-      const lineMod = cliState.idToLineMod.get(snippet.stdoutSpec.lineModId);
-      if (lineMod === undefined) {
-        throw new MarkcheckSyntaxError(
-          `Could not find LineMod with id ${stringify(snippet.stdoutSpec.lineModId)} (attribute ${stringify(ATTR_KEY_STDOUT)})`
-        );
-      }
-      const tmpLines = new Array<string>();
-      lineMod.pushModifiedBodyTo(snippet.lineNumber, actualStdoutLines, undefined, tmpLines);
-      actualStdoutLines = tmpLines;
-    }
+    compareStdStreamLines('Stdout', config, cliState, snippet, snippet.stdoutSpec, stdoutLines, ATTR_KEY_STDOUT, PROP_STDOUT);
+  }
+  if (snippet.stderrSpec) {
+    compareStdStreamLines('Stderr', config, cliState, snippet, snippet.stderrSpec, stderrLines, ATTR_KEY_STDERR, PROP_STDERR);
+  }
+}
 
-    const expectedStdoutLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, ATTR_KEY_STDOUT, snippet.stdoutSpec.snippetId);
-    trimTrailingEmptyLines(expectedStdoutLines);
-    if (!isOutputEqual(expectedStdoutLines, actualStdoutLines)) {
-      throw new TestFailure(
-        'stdout was not as expected',
-        {
-          stdoutLines: actualStdoutLines,
-          expectedStdoutLines,
-        }
+function compareStdStreamLines(stdStreamName: string, config: Config, cliState: CliState, snippet: Snippet, expectedContentSpec: StdStreamContentSpec, actualLines: Array<string>, attrKey: typeof ATTR_KEY_STDOUT | typeof ATTR_KEY_STDERR, failurePropKey: typeof PROP_STDERR | typeof PROP_STDOUT): void {
+  if (expectedContentSpec.lineModId) {
+    const lineMod = cliState.idToLineMod.get(expectedContentSpec.lineModId);
+    if (lineMod === undefined) {
+      throw new MarkcheckSyntaxError(
+        `Could not find LineMod with id ${stringify(expectedContentSpec.lineModId)} (attribute ${stringify(attrKey)})`
       );
     }
+    const tmpLines = new Array<string>();
+    lineMod.pushModifiedBodyTo(snippet.lineNumber, actualLines, undefined, tmpLines);
+    actualLines = tmpLines;
+  }
+
+  const expectedLines = assembleOuterLinesForId(cliState, config, snippet.lineNumber, attrKey, expectedContentSpec.snippetId);
+  trimTrailingEmptyLines(expectedLines);
+  if (!areLinesEqual(expectedLines, actualLines)) {
+    throw new TestFailure(
+      `${stdStreamName} was not as expected`,
+      {
+        [failurePropKey]: {
+          expectedLines,
+          actualLines,
+        }
+      }
+    );
   }
 }
 

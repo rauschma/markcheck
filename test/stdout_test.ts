@@ -35,14 +35,12 @@ test('stdout: success', () => {
   // – if it were to run!
   const mockShellData: MockShellData = {
     interceptedCommands: [],
-    commandResults: [
-      {
-        stdout: 'red\ngreen\nblue',
-        stderr: '',
-        status: 0,
-        signal: null,
-      }
-    ],
+    lastCommandResult: {
+      stdout: 'red\ngreen\nblue',
+      stderr: '',
+      status: 0,
+      signal: null,
+    },
   };
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, mockShellData).hasSucceeded()
@@ -72,14 +70,12 @@ test('stdout: failure', () => {
 
   const mockShellData: MockShellData = {
     interceptedCommands: [],
-    commandResults: [
-      {
-        stdout: 'red\ngreen\nblue',
-        stderr: '',
-        status: 0,
-        signal: null,
-      }
-    ],
+    lastCommandResult: {
+      stdout: 'red\ngreen\nblue',
+      stderr: '',
+      status: 0,
+      signal: null,
+    },
   };
   assert.deepEqual(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, mockShellData).toJson(),

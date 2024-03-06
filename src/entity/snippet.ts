@@ -7,7 +7,7 @@ import type { Translator } from '../translation/translation.js';
 import { MarkcheckSyntaxError, contextDescription, contextLineNumber, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ConfigMod } from './config-mod.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import { Heading } from './heading.js';
 import { LineMod } from './line-mod.js';
 
@@ -134,6 +134,7 @@ export abstract class Snippet {
   abstract get writeOuter(): null | string;
   abstract get externalSpecs(): Array<ExternalSpec>;
   //
+  abstract get exitStatus(): null | 'nonzero' | number;
   abstract get stdoutSpec(): null | StdStreamContentSpec;
   abstract get stderrSpec(): null | StdStreamContentSpec;
 
@@ -227,6 +228,20 @@ export class SingleSnippet extends Snippet {
       }
     }
 
+    const exitStatus = directive.getString(ATTR_KEY_EXIT_STATUS);
+    if (exitStatus) {
+      if (exitStatus === 'nonzero') {
+        snippet.exitStatus = 'nonzero';
+      } else {
+        const parsedNumber = Number(exitStatus);
+        if (Number.isNaN(parsedNumber)) {
+          throw new MarkcheckSyntaxError(
+            `Illegal value for attribute ${stringify(ATTR_KEY_EXIT_STATUS)}: ${stringify(exitStatus)}`
+          );
+        }
+        snippet.exitStatus = parsedNumber;
+      }
+    }
     const stdoutSpecStr = directive.getString(ATTR_KEY_STDOUT);
     if (stdoutSpecStr) {
       snippet.stdoutSpec = parseStdStreamContentSpec(directive.lineNumber, ATTR_KEY_STDOUT, stdoutSpecStr);
@@ -272,6 +287,7 @@ export class SingleSnippet extends Snippet {
   override externalSpecs = new Array<ExternalSpec>();
   #internalFileName: null | string = null;
   //
+  override exitStatus: null | 'nonzero' | number = null;
   override stdoutSpec: null | StdStreamContentSpec = null;
   override stderrSpec: null | StdStreamContentSpec = null;
   //
@@ -561,6 +577,9 @@ export class SequenceSnippet extends Snippet {
   override get externalSpecs(): Array<ExternalSpec> {
     return this.firstElement.externalSpecs;
   }
+  override get exitStatus(): number | 'nonzero' | null {
+    return this.firstElement.exitStatus;
+  }
   override get stdoutSpec(): null | StdStreamContentSpec {
     return this.firstElement.stdoutSpec;
   }
@@ -621,20 +640,20 @@ export function snippetJson(partial: Partial<SingleSnippetJson>): SingleSnippetJ
 
 export type MockShellData = {
   interceptedCommands: Array<string>,
-  commandResults: null | Array<CommandResult>,
+  lastCommandResult: null | CommandResult,
 };
 export function emptyMockShellData(): MockShellData {
   return {
     interceptedCommands: new Array<string>(),
-    commandResults: null,
+    lastCommandResult: null,
   };
 }
 
 export type CommandResult = {
-  stdout: string;
-  stderr: string;
-  status: number | null;
-  signal: NodeJS.Signals | null;
+  stdout: string,
+  stderr: string,
+  status: number | null,
+  signal: NodeJS.Signals | null,
 };
 
 export type CliState = {

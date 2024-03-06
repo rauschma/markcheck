@@ -45,22 +45,29 @@ export function contextDescription(description: string): EntityContextDescriptio
 
 //#################### TestFailure ####################
 
-export interface TestFailureOptions {
-  lineNumber?: number;
-  stdoutLines?: Array<string>;
-  expectedStdoutLines?: Array<string>
-  stderrLines?: Array<string>;
-  expectedStderrLines?: Array<string>
-  cause?: any;
+export const PROP_STDOUT = 'stdout';
+export const PROP_STDERR = 'stderr';
+
+export type TestFailureOptions = {
+  lineNumber?: number,
+  [PROP_STDOUT]?: {
+    actualLines: Array<string>,
+    expectedLines?: Array<string>,
+  },
+  [PROP_STDERR]?: {
+    actualLines: Array<string>,
+    expectedLines?: Array<string>,
+  },
+  cause?: any,
 }
 
 export class TestFailure extends Error {
   override name = this.constructor.name;
   context: undefined | EntityContext;
-  stdoutLines;
-  expectedStdoutLines;
-  stderrLines;
-  expectedStderrLines;
+  actualStdoutLines: undefined | Array<string>;
+  expectedStdoutLines: undefined | Array<string>;
+  actualStderrLines: undefined | Array<string>;
+  expectedStderrLines: undefined | Array<string>;
   constructor(message: string, opts: TestFailureOptions = {}) {
     super(
       message,
@@ -72,10 +79,10 @@ export class TestFailure extends Error {
         lineNumber: opts.lineNumber,
       };
     }
-    this.stdoutLines = opts.stdoutLines;
-    this.expectedStdoutLines = opts.expectedStdoutLines;
-    this.stderrLines = opts.stderrLines;
-    this.expectedStderrLines = opts.expectedStderrLines;
+    this.actualStdoutLines = opts[PROP_STDOUT]?.actualLines;
+    this.expectedStdoutLines = opts[PROP_STDOUT]?.expectedLines;
+    this.actualStderrLines = opts[PROP_STDERR]?.actualLines;
+    this.expectedStderrLines = opts[PROP_STDERR]?.expectedLines;
   }
   logTo(out: Output, prefix = ''): void {
     const description = (

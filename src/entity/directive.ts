@@ -1,7 +1,7 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
-import { InternalError, MarkcheckSyntaxError, type LineNumber, type EntityContext } from '../util/errors.js';
+import { InternalError, MarkcheckSyntaxError, type EntityContext, type LineNumber } from '../util/errors.js';
 
 const { stringify } = JSON;
 const { raw } = String;
@@ -86,8 +86,9 @@ export function parseExternalSpecs(lineNumber: number, str: string): Array<Exter
   return specs;
 }
 
-//----- Checking output -----
+//----- Checking command results -----
 
+export const ATTR_KEY_EXIT_STATUS = 'exitStatus';
 export const ATTR_KEY_STDOUT = 'stdout';
 export const ATTR_KEY_STDERR = 'stderr';
 
@@ -191,6 +192,7 @@ export const ATTRS_SNIPPET: ExpectedAttributeValues = new Map<string, AttrValue 
   [ATTR_KEY_INTERNAL, AttrValue.String],
   [ATTR_KEY_EXTERNAL, AttrValue.String],
   //
+  [ATTR_KEY_EXIT_STATUS, AttrValue.String],
   [ATTR_KEY_STDOUT, AttrValue.String],
   [ATTR_KEY_STDERR, AttrValue.String],
 ]);
