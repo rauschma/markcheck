@@ -11,7 +11,7 @@ createSuite(import.meta.url);
 
 test('ignoreLines: line numbers', () => {
   const readme = outdent`
-    <!--markcheck onlyLocalLines ignoreLines="1..2, -1"-->
+    <!--markcheck runLocalLines ignoreLines="1..2, -1"-->
     ▲▲▲js
     // one
     // two
@@ -41,7 +41,7 @@ test('ignoreLines: line numbers', () => {
 
 test('ignoreLines: text fragments', () => {
   const readme = outdent`
-    <!--markcheck onlyLocalLines ignoreLines="'two', 'four'..'five'"-->
+    <!--markcheck runLocalLines ignoreLines="'two', 'four'..'five'"-->
     ▲▲▲js
     // one
     // two

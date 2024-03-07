@@ -11,7 +11,7 @@ createSuite(import.meta.url);
 
 test('before', () => {
   const readme = outdent`
-    <!--markcheck onlyLocalLines before:
+    <!--markcheck runLocalLines before:
     // BEFORE
     -->
     ▲▲▲js
@@ -38,7 +38,7 @@ test('before', () => {
 
 test('after', () => {
   const readme = outdent`
-    <!--markcheck onlyLocalLines after:
+    <!--markcheck runLocalLines after:
     // AFTER
     -->
     ▲▲▲js

@@ -12,7 +12,7 @@ createSuite(import.meta.url);
 
 test('stdout: success', () => {
   const readme = outdent`
-    <!--markcheck stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
+    <!--markcheck stdout="|modify-stdout=expected-stdout" runLocalLines-->
     ▲▲▲js
     console.log('red');
     console.log('green');
@@ -49,7 +49,7 @@ test('stdout: success', () => {
 
 test('stdout: failure', () => {
   const readme = outdent`
-    <!--markcheck stdout="|modify-stdout=expected-stdout" onlyLocalLines-->
+    <!--markcheck stdout="|modify-stdout=expected-stdout" runLocalLines-->
     ▲▲▲js
     console.log('red');
     console.log('green');

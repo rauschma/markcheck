@@ -11,7 +11,7 @@ createSuite(import.meta.url);
 
 test('Written snippet', () => {
   const readme = outdent`
-    <!--markcheck writeInner="test-file.txt" body:
+    <!--markcheck writeLocal="test-file.txt" body:
     Test file content
     -->
   `.replaceAll('▲', '`');

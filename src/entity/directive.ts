@@ -37,7 +37,7 @@ export const ATTR_KEY_INCLUDE = 'include';
 export const ATTR_KEY_APPLY_TO_BODY = 'applyToBody';
 export const ATTR_KEY_APPLY_TO_OUTER = 'applyToOuter';
 /** Exclude config lines and language LineMods */
-export const ATTR_KEY_ONLY_LOCAL_LINES = 'onlyLocalLines';
+export const ATTR_KEY_RUN_LOCAL_LINES = 'runLocalLines';
 export const ATTR_KEY_IGNORE_LINES = 'ignoreLines';
 export const ATTR_KEY_SEARCH_AND_REPLACE = 'searchAndReplace';
 
@@ -50,10 +50,10 @@ export const ATTR_KEY_CONTAINED_IN_FILE = 'containedInFile';
 
 //----- Writing and referring to files -----
 
-export const ATTR_KEY_WRITE_INNER = 'writeInner';
-export const ATTR_KEY_WRITE_OUTER = 'writeOuter';
+export const ATTR_KEY_WRITE_LOCAL = 'writeLocal';
+export const ATTR_KEY_WRITE_ALL = 'writeAll';
 
-export const ATTR_KEY_INTERNAL = 'internal';
+export const ATTR_KEY_RUN_FILE_NAME = 'runFileName';
 
 /**
  * ```
@@ -182,14 +182,14 @@ export const ATTRS_SNIPPET: ExpectedAttributeValues = new Map<string, AttrValue 
   [ATTR_KEY_INCLUDE, AttrValue.String],
   [ATTR_KEY_APPLY_TO_BODY, AttrValue.String],
   [ATTR_KEY_APPLY_TO_OUTER, AttrValue.String],
-  [ATTR_KEY_ONLY_LOCAL_LINES, AttrValue.Valueless],
+  [ATTR_KEY_RUN_LOCAL_LINES, AttrValue.Valueless],
   //
   [ATTR_KEY_SAME_AS_ID, AttrValue.String],
   [ATTR_KEY_CONTAINED_IN_FILE, AttrValue.String],
   //
-  [ATTR_KEY_WRITE_INNER, AttrValue.String],
-  [ATTR_KEY_WRITE_OUTER, AttrValue.String],
-  [ATTR_KEY_INTERNAL, AttrValue.String],
+  [ATTR_KEY_WRITE_LOCAL, AttrValue.String],
+  [ATTR_KEY_WRITE_ALL, AttrValue.String],
+  [ATTR_KEY_RUN_FILE_NAME, AttrValue.String],
   [ATTR_KEY_EXTERNAL, AttrValue.String],
   //
   [ATTR_KEY_EXIT_STATUS, AttrValue.String],

@@ -18,7 +18,7 @@ test('Assemble snippet with body LineMod', () => {
     // Language LineMod AFTER
     -->
 
-    <!--markcheck include="included-snippet" applyToOuter="outer-line-mod" internal="my-module.mjs" around:
+    <!--markcheck include="included-snippet" applyToOuter="outer-line-mod" runFileName="my-module.mjs" around:
     // Body LineMod BEFORE
     •••
     // Body LineMod AFTER
@@ -101,7 +101,7 @@ test('Assemble snippet with applyToBody LineMod', () => {
     // Language LineMod AFTER
     -->
 
-    <!--markcheck include="other" applyToBody="apply-to-body-line-mod" applyToOuter="outer-line-mod" internal="my-module.mjs"-->
+    <!--markcheck include="other" applyToBody="apply-to-body-line-mod" applyToOuter="outer-line-mod" runFileName="my-module.mjs"-->
     ▲▲▲js
     // Body
     ▲▲▲

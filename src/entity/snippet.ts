@@ -6,7 +6,7 @@ import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, PROP_KEY_DEFAULT_FIL
 import type { Translator } from '../translation/translation.js';
 import { MarkcheckSyntaxError, contextDescription, contextSnippet, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_INTERNAL, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_ONLY_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_INNER, ATTR_KEY_WRITE_OUTER, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_LOCAL, ATTR_KEY_WRITE_ALL, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
 import { LineMod } from './line-mod.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
@@ -46,7 +46,7 @@ export function assembleInnerLines(fileState: FileState, config: Config, snippet
 export function assembleOuterLines(fileState: FileState, config: Config, snippet: Snippet) {
   const lines = new Array<string>();
 
-  const outerLineMods = collectOuterLineMods(snippet.onlyLocalLines);
+  const outerLineMods = collectOuterLineMods(snippet.runLocalLines);
 
   for (let i = 0; i < outerLineMods.length; i++) {
     outerLineMods[i].pushBeforeLines(lines);
@@ -64,10 +64,10 @@ export function assembleOuterLines(fileState: FileState, config: Config, snippet
   }
   return lines;
 
-  function collectOuterLineMods(onlyLocalLines: boolean): Array<LineMod> {
+  function collectOuterLineMods(runLocalLines: boolean): Array<LineMod> {
     const outerLineMods = new Array<LineMod>();
 
-    if (!onlyLocalLines) {
+    if (!runLocalLines) {
       if (snippet.lang) {
         const lang = config.getLang(snippet.lang);
         if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
@@ -117,14 +117,14 @@ export abstract class Snippet extends MarkcheckEntity {
   //
   abstract get lang(): string;
   //
-  abstract get onlyLocalLines(): boolean;
+  abstract get runLocalLines(): boolean;
   abstract get applyToOuterId(): null | string;
   //
   abstract get sameAsId(): null | string;
   abstract get containedInFile(): null | string;
   //
-  abstract get writeInner(): null | string;
-  abstract get writeOuter(): null | string;
+  abstract get writeLocal(): null | string;
+  abstract get writeAll(): null | string;
   abstract get externalSpecs(): Array<ExternalSpec>;
   //
   abstract get exitStatus(): null | 'nonzero' | number;
@@ -192,7 +192,7 @@ export class SingleSnippet extends Snippet {
 
       snippet.applyToBodyId = directive.getString(ATTR_KEY_APPLY_TO_BODY);
       snippet.applyToOuterId = directive.getString(ATTR_KEY_APPLY_TO_OUTER);
-      snippet.onlyLocalLines = directive.getBoolean(ATTR_KEY_ONLY_LOCAL_LINES);
+      snippet.runLocalLines = directive.getBoolean(ATTR_KEY_RUN_LOCAL_LINES);
     }
 
     { // Checks
@@ -212,9 +212,9 @@ export class SingleSnippet extends Snippet {
     }
 
     { // File names
-      snippet.writeInner = directive.getString(ATTR_KEY_WRITE_INNER);
-      snippet.writeOuter = directive.getString(ATTR_KEY_WRITE_OUTER);
-      snippet.#internalFileName = directive.getString(ATTR_KEY_INTERNAL);
+      snippet.writeLocal = directive.getString(ATTR_KEY_WRITE_LOCAL);
+      snippet.writeAll = directive.getString(ATTR_KEY_WRITE_ALL);
+      snippet.#internalFileName = directive.getString(ATTR_KEY_RUN_FILE_NAME);
       const external = directive.getString(ATTR_KEY_EXTERNAL);
       if (external) {
         snippet.externalSpecs = parseExternalSpecs(directive.lineNumber, external);
@@ -268,15 +268,15 @@ export class SingleSnippet extends Snippet {
   bodyLineMod: null | LineMod = null;
   applyToBodyId: null | string = null;
   override applyToOuterId: null | string = null;
-  override onlyLocalLines = false;
+  override runLocalLines = false;
   //
   override sameAsId: null | string = null;
   override containedInFile: null | string = null;
   //
   #lang: null | string = null;
   //
-  override writeInner: null | string = null;
-  override writeOuter: null | string = null;
+  override writeLocal: null | string = null;
+  override writeAll: null | string = null;
   override externalSpecs = new Array<ExternalSpec>();
   #internalFileName: null | string = null;
   //
@@ -305,7 +305,7 @@ export class SingleSnippet extends Snippet {
       return langDef.defaultFileName;
     }
     throw new MarkcheckSyntaxError(
-      `Snippet does not have a filename: neither via config (${stringify(CONFIG_KEY_LANG)} property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}) nor via attribute ${stringify(ATTR_KEY_INTERNAL)}`,
+      `Snippet does not have a filename: neither via config (${stringify(CONFIG_KEY_LANG)} property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}) nor via attribute ${stringify(ATTR_KEY_RUN_FILE_NAME)}`,
       { lineNumber: this.lineNumber }
     );
   }
@@ -546,8 +546,8 @@ export class SequenceSnippet extends Snippet {
   override get applyToOuterId(): null | string {
     return this.firstElement.applyToOuterId;
   }
-  override get onlyLocalLines(): boolean {
-    return this.firstElement.onlyLocalLines;
+  override get runLocalLines(): boolean {
+    return this.firstElement.runLocalLines;
   }
   override get sameAsId(): null | string {
     return this.firstElement.sameAsId;
@@ -561,11 +561,11 @@ export class SequenceSnippet extends Snippet {
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return this.firstElement.getAllFileNames(langDef);
   }
-  override get writeInner(): null | string {
-    return this.firstElement.writeInner;
+  override get writeLocal(): null | string {
+    return this.firstElement.writeLocal;
   }
-  override get writeOuter(): null | string {
-    return this.firstElement.writeOuter;
+  override get writeAll(): null | string {
+    return this.firstElement.writeAll;
   }
   override get externalSpecs(): Array<ExternalSpec> {
     return this.firstElement.externalSpecs;

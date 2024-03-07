@@ -41,7 +41,7 @@ function functionThatShouldThrow() {
 ```js
 ```
 
-<!--markcheck writeInner="some-file.txt" body:
+<!--markcheck writeLocal="some-file.txt" body:
 Content of some-file.txt
 -->
 ``````
@@ -99,11 +99,13 @@ After directories were paired with code blocks, we get the following entities:
 Phases of visitation:
 
 * Checks: `sameAsId`, `containedInFile`
-* Writing to disk via `writeInner`, `writeOuter`
-  * Skips running. Use `internal` to change the snippet’s default filename and run it.
+* Writing to disk via `writeLocal`, `writeAll`
+  * Skips running. Use `runFileName` to change the snippet’s default filename and run it.
 * Running:
-  * Writing to disk (current snippet and external snippets it references)
-    * Override main filename via `internal="file-name"`
+  * Writing to disk:
+    * External snippets whose IDs are mentioned by `external`.
+    * Current snippet
+      * Override its default filename via `runFileName="file-name"`
   * Running shell commands
 
 Running: 
@@ -115,9 +117,9 @@ Running:
   * Visitation mode `normal` (not an attribute): active if none of the previous attributes are present.
 * `id` sets running mode to `skip`.
   * Override via `alwaysRun` or `only`
-* `writeInner`, `writeOuter` always prevent running. Alternatives:
-  * `internal="file-name"` changes the filename that is used when running a snippet. It overrides the default set by the config.
-  * `onlyLocalLines` excludes global lines when writing a file to disk for running.
+* `writeLocal`, `writeAll` always prevent running. Alternatives:
+  * `runFileName="file-name"` changes the filename that is used when running a snippet. It overrides the default set by the config.
+  * `runLocalLines` excludes global lines when writing a file to disk for running.
 
 ### How lines are assembled
 
@@ -185,16 +187,16 @@ All global lines are outer lines. But snippets can also contribute local outer l
     * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
   * `applyInner="id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
   * `applyOuter="id"`: applies an appliable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
-  * `onlyLocalLines`: when a snippet is self-contained and does not need config lines and language LineMod lines.
+  * `runLocalLines`: when a snippet is self-contained and does not need config lines and language LineMod lines.
 * Additional checks:
   * `sameAsId="id"`
   * `containedInFile="filePath"`:
     * `filePath` is either relative to the Markdown file or absolute.
     * The outer LineMods are not applied.
 * Writing and referring to files:
-  * `writeInner="filePath"`
-  * `writeOuter="filePath"`
-  * `internal="filePath"`
+  * `writeLocal="filePath"`
+  * `writeAll="filePath"`
+  * `runFileName="filePath"`
   * `external="id1>lib1.js, lib2.js"`
 * Checking output:
   * `stdout="|lineModId=id"`

@@ -12,7 +12,7 @@ createSuite(import.meta.url);
 
 test('exitStatus: expecting 0 fails if actual is 1', () => {
   const readme = outdent`
-    <!--markcheck exitStatus="0" onlyLocalLines-->
+    <!--markcheck exitStatus="0" runLocalLines-->
     ▲▲▲js
     process.exit(1);
     ▲▲▲
@@ -41,7 +41,7 @@ test('exitStatus: expecting 0 fails if actual is 1', () => {
 
 test('exitStatus: expecting "nonzero" succeeds if actual is 1', () => {
   const readme = outdent`
-    <!--markcheck exitStatus="nonzero" onlyLocalLines-->
+    <!--markcheck exitStatus="nonzero" runLocalLines-->
     ▲▲▲js
     process.exit(1);
     ▲▲▲

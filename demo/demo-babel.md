@@ -31,7 +31,7 @@ We need to configure Babel. We use the “project-wide” configuration file `ba
 
 More information on Babel configuration files: https://babeljs.io/docs/en/config-files
 
-<!--markcheck writeInner="babel.config.json" body:
+<!--markcheck writeLocal="babel.config.json" body:
 {
   "plugins": [
     ["@babel/plugin-proposal-decorators", {"version": "2022-03"}]

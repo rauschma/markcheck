@@ -253,7 +253,7 @@ Setting up an external file:
 
 <!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--markcheck writeInner="some-file.txt" body:
+<!--markcheck writeLocal="some-file.txt" body:
 Content of some-file.txt
 -->
 

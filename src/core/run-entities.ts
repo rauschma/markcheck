@@ -289,16 +289,16 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
 
   //----- Writing -----
 
-  const writeOuter: null | string = snippet.writeOuter;
-  if (writeOuter) {
+  const writeAll: null | string = snippet.writeAll;
+  if (writeAll) {
     const lines = assembleOuterLines(fileState, config, snippet);
-    writeOneFile(fileState, config, snippetState, writeOuter, lines);
+    writeOneFile(fileState, config, snippetState, writeAll, lines);
     return;
   }
-  const writeInner: null | string = snippet.writeInner;
-  if (writeInner) {
+  const writeLocal: null | string = snippet.writeLocal;
+  if (writeLocal) {
     const lines = assembleOuterLines(fileState, config, snippet);
-    writeOneFile(fileState, config, snippetState, writeInner, lines);
+    writeOneFile(fileState, config, snippetState, writeLocal, lines);
     return;
   }
 
