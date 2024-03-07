@@ -1,3 +1,4 @@
+import type { SearchAndReplace } from '@rauschma/helpers/js/escaper.js';
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
@@ -425,18 +426,9 @@ const RE_SEARCH_AND_REPLACE = re`/^[/](${RE_INNER})[/](${RE_INNER})[/]([i])?$/`;
  * Example: `"/[⎡⎤]//i"`
  */
 export class SearchAndReplaceSpec {
-  static fromString(context: EntityContext, str: string): SearchAndReplaceSpec {
-    const match = RE_SEARCH_AND_REPLACE.exec(str);
-    if (!match) {
-      throw new MarkcheckSyntaxError(
-        `Not a valid searchAndReplace string: ${stringify(str)}`,
-        { entityContext: context }
-      );
-    }
-    const search = match[1];
-    const replace = match[2].replaceAll(raw`\/`, '/');
-    const flags = 'g' + (match[3] ?? '');
-    return new SearchAndReplaceSpec(new RegExp(search, flags), replace);
+  static fromString(entityContext: EntityContext, str: string): SearchAndReplaceSpec {
+    const {search, replace} = parseSearchAndReplaceString(entityContext, str);
+    return new SearchAndReplaceSpec(search, replace);
   }
   #search;
   #replace;
@@ -454,4 +446,21 @@ export class SearchAndReplaceSpec {
   replaceAll(str: string): string {
     return str.replaceAll(this.#search, this.#replace);
   }
+}
+
+export function parseSearchAndReplaceString(entityContext: EntityContext, str: string): SearchAndReplace {
+  const match = RE_SEARCH_AND_REPLACE.exec(str);
+  if (!match) {
+    throw new MarkcheckSyntaxError(
+      `Not a valid searchAndReplace string: ${stringify(str)}`,
+      { entityContext }
+    );
+  }
+  const search = match[1];
+  const replace = match[2].replaceAll(raw`\/`, '/');
+  const flags = 'g' + (match[3] ?? '');
+  return {
+    search: new RegExp(search, flags),
+    replace,
+  };
 }

@@ -1,53 +1,49 @@
 import { createSuite } from '@rauschma/helpers/nodejs/test.js';
 import assert from 'node:assert/strict';
-import { contextLineNumber } from '../util/errors.js';
+import { CMD_VAR_FILE_NAME } from '../entity/directive.js';
+import { contextDescription, contextLineNumber } from '../util/errors.js';
 import { Config } from './config.js';
 
 createSuite(import.meta.url);
 
 test('config.toJson()', () => {
-  const json = new Config().toJson();
+  const config = new Config();
+  config.applyMod(
+    contextDescription('Test'),
+    {
+      searchAndReplace: [
+        '/[⎡⎤]//',
+      ],
+      lang: {
+        'js': {
+          before: [
+            "import assert from 'node:assert/strict';"
+          ],
+          runFileName: 'main.mjs',
+          commands: [
+            ["node", CMD_VAR_FILE_NAME],
+          ],
+        },
+      },
+    }
+  );
+  const json = config.toJson();
   // console.log(JSON.stringify(json, null, 2));
   assert.deepEqual(
     json,
     {
+      "searchAndReplace": [
+        "/[⎡⎤]//"
+      ],
       "lang": {
-        "": "[skip]",
         "js": {
+          "before": [
+            "import assert from 'node:assert/strict';"
+          ],
           "runFileName": "main.mjs",
           "commands": [
             [
               "node",
-              "$FILE_NAME"
-            ]
-          ]
-        },
-        "node-repl": {
-          "extends": "js",
-          "translator": "node-repl-to-js"
-        },
-        "babel": {
-          "runFileName": "main.mjs",
-          "commands": [
-            [
-              "node",
-              "--loader=babel-register-esm",
-              "--disable-warning=ExperimentalWarning",
-              "$FILE_NAME"
-            ]
-          ]
-        },
-        "ts": {
-          "runFileName": "main.ts",
-          "commands": [
-            [
-              "npx",
-              "ts-expect-error",
-              "$ALL_FILE_NAMES"
-            ],
-            [
-              "npx",
-              "tsx",
               "$FILE_NAME"
             ]
           ]
@@ -58,11 +54,12 @@ test('config.toJson()', () => {
 });
 
 test('config.getLang()', () => {
-  const config = new Config();
+  const config = new Config().addDefaults();
   config.applyMod(contextLineNumber(1), {
     "lang": {
       "js": {
         "extends": "babel",
+        "runFileName": "main-babel.mjs",
       },
     },
   });
@@ -73,6 +70,9 @@ test('config.getLang()', () => {
   assert.deepEqual(
     langDef,
     {
+      beforeLines: [
+        "import assert from 'node:assert/strict';"
+      ],
       commands: [
         [
           'node',
@@ -81,8 +81,9 @@ test('config.getLang()', () => {
           '$FILE_NAME'
         ]
       ],
-      runFileName: 'main.mjs',
+      extends: 'babel',
       kind: 'LangDefCommand',
+      runFileName: 'main-babel.mjs',
       translator: undefined
     }
   );

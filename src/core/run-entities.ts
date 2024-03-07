@@ -46,7 +46,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     globalRunningMode = GlobalRunningMode.Only;
   }
 
-  const config = new Config();
+  const config = new Config().addDefaults();
   const configFilePath = path.resolve(markcheckDir, CONFIG_FILE_NAME);
   if (fs.existsSync(configFilePath)) {
     const json = json5.parse(fs.readFileSync(configFilePath, 'utf-8'));

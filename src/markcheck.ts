@@ -46,7 +46,7 @@ export function main() {
     return;
   }
   if (args.values['print-config']) {
-    out.writeLine(JSON.stringify(new Config().toJson(), null, 2));
+    out.writeLine(JSON.stringify(new Config().addDefaults().toJson(), null, 2));
     return;
   }
   if (args.values.help || args.positionals.length === 0) {

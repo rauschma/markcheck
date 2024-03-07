@@ -1,10 +1,10 @@
-import { createSequentialEscaper } from '@rauschma/helpers/js/escaper.js';
+import { createSequentialRegExpEscaper } from '@rauschma/helpers/js/escaper.js';
 import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { z } from 'zod';
-import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP } from '../entity/directive.js';
+import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP, parseSearchAndReplaceString } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
-import { ConfigurationError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
+import { ConfigurationError, MarkcheckSyntaxError, contextDescription, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -61,13 +61,109 @@ export const CONFIG_PROP_BEFORE_LINES = 'beforeLines';
 
 export class Config {
   searchAndReplaceFunc: (str: string) => string = (str) => str;
-  #searchAndReplaceData: Record<string, string> = {};
+  #searchAndReplaceData: Array<string> = [];
   #lang = new Map<string, LangDef>();
-
-  constructor() {
-    this.#setSearchAndReplace({
-      '[⎡⎤]': '',
-    });
+  toJson(): ConfigModJson {
+    return {
+      "searchAndReplace": this.#searchAndReplaceData,
+      "lang": Object.fromEntries(
+        Array.from(
+          this.#lang,
+          ([key, value]) => [
+            key, langDefToJson(value)
+          ]
+        )
+      ),
+    };
+  }
+  /**
+   * @param entityContext `configModJson` comes from a config file or a
+   * ConfigMod (inside a Markdown file).
+   */
+  applyMod(entityContext: EntityContext, configModJson: ConfigModJson): void {
+    if (configModJson.searchAndReplace) {
+      this.#setSearchAndReplace(entityContext, configModJson.searchAndReplace);
+    }
+    if (configModJson.lang) {
+      for (const [key, langDefJson] of Object.entries(configModJson.lang)) {
+        this.#lang.set(key, langDefFromJson(entityContext, langDefJson));
+      }
+    }
+  }
+  #setSearchAndReplace(entityContext: EntityContext, data: Array<string>) {
+    this.searchAndReplaceFunc = createSequentialRegExpEscaper(
+      data.map(
+        (str) => parseSearchAndReplaceString(entityContext, str)
+      )
+    );
+    this.#searchAndReplaceData = data;
+  }
+  getLang(langKey: string): undefined | LangDef {
+    const langDef = this.#lang.get(langKey);
+    if (langDef === undefined) {
+      return langDef;
+    }
+    if (langDef.kind === 'LangDefCommand') {
+      return this.#lookUpLangDefJson(langKey, langDef);
+    } else {
+      return langDef;
+    }
+  }
+  #lookUpLangDefJson(parentKey: string, partialCommand: LangDefCommand, visitedLanguages = new Set<string>): LangDef {
+    const origParentKey = parentKey;
+    let result = partialCommand;
+    while (true) {
+      if (partialCommand.extends === undefined) {
+        break;
+      }
+      if (visitedLanguages.has(partialCommand.extends)) {
+        const keyPath = [...visitedLanguages, partialCommand.extends];
+        throw new ConfigurationError(
+          `Cycle in property ${stringify(PROP_KEY_EXTENDS)} (object ${stringify(CONFIG_KEY_LANG)}): ${stringify(keyPath)}`
+        );
+      }
+      visitedLanguages.add(partialCommand.extends);
+      const nextLangDef = this.#lang.get(partialCommand.extends);
+      if (nextLangDef === undefined) {
+        throw new ConfigurationError(
+          `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(partialCommand.extends)}`
+        );
+      }
+      switch (nextLangDef.kind) {
+        case 'LangDefSkip':
+        case 'LangDefErrorIfRun':
+          // End of the road
+          return nextLangDef;
+        case 'LangDefCommand':
+          // `result` extends `nextLangDef` – the properties of the former
+          // win.
+          result = merge(result, nextLangDef);
+          parentKey = partialCommand.extends;
+          partialCommand = nextLangDef;
+          break;
+        default:
+          throw new UnsupportedValueError(nextLangDef);
+      }
+    } // while
+    if (result.runFileName === undefined) {
+      throw new ConfigurationError(
+        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}`
+      );
+    }
+    if (result.commands === undefined) {
+      throw new ConfigurationError(
+        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_COMMANDS)}`
+      );
+    }
+    return result;
+  }
+  addDefaults(): this {
+    this.#setSearchAndReplace(
+      contextDescription('Default config'),
+      [
+        '/[⎡⎤]//',
+      ]
+    );
     // Bare code blocks may be written but are never run.
     this.#lang.set(
       '',
@@ -156,96 +252,7 @@ export class Config {
         ],
       }
     );
-  }
-  toJson(): ConfigModJson {
-    return {
-      "searchAndReplace": this.#searchAndReplaceData,
-      "lang": Object.fromEntries(
-        Array.from(
-          this.#lang,
-          ([key, value]) => [
-            key, langDefToJson(value)
-          ]
-        )
-      ),
-    };
-  }
-  /**
-   * @param context `configModJson` comes from a config file or a ConfigMod
-   * (inside a Markdown file).
-   */
-  applyMod(context: EntityContext, configModJson: ConfigModJson): void {
-    if (configModJson.searchAndReplace) {
-      this.#setSearchAndReplace(configModJson.searchAndReplace);
-    }
-    if (configModJson.lang) {
-      for (const [key, langDefJson] of Object.entries(configModJson.lang)) {
-        this.#lang.set(key, langDefFromJson(context, langDefJson));
-      }
-    }
-  }
-  #setSearchAndReplace(data: Record<string, string>) {
-    this.searchAndReplaceFunc = createSequentialEscaper(Object.entries(data));
-    this.#searchAndReplaceData = data;
-  }
-  getLang(langKey: string): undefined | LangDef {
-    const langDef = this.#lang.get(langKey);
-    if (langDef === undefined) {
-      return langDef;
-    }
-    if (langDef.kind === 'LangDefCommand') {
-      return this.#lookUpLangDefJson(langKey, langDef);
-    } else {
-      return langDef;
-    }
-  }
-  #lookUpLangDefJson(parentKey: string, partialCommand: LangDefCommand, visitedLanguages = new Set<string>): LangDef {
-    const origParentKey = parentKey;
-    let result = partialCommand;
-    while (true) {
-      if (partialCommand.extends === undefined) {
-        break;
-      }
-      if (visitedLanguages.has(partialCommand.extends)) {
-        const keyPath = [...visitedLanguages, partialCommand.extends];
-        throw new ConfigurationError(
-          `Cycle in property ${stringify(PROP_KEY_EXTENDS)} (object ${stringify(CONFIG_KEY_LANG)}): ${stringify(keyPath)}`
-        );
-      }
-      visitedLanguages.add(partialCommand.extends);
-      const nextLangDef = this.#lang.get(partialCommand.extends);
-      if (nextLangDef === undefined) {
-        throw new ConfigurationError(
-          `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(partialCommand.extends)}`
-        );
-      }
-      switch (nextLangDef.kind) {
-        case 'LangDefSkip':
-        case 'LangDefErrorIfRun':
-          // End of the road
-          return nextLangDef;
-        case 'LangDefCommand':
-          // `result` extends `nextLangDef` – the properties of the former
-          // win.
-          result = merge(result, nextLangDef);
-          parentKey = partialCommand.extends;
-          partialCommand = nextLangDef;
-          break;
-        default:
-          throw new UnsupportedValueError(nextLangDef);
-      }
-    } // while
-    if (result.runFileName === undefined) {
-      throw new ConfigurationError(
-        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}`
-      );
-    }
-    if (result.commands === undefined) {
-      throw new ConfigurationError(
-        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_COMMANDS)}`
-      );
-    }
-    return result;
+    return this;
   }
 }
 
@@ -288,7 +295,7 @@ export type ConfigModJson = {
    * type+schema for parsing in that case.
    */
   markcheckDirectory?: string,
-  searchAndReplace?: Record<string, string>,
+  searchAndReplace?: Array<string>,
   lang?: Record<string, LangDefPartialJson>,
 };
 export const CONFIG_KEY_LANG = 'lang';
@@ -349,17 +356,24 @@ function langDefToJson(langDef: LangDef): LangDefPartialJson {
     case 'LangDefErrorIfRun':
       return LANG_ERROR_IF_RUN;
     case 'LangDefCommand': {
-      return {
-        extends: langDef.extends,
-        before: langDef.beforeLines,
-        ...(
-          langDef.translator
-            ? { translator: langDef.translator.key }
-            : {}
-        ),
-        runFileName: langDef.runFileName,
-        commands: langDef.commands,
+      const result: LangDefPartialJson = {
       };
+      if (langDef.extends) {
+        result.extends = langDef.extends;
+      }
+      if (langDef.beforeLines) {
+        result.before = langDef.beforeLines;
+      }
+      if (langDef.translator) {
+        result.translator = langDef.translator.key;
+      }
+      if (langDef.runFileName) {
+        result.runFileName = langDef.runFileName;
+      }
+      if (langDef.commands) {
+        result.commands = langDef.commands;
+      }
+      return result;
     }
     default:
       throw new UnsupportedValueError(langDef);
@@ -384,7 +398,7 @@ export const LangDefPartialJsonSchema = z.union([
 
 export const ConfigModJsonSchema = z.object({
   markcheckDirectory: z.optional(z.string()),
-  searchAndReplace: z.optional(z.record(z.string())),
+  searchAndReplace: z.optional(z.array(z.string())),
   lang: z.optional(
     z.record(
       LangDefPartialJsonSchema
