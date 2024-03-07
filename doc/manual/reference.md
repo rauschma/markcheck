@@ -282,17 +282,17 @@ Property `"lang"`:
 * Value `"[skip]"`: Don’t run the snippets.
 * Value `"[errorIfRun]"`: Snippets must not be run – which can, e.g., be avoided via attribute `skip`.
 
-## Search and replace
+### Search and replace
 
 ```json
 {
   "searchAndReplace": [
-    { search: "[⎡⎤]", replace: "" },
+    "/[⎡⎤]//"
   ],
 }
 ```
 
-## Translators
+### Translators
 
 ```json
 {
