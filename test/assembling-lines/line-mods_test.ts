@@ -10,7 +10,7 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Assemble snippet with body LineMod', () => {
+test('Assemble snippet with body LineMod and applyToOuter', () => {
   const readme = outdent`
     <!--markcheck each="js" around:
     // Language LineMod BEFORE
@@ -89,6 +89,68 @@ test('Assemble snippet with body LineMod', () => {
     [
       'js-command1 my-module.mjs',
       'js-command2 my-module.mjs',
+    ]
+  );
+});
+
+test('Assemble snippet with runLocalLines and applyToOuter: must include applyToOuter lines but not config lines', () => {
+  const readme = outdent`
+    <!--markcheck applyToOuter="outer-line-mod" runLocalLines-->
+    ▲▲▲js
+    // Body
+    ▲▲▲
+
+    <!--markcheck lineModId="outer-line-mod" around:
+    // Outer applied LineMod BEFORE
+    •••
+    // Outer applied LineMod AFTER
+    -->
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {
+      'markcheck-config.jsonc': outdent`
+        {
+          "lang": {
+            "": "[skip]",
+            "js": {
+              "before": [
+                "// Config line BEFORE"
+              ],
+              "runFileName": "main.mjs",
+              "commands": [
+                [ "js-command1", "$FILE_NAME" ],
+                [ "js-command2", "$FILE_NAME" ],
+              ]
+            },
+          },
+        }
+      `,
+    },
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  const mockShellData = emptyMockShellData();
+  assert.equal(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
+    0
+  );
+  // Per file: config lines, language LineMods
+  // Per snippet: applied line mod, local line mod
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        // Outer applied LineMod BEFORE
+        // Body
+        // Outer applied LineMod AFTER
+      `,
+    }
+  );
+  assert.deepEqual(
+    mockShellData.interceptedCommands,
+    [
+      'js-command1 main.mjs',
+      'js-command2 main.mjs',
     ]
   );
 });
