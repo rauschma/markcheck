@@ -57,7 +57,7 @@ export function main() {
       'Options:',
       `${style.Bold`--help -h`}          get help`,
       `${style.Bold`--version`}          print version`,
-      `${style.Bold`--print-config -p`}  print built-in configuration`,
+      `${style.Bold`--print-config -p`}  print configuration defaults`,
       `${style.Bold`--verbose -v`}       show more information (e.g. which shell commands are run)`,
       '',
     ];

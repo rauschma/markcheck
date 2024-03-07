@@ -21,19 +21,14 @@ npx markcheck demo/demo-javascript.md
 npx markcheck demo/demo-node-repl.md
 ```
 
-For `demo-babel.md` and `demo-typescript.md`, you need to install the packages inside `markcheck/demo`:
-
-```txt
-cd markcheck/demo
-npm install
-```
+More demos are here: [`demo/`](demo)
 
 ## Using Markcheck for your own files
 
 * The remainder of this readme explains the basics of using Markcheck.
-* For more information, check [`doc/manual/`](doc/manual) and [`demo/`](demo).
+* For even more information, check [`doc/manual/`](doc/manual) and [`demo/`](demo).
 
-### Step 1: Creating a Markdown file
+### Step 1: create a Markdown file
 
 We create the following Markdown file that we want to check with Markcheck:
 
@@ -50,7 +45,7 @@ assert.equal(
 * The Node.js `assert.*` methods are available by default.
 * We put the file at `/home/robin/proj/md/readme.md`
 
-### Step 2: directory `markcheck-data/`
+### Step 2: create directory `markcheck-data/`
 
 Markcheck stores the code in Markdown files in temporary files and feeds them to various shell commands. Therefore, to use it, we must provide a location for these files:
 
@@ -133,8 +128,9 @@ These commands are the default for TypeScript:
 We can install the commands `ts-expect-error` and `tsx` in several ways:
 
 * Automatically, cached locally by `npx`
-* Locally, e.g. inside `markcheck-data/node_modules/`
-* Globally via `npm install -g`
+* Manually:
+  * Locally, e.g. inside `markcheck-data/node_modules/`
+  * Globally via `npm install -g`
 
 ## Markdown examples
 

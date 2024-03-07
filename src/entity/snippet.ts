@@ -26,9 +26,14 @@ export function getTargetSnippet(fileState: FileState, sourceLineNumber: number,
   return targetSnippet;
 }
 
-export function assembleOuterLinesForId(fileState: FileState, config: Config, sourceLineNumber: number, attrKey: string, targetId: string): Array<string> {
+export function assembleAllLinesForId(fileState: FileState, config: Config, sourceLineNumber: number, attrKey: string, targetId: string): Array<string> {
   const targetSnippet = getTargetSnippet(fileState, sourceLineNumber, attrKey, targetId);
-  return assembleOuterLines(fileState, config, targetSnippet);
+  return assembleAllLines(fileState, config, targetSnippet);
+}
+
+export function assembleLocalLinesForId(fileState: FileState, config: Config, sourceLineNumber: number, attrKey: string, targetId: string): Array<string> {
+  const targetSnippet = getTargetSnippet(fileState, sourceLineNumber, attrKey, targetId);
+  return assembleAllLines(fileState, config, targetSnippet, true);
 }
 
 export function assembleInnerLines(fileState: FileState, config: Config, snippet: Snippet): Array<string> {
@@ -43,10 +48,10 @@ export function assembleInnerLines(fileState: FileState, config: Config, snippet
  * - Language LineMod
  * - Config before lines
  */
-export function assembleOuterLines(fileState: FileState, config: Config, snippet: Snippet) {
+export function assembleAllLines(fileState: FileState, config: Config, snippet: Snippet, runLocalLines=snippet.runLocalLines) {
   const lines = new Array<string>();
 
-  const outerLineMods = collectOuterLineMods(snippet.runLocalLines);
+  const outerLineMods = collectOuterLineMods(runLocalLines);
 
   for (let i = 0; i < outerLineMods.length; i++) {
     outerLineMods[i].pushBeforeLines(lines);
@@ -87,7 +92,7 @@ export function assembleOuterLines(fileState: FileState, config: Config, snippet
     }
 
     // `applyToOuter` contributes outer lines but is applied locally (by
-    // the snippet)
+    // the snippet). That’s why it is not affected `runLocalLines`.
     const applyOuterId = snippet.applyToOuterId;
     if (applyOuterId) {
       const applyLineMod = fileState.idToLineMod.get(applyOuterId);

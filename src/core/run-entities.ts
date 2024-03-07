@@ -13,7 +13,7 @@ import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LI
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleInnerLines, assembleOuterLines, assembleOuterLinesForId, getTargetSnippet, type CommandResult, type FileState, type MockShellData } from '../entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MockShellData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
 import { ConfigurationError, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
@@ -291,13 +291,13 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
 
   const writeAll: null | string = snippet.writeAll;
   if (writeAll) {
-    const lines = assembleOuterLines(fileState, config, snippet);
+    const lines = assembleAllLines(fileState, config, snippet);
     writeOneFile(fileState, config, snippetState, writeAll, lines);
     return;
   }
   const writeLocal: null | string = snippet.writeLocal;
   if (writeLocal) {
-    const lines = assembleOuterLines(fileState, config, snippet);
+    const lines = assembleAllLines(fileState, config, snippet);
     writeOneFile(fileState, config, snippetState, writeLocal, lines);
     return;
   }
@@ -328,7 +328,7 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
   //----- Running -----
 
   const fileName = snippet.getInternalFileName(langDef);
-  const lines = assembleOuterLines(fileState, config, snippet);
+  const lines = assembleAllLines(fileState, config, snippet);
   writeFilesForRunning(fileState, config, snippetState, snippet, fileName, lines);
 
   assertTrue(langDef.kind === 'LangDefCommand');
@@ -352,7 +352,7 @@ function writeFilesForRunning(fileState: FileState, config: Config, snippetState
 
   for (const { id, fileName } of snippet.externalSpecs) {
     if (!id) continue;
-    const lines = assembleOuterLinesForId(fileState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL, id);
+    const lines = assembleAllLinesForId(fileState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL, id);
     writeOneFile(fileState, config, snippetState, fileName, lines);
   }
 }
@@ -466,7 +466,7 @@ function compareStdStreamLines(stdStreamName: string, config: Config, fileState:
     actualLines = tmpLines;
   }
 
-  const expectedLines = assembleOuterLinesForId(fileState, config, snippet.lineNumber, attrKey, expectedContentSpec.snippetId);
+  const expectedLines = assembleLocalLinesForId(fileState, config, snippet.lineNumber, attrKey, expectedContentSpec.snippetId);
   trimTrailingEmptyLines(expectedLines);
   if (!areLinesEqual(expectedLines, actualLines)) {
     throw new TestFailure(

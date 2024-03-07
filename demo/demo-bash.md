@@ -20,12 +20,16 @@
 echo 'Hello!'
 ```
 
+Expected stdout:
+
 <!--markcheck id="stdout-hello"-->
 ```
 Hello!
 ```
 
 ### Expecting a nonzero exit status
+
+This command fails:
 
 <!--markcheck exitStatus="nonzero"-->
 ```bash
@@ -34,10 +38,14 @@ ls does-not-exist.txt
 
 ### Expecting a nonzero exit status and error output
 
+This command fails:
+
 <!--markcheck exitStatus="nonzero" stderr="stderr-ls"-->
 ```bash
 ls does-not-exist.txt
 ```
+
+Expected stderr:
 
 <!--markcheck id="stderr-ls"-->
 ```

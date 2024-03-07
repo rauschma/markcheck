@@ -6,10 +6,10 @@
 markcheck «file1.md» «file2.md» ...
 
 Options:
---help -h: get help
---version -v: print version
---print-config: print built-in configuration
---verbose -v: show more information (e.g. which shell commands are run)
+--help -h          get help
+--version          print version
+--print-config -p  print configuration defaults
+--verbose -v       show more information (e.g. which shell commands are run)
 ```
 
 ## File structure
@@ -206,9 +206,9 @@ All global lines are outer lines. But snippets can also contribute local outer l
   * `writeAll="filePath"`
   * `runFileName="filePath"`
   * `external="id1>lib1.js, lib2.js"`
-* Checking output:
-  * `stdout="|lineModId=id"`
-  * `stderr="id"`
+* Checking output: To hide line from human readers, we can use LineMod operations to change the expected content or the actual content. Uses local lines.
+  * `stdout="|lineModId=snippet-id"`
+  * `stderr="snippet-id"`
 
 ### Body LineMods and applyToBody LineMods
 
