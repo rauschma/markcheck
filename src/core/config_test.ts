@@ -14,7 +14,7 @@ test('config.toJson()', () => {
       "lang": {
         "": "[skip]",
         "js": {
-          "defaultFileName": "main.mjs",
+          "runFileName": "main.mjs",
           "commands": [
             [
               "node",
@@ -27,7 +27,7 @@ test('config.toJson()', () => {
           "translator": "node-repl-to-js"
         },
         "babel": {
-          "defaultFileName": "main.mjs",
+          "runFileName": "main.mjs",
           "commands": [
             [
               "node",
@@ -38,7 +38,7 @@ test('config.toJson()', () => {
           ]
         },
         "ts": {
-          "defaultFileName": "main.ts",
+          "runFileName": "main.ts",
           "commands": [
             [
               "npx",
@@ -81,7 +81,7 @@ test('config.getLang()', () => {
           '$FILE_NAME'
         ]
       ],
-      defaultFileName: 'main.mjs',
+      runFileName: 'main.mjs',
       kind: 'LangDefCommand',
       translator: undefined
     }

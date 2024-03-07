@@ -107,7 +107,7 @@ The defaults look like this:
       "before": [
         "import assert from 'node:assert/strict';"
       ],
-      "defaultFileName": "main.mjs",
+      "runFileName": "main.mjs",
       "commands": [
         [ "node", "$FILE_NAME" ]
       ]

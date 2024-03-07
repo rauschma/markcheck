@@ -4,7 +4,7 @@
 {
   "lang": {
     "bash": {
-      "defaultFileName": "main.sh",
+      "runFileName": "main.sh",
       "commands": [
         ["bash", "$FILE_NAME"]
       ],

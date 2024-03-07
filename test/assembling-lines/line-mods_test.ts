@@ -48,7 +48,7 @@ test('Assemble snippet with body LineMod', () => {
               "before": [
                 "// Config line BEFORE"
               ],
-              "defaultFileName": "main.mjs",
+              "runFileName": "main.mjs",
               "commands": [
                 [ "js-command1", "$FILE_NAME" ],
                 [ "js-command2", "$FILE_NAME" ],
@@ -132,7 +132,7 @@ test('Assemble snippet with applyToBody LineMod', () => {
               "before": [
                 "// Config line BEFORE"
               ],
-              "defaultFileName": "main.mjs",
+              "runFileName": "main.mjs",
               "commands": [
                 [ "js-command1", "$FILE_NAME" ],
                 [ "js-command2", "$FILE_NAME" ],

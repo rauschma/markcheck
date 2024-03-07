@@ -25,11 +25,11 @@ export type LangDefCommand = {
   extends?: string,
   beforeLines?: Array<string>,
   translator?: Translator,
-  defaultFileName?: string,
+  runFileName?: string,
   commands?: Array<Array<string>>,
 };
 const PROP_KEY_EXTENDS = 'extends';
-export const PROP_KEY_DEFAULT_FILE_NAME = 'defaultFileName';
+export const PROP_KEY_DEFAULT_FILE_NAME = 'runFileName';
 export const PROP_KEY_COMMANDS = 'commands';
 
 /**
@@ -99,7 +99,7 @@ export class Config {
       "js",
       {
         kind: 'LangDefCommand',
-        defaultFileName: 'main.mjs',
+        runFileName: 'main.mjs',
         commands: [
           ["node", CMD_VAR_FILE_NAME],
         ],
@@ -120,7 +120,7 @@ export class Config {
       "babel",
       {
         kind: 'LangDefCommand',
-        defaultFileName: 'main.mjs',
+        runFileName: 'main.mjs',
         commands: [
           // https://github.com/giltayar/babel-register-esm
           ["node", "--loader=babel-register-esm", "--disable-warning=ExperimentalWarning", CMD_VAR_FILE_NAME],
@@ -134,7 +134,7 @@ export class Config {
       "ts",
       {
         kind: 'LangDefCommand',
-        defaultFileName: 'main.ts',
+        runFileName: 'main.ts',
         commands: [
           ["npx", "ts-expect-error", "--unexpected-errors", CMD_VAR_ALL_FILE_NAMES],
           // Snippets can only check stdout & stderr of last command
@@ -150,7 +150,7 @@ export class Config {
       "html",
       {
         kind: 'LangDefCommand',
-        defaultFileName: 'index.html',
+        runFileName: 'index.html',
         commands: [
           ["npx", "html-validate", CMD_VAR_FILE_NAME],
         ],
@@ -235,7 +235,7 @@ export class Config {
           throw new UnsupportedValueError(nextLangDef);
       }
     } // while
-    if (result.defaultFileName === undefined) {
+    if (result.runFileName === undefined) {
       throw new ConfigurationError(
         `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}`
       );
@@ -262,7 +262,7 @@ function merge(extending: LangDefCommand, extended: LangDefCommand): LangDefComm
     extends: extending.extends ?? extended.extends,
     beforeLines: extending.beforeLines ?? extended.beforeLines,
     translator: extending.translator ?? extended.translator,
-    defaultFileName: extending.defaultFileName ?? extended.defaultFileName,
+    runFileName: extending.runFileName ?? extended.runFileName,
     commands: extending.commands ?? extended.commands,
   };
 }
@@ -303,7 +303,7 @@ export type LangDefCommandPartialJson = {
   extends?: string,
   before?: Array<string>,
   translator?: string,
-  defaultFileName?: string,
+  runFileName?: string,
   commands?: Array<Array<string>>,
 };
 
@@ -337,7 +337,7 @@ function langDefFromJson(context: EntityContext, langDefJson: LangDefPartialJson
     extends: langDefJson.extends,
     beforeLines: langDefJson.before,
     translator,
-    defaultFileName: langDefJson.defaultFileName,
+    runFileName: langDefJson.runFileName,
     commands: langDefJson.commands,
   };
 }
@@ -357,7 +357,7 @@ function langDefToJson(langDef: LangDef): LangDefPartialJson {
             ? { translator: langDef.translator.key }
             : {}
         ),
-        defaultFileName: langDef.defaultFileName,
+        runFileName: langDef.runFileName,
         commands: langDef.commands,
       };
     }
@@ -372,7 +372,7 @@ export const LangDefCommandPartialJsonSchema = z.object({
   extends: z.optional(z.string()),
   before: z.optional(z.array(z.string())),
   translator: z.optional(z.string()),
-  defaultFileName: z.optional(z.string()),
+  runFileName: z.optional(z.string()),
   commands: z.optional(z.array(z.array(z.string()))),
 });
 

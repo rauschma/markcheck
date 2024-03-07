@@ -301,8 +301,8 @@ export class SingleSnippet extends Snippet {
     if (this.#internalFileName) {
       return this.#internalFileName;
     }
-    if (langDef.kind === 'LangDefCommand' && langDef.defaultFileName !== undefined) {
-      return langDef.defaultFileName;
+    if (langDef.kind === 'LangDefCommand' && langDef.runFileName !== undefined) {
+      return langDef.runFileName;
     }
     throw new MarkcheckSyntaxError(
       `Snippet does not have a filename: neither via config (${stringify(CONFIG_KEY_LANG)} property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}) nor via attribute ${stringify(ATTR_KEY_RUN_FILE_NAME)}`,

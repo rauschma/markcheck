@@ -19,7 +19,7 @@ test('singleSnippet.getAllFileNames', () => {
   assert.deepEqual(
     snippet.getAllFileNames({
       kind: 'LangDefCommand',
-      defaultFileName: 'main.js',
+      runFileName: 'main.js',
       commands: [],
     }),
     ['file.js']

@@ -253,7 +253,7 @@ See all defaults: `markcheck --print-config`
       "before": [
         "import assert from 'node:assert/strict';"
       ],
-      "defaultFileName": "main.mjs",
+      "runFileName": "main.mjs",
       "commands": [
         [ "node", "$FILE_NAME" ]
       ]
