@@ -2,13 +2,16 @@ import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import markdownit from 'markdown-it';
 import { ConfigMod } from '../entity/config-mod.js';
-import { directiveToEntity } from '../entity/directive-to-entity.js';
-import { Directive } from '../entity/directive.js';
+import { ATTRS_APPLIABLE_LINE_MOD, ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT, ATTRS_CONFIG_MOD, ATTRS_LANGUAGE_LINE_MOD, ATTRS_SNIPPET, ATTRS_SNIPPET_BODY_LABEL_INSERT, ATTR_KEY_EACH, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, Directive } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
 import { SequenceSnippet, SingleSnippet, Snippet } from '../entity/snippet.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { MarkcheckSyntaxError, describeEntityContext } from '../util/errors.js';
+
+const { stringify } = JSON;
+
+//#################### parseMarkdown() ####################
 
 export type ParsedMarkdown = {
   entities: Array<MarkcheckEntity>,
@@ -155,6 +158,78 @@ function pushSingleSnippet(result: Array<MarkcheckEntity>, state: ParsingState, 
   }
   state.prevHeading = null;
   return;
+}
+
+//#################### directiveToEntity ####################
+
+/**
+ * Returned snippets are open or closed
+ */
+export function directiveToEntity(directive: Directive): null | ConfigMod | SingleSnippet | LineMod {
+  switch (directive.bodyLabel) {
+    case BODY_LABEL_CONFIG:
+      directive.checkAttributes(ATTRS_CONFIG_MOD);
+      return new ConfigMod(directive);
+
+    case BODY_LABEL_BODY: {
+      directive.checkAttributes(ATTRS_SNIPPET);
+      return SingleSnippet.createClosedFromBodyDirective(directive);
+    }
+
+    case BODY_LABEL_BEFORE:
+    case BODY_LABEL_AFTER:
+    case BODY_LABEL_AROUND:
+    case BODY_LABEL_INSERT:
+    case null: {
+      // Either:
+      // - Language LineMod
+      // - Appliable LineMod
+      // - Open snippet with local LineMod
+
+      const each = directive.getString(ATTR_KEY_EACH);
+      if (each !== null) {
+        // Language LineMod
+        directive.checkAttributes(ATTRS_LANGUAGE_LINE_MOD);
+        return LineMod.parse(directive, {
+          tag: 'LineModKindLanguage',
+          targetLanguage: each,
+        });
+      }
+
+      const lineModId = directive.getString(ATTR_KEY_LINE_MOD_ID);
+      if (lineModId !== null) {
+        // Appliable LineMod
+        if (directive.bodyLabel === BODY_LABEL_INSERT) {
+          directive.checkAttributes(ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT);
+        } else {
+          directive.checkAttributes(ATTRS_APPLIABLE_LINE_MOD);
+        }
+        return LineMod.parse(directive, {
+          tag: 'LineModKindAppliable',
+          lineModId,
+        });
+      }
+
+      // Open snippet with local LineMod
+      if (directive.bodyLabel === BODY_LABEL_INSERT) {
+        directive.checkAttributes(ATTRS_SNIPPET_BODY_LABEL_INSERT);
+      } else {
+        directive.checkAttributes(ATTRS_SNIPPET);
+      }
+      const snippet = SingleSnippet.createOpen(directive);
+      snippet.bodyLineMod = LineMod.parse(directive, {
+        tag: 'LineModKindBody',
+      });
+      return snippet;
+    }
+
+    default: {
+      throw new MarkcheckSyntaxError(
+        `Unsupported body label: ${stringify(directive.bodyLabel)}`,
+        { lineNumber: directive.lineNumber }
+      );
+    }
+  }
 }
 
 //#################### Comments ####################
