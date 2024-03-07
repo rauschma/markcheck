@@ -3,7 +3,7 @@ import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
 import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
 import { InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { ATTR_KEY_IGNORE_LINES } from './directive.js';
-import { insertParsingPos, stringifySingleQuoted, unescapeBackslashes } from './entity-helpers.js';
+import { insertParsingPos, stringifyWithSingleQuote, unescapeBackslashes } from './entity-helpers.js';
 
 const { stringify } = JSON;
 
@@ -27,7 +27,7 @@ function lineLocToString(lineLoc: LineLoc) {
   if (typeof lineLoc.loc === 'number') {
     return String(lineLoc.loc);
   } else if (typeof lineLoc.loc === 'string') {
-    return stringifySingleQuoted(lineLoc.loc);
+    return stringifyWithSingleQuote(lineLoc.loc);
   } else {
     throw new UnsupportedValueError(lineLoc.loc);
   }

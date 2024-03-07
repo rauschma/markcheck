@@ -18,8 +18,8 @@
     "clean": "shx rm -rf ./dist/*",
     "chmod": "chmod u+x ./dist/src/markcheck.js",
     "\n========== Testing ==========": "",
-    "test": "mocha --ui qunit --full-trace --enable-source-maps --no-warnings=ExperimentalWarning",
-    "testall": "mocha --ui qunit --full-trace --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
+    "test": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning",
+    "testall": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
     "circular": "npx madge --circular src/markcheck.ts"
   },
   "dependencies": {

@@ -20,7 +20,7 @@ test('extractCommentContent()', () => {
   );
 });
 
-test.only('parseMarkdown(): LineMod', () => {
+test('parseMarkdown(): LineMod', () => {
   const {entities} = parseMarkdown(outdent`
     <!--markcheck each="js" around:
     Line before

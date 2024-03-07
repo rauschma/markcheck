@@ -61,7 +61,7 @@ test('Directive.parse()', () => {
   assert.throws(
     () => parseDirective(raw`<!--markcheck key="unclosed-->`),
     {
-      name: 'UserError',
+      name: 'MarkcheckSyntaxError',
       message: raw`Could not parse attributes: Stopped parsing before "=\"unclosed"`,
     },
     'Unclosed attribute value'
