@@ -5,25 +5,23 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
+const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Insert single line at line numbers', () => {
+test('before', () => {
   const readme = outdent`
-    <!--markcheck at="before:2" insert:
-    err.stack = beautifyStackTrace(err.stack);
+    <!--markcheck onlyLocalLines before:
+    // BEFORE
     -->
     ▲▲▲js
-    const err = new Error('Hello!');
-    assert.equal(err.stack, 'the-stack-trace');
+    console.log('body');
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
-
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
@@ -31,34 +29,26 @@ test('Insert single line at line numbers', () => {
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
-        import assert from 'node:assert/strict';
-        const err = new Error('Hello!');
-        err.stack = beautifyStackTrace(err.stack);
-        assert.equal(err.stack, 'the-stack-trace');
+        // BEFORE
+        console.log('body');
       `,
     }
   );
 });
 
-test('Insert multiple lines at line numbers', () => {
+test('after', () => {
   const readme = outdent`
-    <!--markcheck at="before:1, after:1, after:-1" insert:
-    // START
-    •••
-    // MIDDLE
-    •••
-    // END
+    <!--markcheck onlyLocalLines after:
+    // AFTER
     -->
     ▲▲▲js
-    // first
-    // second
+    console.log('body');
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
-
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
@@ -66,37 +56,30 @@ test('Insert multiple lines at line numbers', () => {
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
-        import assert from 'node:assert/strict';
-        // START
-        // first
-        // MIDDLE
-        // second
-        // END
+        console.log('body');
+        // AFTER
       `,
     }
   );
 });
 
-
-test('Insert multiple lines at text fragments', () => {
+test('around', () => {
   const readme = outdent`
-    <!--markcheck at="before:'first', after:'first', after:'second'" insert:
-    // START
-    •••
-    // MIDDLE
-    •••
-    // END
+    <!--markcheck around:
+    assert.throws(
+      () => {
+        •••
+      }
+    );
     -->
     ▲▲▲js
-    // first
-    // second
+    throw new Error();
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
-
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
@@ -105,11 +88,11 @@ test('Insert multiple lines at text fragments', () => {
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
-        // START
-        // first
-        // MIDDLE
-        // second
-        // END
+        assert.throws(
+          () => {
+        throw new Error();
+          }
+        );
       `,
     }
   );

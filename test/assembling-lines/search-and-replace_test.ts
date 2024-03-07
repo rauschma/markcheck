@@ -5,15 +5,17 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
+const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Written snippet', () => {
+test('searchAndReplace', () => {
   const readme = outdent`
-    <!--markcheck writeInner="test-file.txt" body:
-    Test file content
-    -->
+    <!--markcheck searchAndReplace="/ \/\/ \([A-Z]\)//"-->
+    ▲▲▲js
+    console.log('First'); // (A)
+    console.log('Second'); // (B)
+    ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
@@ -26,7 +28,11 @@ test('Written snippet', () => {
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
-      'test-file.txt': 'Test file content',
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        console.log('First');
+        console.log('Second');
+      `,
     }
   );
 });

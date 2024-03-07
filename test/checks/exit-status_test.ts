@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-import type { MockShellData } from '../src/entity/snippet.js';
-const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
+import type { MockShellData } from '../../src/entity/snippet.js';
+const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 

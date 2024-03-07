@@ -5,20 +5,26 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
+const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Indented directive', () => {
+test('Assemble sequence', () => {
   const readme = outdent`
-    1. Positional parameters:
-
-       <!--markcheck before:
-       const selectEntries = () => {};
-       -->
-       ▲▲▲js
-       selectEntries(3, 20, 2)
-       ▲▲▲
+    <!--markcheck sequence="1/3"-->
+    ▲▲▲js
+    // Part 1
+    ▲▲▲
+    
+    <!--markcheck sequence="2/3"-->
+    ▲▲▲js
+    // Part 2
+    ▲▲▲
+    
+    <!--markcheck sequence="3/3"-->
+    ▲▲▲js
+    // Part 3
+    ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
@@ -33,8 +39,9 @@ test('Indented directive', () => {
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
-        const selectEntries = () => {};
-        selectEntries(3, 20, 2)
+        // Part 1
+        // Part 2
+        // Part 3
       `,
     }
   );

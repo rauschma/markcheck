@@ -5,7 +5,7 @@ import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js'
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
+const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 

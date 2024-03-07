@@ -5,81 +5,25 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
+const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('before', () => {
+test('Insert single line at line numbers', () => {
   const readme = outdent`
-    <!--markcheck onlyLocalLines before:
-    // BEFORE
+    <!--markcheck at="before:2" insert:
+    err.stack = beautifyStackTrace(err.stack);
     -->
     ▲▲▲js
-    console.log('body');
+    const err = new Error('Hello!');
+    assert.equal(err.stack, 'the-stack-trace');
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
     '/tmp/markdown/readme.md': readme,
   });
-  assert.ok(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
-  );
-  assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
-    {
-      'main.mjs': outdent`
-        // BEFORE
-        console.log('body');
-      `,
-    }
-  );
-});
 
-test('after', () => {
-  const readme = outdent`
-    <!--markcheck onlyLocalLines after:
-    // AFTER
-    -->
-    ▲▲▲js
-    console.log('body');
-    ▲▲▲
-  `.replaceAll('▲', '`');
-  jsonToCleanDir(mfs, {
-    '/tmp/markcheck-data': {},
-    '/tmp/markdown/readme.md': readme,
-  });
-  assert.ok(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
-  );
-  assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
-    {
-      'main.mjs': outdent`
-        console.log('body');
-        // AFTER
-      `,
-    }
-  );
-});
-
-test('around', () => {
-  const readme = outdent`
-    <!--markcheck around:
-    assert.throws(
-      () => {
-        •••
-      }
-    );
-    -->
-    ▲▲▲js
-    throw new Error();
-    ▲▲▲
-  `.replaceAll('▲', '`');
-  jsonToCleanDir(mfs, {
-    '/tmp/markcheck-data': {},
-    '/tmp/markdown/readme.md': readme,
-  });
   assert.ok(
     runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
@@ -88,11 +32,84 @@ test('around', () => {
     {
       'main.mjs': outdent`
         import assert from 'node:assert/strict';
-        assert.throws(
-          () => {
-        throw new Error();
-          }
-        );
+        const err = new Error('Hello!');
+        err.stack = beautifyStackTrace(err.stack);
+        assert.equal(err.stack, 'the-stack-trace');
+      `,
+    }
+  );
+});
+
+test('Insert multiple lines at line numbers', () => {
+  const readme = outdent`
+    <!--markcheck at="before:1, after:1, after:-1" insert:
+    // START
+    •••
+    // MIDDLE
+    •••
+    // END
+    -->
+    ▲▲▲js
+    // first
+    // second
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        // START
+        // first
+        // MIDDLE
+        // second
+        // END
+      `,
+    }
+  );
+});
+
+
+test('Insert multiple lines at text fragments', () => {
+  const readme = outdent`
+    <!--markcheck at="before:'first', after:'first', after:'second'" insert:
+    // START
+    •••
+    // MIDDLE
+    •••
+    // END
+    -->
+    ▲▲▲js
+    // first
+    // second
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        // START
+        // first
+        // MIDDLE
+        // second
+        // END
       `,
     }
   );

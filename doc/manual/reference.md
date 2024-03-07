@@ -116,21 +116,21 @@ Running:
 * `id` sets running mode to `skip`.
   * Override via `alwaysRun` or `only`
 * `writeInner`, `writeOuter` always prevent running. Alternatives:
-  * `internal="file-name"` changes the filename that is used when running a snippet
-  * `onlyLocalLines` excludes global lines when writing to disk.
+  * `internal="file-name"` changes the filename that is used when running a snippet. It overrides the default set by the config.
+  * `onlyLocalLines` excludes global lines when writing a file to disk for running.
 
 ### How lines are assembled
 
 For assembling lines, two dimensions are important:
 
-* Inner vs. outer:
-  * Inner are the lines of each snippet. Multiple snippets can exist per file that is written to disk (via sequences and includes).
-  * Outer are lines that exist once per file.
-* Local vs. global:
+* Local vs. global: Who adds the lines?
   * Local are the lines that are controlled by the snippet itself.
   * Global are the lines that are contributed from elsewhere:
     * By the config file: the “before” lines for a language.
     * Via a language LineMod – e.g.: `<!--markcheck each="js" before:`
+* Inner vs. outer: Where are the lines added?
+  * Inner are the lines of each snippet. Multiple snippets can exist per file that is written to disk (via sequences and includes).
+  * Outer are lines that exist once per file.
 
 All global lines are outer lines. But snippets can also contribute local outer lines. This is an exhaustive list:
 
@@ -138,16 +138,22 @@ All global lines are outer lines. But snippets can also contribute local outer l
   * Body
   * Body LineMod
   * Applied LineMod: `applyToBody`
+    * Example: Wrap a function around a body that includes other functions that it calls.
   * Includes
 * Inner lines from SequenceSnippet:
-  * Lines of sequence elements, concatenated
+  * Inner lines of sequence elements, concatenated
 * Outer lines from Snippet (either a SequenceSnippet or a SingleSnippet)
-  * Applied LineMod: `applyToOuter` (e.g. a function around a multi-part snippet)
+  * Applied LineMod: `applyToOuter`.
+    * Example: Wrap a function around a multi-part snippet.
 * Global lines (always outer):
   * Language LineMod
   * Config lines
 
-❌ TODO: translator (not translated: before, after, around), outer LineMods only wrap, only one of them is used: Body LineMod, applyToBody LineMod
+❌ TODO:
+
+* Translator (not translated: before, after, around)
+* Outer LineMods only wrap
+* Only one of them is used: body LineMod, applyToBody LineMod
 
 
 

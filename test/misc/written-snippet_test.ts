@@ -5,26 +5,15 @@ import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { runParsedMarkdownForTests } = await import('../src/util/test-tools.js');
+const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Assemble sequence', () => {
+test('Written snippet', () => {
   const readme = outdent`
-    <!--markcheck sequence="1/3"-->
-    ▲▲▲js
-    // Part 1
-    ▲▲▲
-    
-    <!--markcheck sequence="2/3"-->
-    ▲▲▲js
-    // Part 2
-    ▲▲▲
-    
-    <!--markcheck sequence="3/3"-->
-    ▲▲▲js
-    // Part 3
-    ▲▲▲
+    <!--markcheck writeInner="test-file.txt" body:
+    Test file content
+    -->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},
@@ -37,12 +26,7 @@ test('Assemble sequence', () => {
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
-      'main.mjs': outdent`
-        import assert from 'node:assert/strict';
-        // Part 1
-        // Part 2
-        // Part 3
-      `,
+      'test-file.txt': 'Test file content',
     }
   );
 });
