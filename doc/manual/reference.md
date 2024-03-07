@@ -53,6 +53,14 @@ The syntax within a directive is inspired by HTML and Python:
   * In the previous example, `before:` and `body:` are body labels.
 * A single-line directive ends with `-->`.
 
+### Attribute values
+
+Attribute values are passed on raw. Therefore, there is no first pass where we have to write two backslashes so that an attribute receives a single backslash (which is what happens in JSON):
+
+* Example: `<!--markcheck searchAndReplace="/\([A-Z]\)//"-->`
+  * JSON: `"/\\([A-Z]\\)//"`
+* Example: `<!--markcheck at="before:'With \'single\' quotes'" insert:`
+
 ### Kinds of directives
 
 * Body directive: body label `body:`
@@ -74,13 +82,13 @@ There are several kinds of LineMods:
   * It cannot use `insert:`
 * Appliable LineMod: `lineModId="lm-id"`
   * Can be applied to snippets via `wrapOuter="lm-id"` or `applyInner="lm-id"`
-* Local LineMod: neither `each` nor `lineModId`
-  * The LineMod attributes define a _local LineMod_
-  * The remaining attributes apply to the following code block and produce a snippet that has the given local LineMod.
+* Body LineMod: neither `each` nor `lineModId`
+  * The LineMod attributes define a _body LineMod_
+  * The remaining attributes apply to the following code block and produce a snippet that has the given body LineMod.
 
 ## Entities
 
-After directories were paired with code blocks, we get the following entities:
+After directives were paired with code blocks, we get the following entities:
 
 * Snippets:
   * Created by code block directive + code block or by a code block on its own.

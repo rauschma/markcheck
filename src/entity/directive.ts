@@ -225,7 +225,7 @@ export const ATTRS_CONFIG_MOD: ExpectedAttributeValues = new Map([
 
 // Attribute values are stored raw – then we can decide in each case how to
 // handle backslashes.
-// - Use case – body label `insert:`: `at="before:'Don\'t do it!'"`
+// - Use case – body label `insert:`: `at="before:'With \'single\' quotes'"`
 // - Use case: `searchAndReplace="/ \/\/ \([A-Z]\)//"`
 
 const MARKTEST_MARKER = 'markcheck';

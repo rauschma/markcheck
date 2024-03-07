@@ -9,7 +9,7 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('searchAndReplace', () => {
+test('searchAndReplace slashes', () => {
   const readme = outdent`
     <!--markcheck searchAndReplace="/ \/\/ \([A-Z]\)//"-->
     ▲▲▲js
@@ -32,6 +32,81 @@ test('searchAndReplace', () => {
         import assert from 'node:assert/strict';
         console.log('First');
         console.log('Second');
+      `,
+    }
+  );
+});
+
+test('searchAndReplace double quotes', () => {
+  const readme = outdent`
+    <!--markcheck searchAndReplace="/\"/X/" runLocalLines-->
+    ▲▲▲js
+    "abc"
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        XabcX
+      `,
+    }
+  );
+});
+
+test('searchAndReplace not ignoring case', () => {
+  const readme = outdent`
+    <!--markcheck writeLocal="text-file.txt" searchAndReplace="/[abc]/x/"-->
+    ▲▲▲txt
+    AaBbZz
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'text-file.txt': outdent`
+        AxBxZz
+      `,
+    }
+  );
+});
+
+test('searchAndReplace ignoring case', () => {
+  const readme = outdent`
+    <!--markcheck writeLocal="text-file.txt" searchAndReplace="/[abc]/x/i"-->
+    ▲▲▲txt
+    AaBbZz
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'text-file.txt': outdent`
+        xxxxZz
       `,
     }
   );
