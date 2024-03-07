@@ -2,11 +2,11 @@ import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
 import markdownit from 'markdown-it';
 import { ConfigMod } from '../entity/config-mod.js';
-import { ATTRS_APPLIABLE_LINE_MOD, ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT, ATTRS_CONFIG_MOD, ATTRS_LANGUAGE_LINE_MOD, ATTRS_SNIPPET, ATTRS_SNIPPET_BODY_LABEL_INSERT, ATTR_KEY_EACH, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, Directive } from '../entity/directive.js';
+import { ATTRS_APPLIABLE_LINE_MOD, ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT, ATTRS_CONFIG_MOD, ATTRS_LANGUAGE_LINE_MOD, ATTRS_SNIPPET, ATTRS_SNIPPET_BODY_LABEL_INSERT, ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, Directive } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
-import { SequenceSnippet, SingleSnippet, Snippet } from '../entity/snippet.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
+import { SequenceSnippet, SingleSnippet, Snippet } from '../entity/snippet.js';
 import { MarkcheckSyntaxError, describeEntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
@@ -252,8 +252,9 @@ function createIdToSnippet(entities: Array<MarkcheckEntity>): Map<string, Snippe
     if (entity instanceof Snippet && entity.id) {
       const other = idToSnippet.get(entity.id);
       if (other) {
+        const description = describeEntityContext(other.getEntityContext());
         throw new MarkcheckSyntaxError(
-          `Duplicate id ${JSON.stringify(entity)} (other usage is in line ${other.lineNumber})`,
+          `Duplicate ${JSON.stringify(ATTR_KEY_ID)}: ${JSON.stringify(entity.id)} (other usage is ${description})`,
           { lineNumber: entity.lineNumber }
         );
       }
@@ -271,9 +272,9 @@ function createIdToLineMod(entities: Array<MarkcheckEntity>): Map<string, LineMo
       if (lineModId) {
         const other = idToLineMod.get(lineModId);
         if (other) {
-          const description = describeEntityContext(other.context);
+          const description = describeEntityContext(other.getEntityContext());
           throw new MarkcheckSyntaxError(
-            `Duplicate id ${JSON.stringify(entity)} (other usage is ${description})`,
+            `Duplicate ${JSON.stringify(ATTR_KEY_LINE_MOD_ID)}: ${JSON.stringify(entity.getLineModId())} (other usage is ${description})`,
             { entityContext: entity.context }
           );
         }

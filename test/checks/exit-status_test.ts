@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
 import type { MockShellData } from '../../src/entity/snippet.js';
-const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
+const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
@@ -34,7 +34,7 @@ test('exitStatus: expecting 0 fails if actual is 1', () => {
     },
   };
   assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).testFailures,
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).testFailures,
     1
   );
 });
@@ -63,7 +63,7 @@ test('exitStatus: expecting "nonzero" succeeds if actual is 1', () => {
     },
   };
   assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).testFailures,
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).testFailures,
     0
   );
 });

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
 import { emptyMockShellData } from '../../src/entity/snippet.js';
-const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
+const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
@@ -63,7 +63,7 @@ test('Assemble snippet with body LineMod', () => {
 
   const mockShellData = emptyMockShellData();
   assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
     0
   );
   // Per file: config lines, language LineMods
@@ -147,7 +147,7 @@ test('Assemble snippet with applyToBody LineMod', () => {
 
   const mockShellData = emptyMockShellData();
   assert.equal(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
     0
   );
   // Per file: config lines, language LineMods

@@ -8,7 +8,7 @@ export type RunOptions = {
   out?: Output,
 };
 
-export function runParsedMarkdownForTests(absFilePath: string, md: string, opts: RunOptions = {}): StatusCounts {
+export function runMarkdownForTests(absFilePath: string, md: string, opts: RunOptions = {}): StatusCounts {
   const mockShellData = opts.mockShellData ?? emptyMockShellData();
   const out = opts.out ?? Output.ignore();
   const statusCounts = new StatusCounts(absFilePath);

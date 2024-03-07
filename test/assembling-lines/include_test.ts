@@ -5,7 +5,7 @@ import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js'
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
-const { runParsedMarkdownForTests } = await import('../../src/util/test-tools.js');
+const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
@@ -28,7 +28,7 @@ test('Included snippet', () => {
   });
 
   assert.ok(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
@@ -70,7 +70,7 @@ test('Included snippet with `before:`', () => {
   });
 
   assert.ok(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
@@ -117,7 +117,7 @@ test('Assembling code fragments out of order', () => {
   });
 
   assert.ok(
-    runParsedMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
