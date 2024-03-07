@@ -111,3 +111,30 @@ test('searchAndReplace ignoring case', () => {
     }
   );
 });
+
+test('searchAndReplace via applyToBody LineMod', () => {
+  const readme = outdent`
+    <!--markcheck writeLocal="text-file.txt" applyToBody="applied-LineMod"-->
+    ▲▲▲txt
+    ABC
+    ▲▲▲
+
+    <!--markcheck lineModId="applied-LineMod" searchAndReplace="/B/X/"-->
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'text-file.txt': outdent`
+        AXC
+      `,
+    }
+  );
+});

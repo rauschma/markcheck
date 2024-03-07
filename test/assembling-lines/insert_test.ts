@@ -9,7 +9,7 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Insert single line at line numbers', () => {
+test('Insert single line at a line number (body LineMod)', () => {
   const readme = outdent`
     <!--markcheck at="before:2" insert:
     err.stack = beautifyStackTrace(err.stack);
@@ -18,6 +18,39 @@ test('Insert single line at line numbers', () => {
     const err = new Error('Hello!');
     assert.equal(err.stack, 'the-stack-trace');
     ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        const err = new Error('Hello!');
+        err.stack = beautifyStackTrace(err.stack);
+        assert.equal(err.stack, 'the-stack-trace');
+      `,
+    }
+  );
+});
+
+test('Insert single line at a line number (applyToBody LineMod)', () => {
+  const readme = outdent`
+    <!--markcheck applyToBody="beautifyStackTrace"-->
+    ▲▲▲js
+    const err = new Error('Hello!');
+    assert.equal(err.stack, 'the-stack-trace');
+    ▲▲▲
+
+    <!--markcheck lineModId="beautifyStackTrace" at="before:2" insert:
+    err.stack = beautifyStackTrace(err.stack);
+    -->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},

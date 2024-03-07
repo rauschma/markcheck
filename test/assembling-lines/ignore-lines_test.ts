@@ -9,7 +9,7 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('ignoreLines: line numbers', () => {
+test('ignoreLines: line numbers (body LineMod)', () => {
   const readme = outdent`
     <!--markcheck runLocalLines ignoreLines="1..2, -1"-->
     ▲▲▲js
@@ -19,6 +19,38 @@ test('ignoreLines: line numbers', () => {
     // four
     // five
     ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        // three
+        // four
+      `,
+    }
+  );
+});
+
+test('ignoreLines: line numbers (applyToBody LineMod)', () => {
+  const readme = outdent`
+    <!--markcheck runLocalLines applyToBody="applied-LineMod"-->
+    ▲▲▲js
+    // one
+    // two
+    // three
+    // four
+    // five
+    ▲▲▲
+
+    <!--markcheck lineModId="applied-LineMod" ignoreLines="1..2, -1"-->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {},

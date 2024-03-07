@@ -87,9 +87,9 @@ export class LineMod extends MarkcheckEntity {
         break;
       }
       case BODY_LABEL_INSERT: {
-        if (kind.tag !== 'LineModKindBody') {
+        if (!(kind.tag === 'LineModKindBody' || kind.tag === 'LineModKindAppliable')) {
           throw new MarkcheckSyntaxError(
-            `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for local line mods`
+            `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for body LineMods and appliable LineMods`
           );
         }
 
