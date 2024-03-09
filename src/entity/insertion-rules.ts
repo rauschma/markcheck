@@ -1,6 +1,6 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
-import { type JsonValue } from '@rauschma/helpers/ts/json.js';
-import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
+import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
+import { assertNonNullable } from '@rauschma/helpers/typescript/type.js';
 import { InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { ATTR_KEY_AT } from './directive.js';
 import { insertParsingPos, unescapeBackslashes } from './entity-helpers.js';

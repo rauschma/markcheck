@@ -5,6 +5,12 @@
   "description": "",
   "license": "MIT",
   "type": "module",
+  "files": [
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "dist/**/*.js"
+  ],
   "bin": {
     "markcheck": "./dist/src/markcheck.js"
   },
@@ -24,6 +30,7 @@
   },
   "dependencies": {
     "@rauschma/helpers": "file:../../libraries/helpers",
+    "@rauschma/nodejs-tools": "file:../../libraries/nodejs-tools",
     "diff": "^5.2.0",
     "json5": "^2.2.3",
     "markdown-it": "^14.0.0",

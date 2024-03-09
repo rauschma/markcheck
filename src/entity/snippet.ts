@@ -1,7 +1,7 @@
-import { style } from '@rauschma/helpers/nodejs/text-style.js';
-import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { type JsonValue } from '@rauschma/helpers/ts/json.js';
-import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
+import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
+import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
+import { assertNonNullable, assertTrue } from '@rauschma/helpers/typescript/type.js';
 import { CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, Config, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
 import { MarkcheckSyntaxError, contextDescription, contextSnippet, type EntityContext } from '../util/errors.js';

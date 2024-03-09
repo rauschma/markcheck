@@ -1,4 +1,4 @@
-import { isEmptyLine } from '@rauschma/helpers/js/string.js';
+import { isEmptyLine } from '@rauschma/helpers/string/string.js';
 import { MarkcheckSyntaxError } from '../util/errors.js';
 import { normalizeWhitespace } from '../util/string.js';
 import { type Translator } from './translation.js';

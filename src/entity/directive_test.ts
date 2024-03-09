@@ -1,5 +1,5 @@
-import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
-import { createSuite } from '@rauschma/helpers/nodejs/test.js';
+import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
+import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { extractCommentContent } from '../core/parse-markdown.js';
 import { contextLineNumber } from '../util/errors.js';

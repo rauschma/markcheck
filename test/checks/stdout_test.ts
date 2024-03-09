@@ -1,10 +1,10 @@
-import { jsonToCleanDir } from '@rauschma/helpers/nodejs/dir-json.js';
-import { createSuite } from '@rauschma/helpers/nodejs/test.js';
+import { jsonToCleanDir } from '@rauschma/nodejs-tools/testing/dir-json.js';
+import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
-import { mfs } from '@rauschma/helpers/nodejs/install-mem-node-fs.js';
+import { mfs } from '@rauschma/nodejs-tools/testing/install-mem-node-fs.js';
 import type { MockShellData } from '../../src/entity/snippet.js';
 const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 

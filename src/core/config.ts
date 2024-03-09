@@ -1,5 +1,5 @@
-import { createSequentialRegExpEscaper } from '@rauschma/helpers/js/escaper.js';
-import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
+import { createSequentialRegExpEscaper } from '@rauschma/helpers/string/escaper.js';
+import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { z } from 'zod';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP, parseSearchAndReplaceString } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';

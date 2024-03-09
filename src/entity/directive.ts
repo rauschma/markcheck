@@ -1,7 +1,7 @@
-import type { SearchAndReplace } from '@rauschma/helpers/js/escaper.js';
+import type { SearchAndReplace } from '@rauschma/helpers/string/escaper.js';
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
-import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
+import { assertNonNullable, assertTrue } from '@rauschma/helpers/typescript/type.js';
 import { InternalError, MarkcheckSyntaxError, type EntityContext, type LineNumber } from '../util/errors.js';
 
 const { stringify } = JSON;

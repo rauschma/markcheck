@@ -1,8 +1,8 @@
 import { setDifference } from '@rauschma/helpers/collection/set.js';
-import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
-import { clearDirectorySync, ensureParentDirectory } from '@rauschma/helpers/nodejs/file.js';
-import { style } from '@rauschma/helpers/nodejs/text-style.js';
-import { assertTrue } from '@rauschma/helpers/ts/type.js';
+import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
+import { MissingDirectoryMode, clearDirectorySync, ensureParentDirectory } from '@rauschma/nodejs-tools/misc/file.js';
+import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
+import { assertTrue } from '@rauschma/helpers/typescript/type.js';
 import json5 from 'json5';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
@@ -35,11 +35,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
 
   const tmpDir = path.resolve(markcheckDir, MARKTEST_TMP_DIR_NAME);
   // `markcheck/` must exist, `markcheck/tmp/` may not exist
-  if (fs.existsSync(tmpDir)) {
-    clearDirectorySync(tmpDir);
-  } else {
-    fs.mkdirSync(tmpDir);
-  }
+  clearDirectorySync(tmpDir, MissingDirectoryMode.Create);
 
   let globalRunningMode = GlobalRunningMode.Normal;
   if (parsedMarkdown.entities.some((e) => e instanceof Snippet && e.runningMode === RuningMode.Only)) {

@@ -1,4 +1,4 @@
-import { type JsonValue } from '@rauschma/helpers/ts/json.js';
+import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
 import { type EntityContext, contextLineNumber } from '../util/errors.js';
 

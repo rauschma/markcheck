@@ -1,4 +1,4 @@
-import { createSuite } from '@rauschma/helpers/nodejs/test.js';
+import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { contextLineNumber } from '../util/errors.js';
 import { lineLocSetToLineNumberSet, parseLineLocSet } from './line-loc-set.js';

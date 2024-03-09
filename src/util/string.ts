@@ -1,4 +1,4 @@
-import { isEmptyLine } from '@rauschma/helpers/js/string.js';
+import { isEmptyLine } from '@rauschma/helpers/string/string.js';
 
 export function trimTrailingEmptyLines(lines: Array<string>): Array<string> {
   lines.length = getEndTrimmedLength(lines);

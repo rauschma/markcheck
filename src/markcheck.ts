@@ -1,8 +1,8 @@
 #!/usr/bin/env -S node --enable-source-maps --no-warnings=ExperimentalWarning
 // Importing JSON is experimental
 
-import { style } from '@rauschma/helpers/nodejs/text-style.js';
-import { assertTrue } from '@rauschma/helpers/ts/type.js';
+import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
+import { assertTrue } from '@rauschma/helpers/typescript/type.js';
 import * as fs from 'node:fs';
 import path from 'path';
 import { parseArgs, type ParseArgsConfig } from 'util';

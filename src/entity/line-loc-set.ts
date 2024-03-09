@@ -1,6 +1,6 @@
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
-import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { assertNonNullable } from '@rauschma/helpers/ts/type.js';
+import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
+import { assertNonNullable } from '@rauschma/helpers/typescript/type.js';
 import { InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { ATTR_KEY_IGNORE_LINES } from './directive.js';
 import { insertParsingPos, stringifyWithSingleQuote, unescapeBackslashes } from './entity-helpers.js';

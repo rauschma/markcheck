@@ -1,4 +1,4 @@
-import { createSuite } from '@rauschma/helpers/nodejs/test.js';
+import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { parseMarkdown } from '../core/parse-markdown.js';
 import { SingleSnippet } from './snippet.js';

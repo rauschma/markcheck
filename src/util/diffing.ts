@@ -1,6 +1,6 @@
-import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
-import { isEntryModule } from '@rauschma/helpers/nodejs/import-meta.js';
-import { style, type TextStyleResult } from '@rauschma/helpers/nodejs/text-style.js';
+import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
+import { isEntryModule } from '@rauschma/nodejs-tools/misc/import-meta.js';
+import { style, type TextStyleResult } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import * as diff from 'diff';
 import { Output } from './errors.js';

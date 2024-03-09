@@ -1,4 +1,4 @@
-import { type JsonValue } from '@rauschma/helpers/ts/json.js';
+import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import json5 from 'json5';
 import * as os from 'node:os';
 import { ConfigModJsonSchema, type ConfigModJson } from '../core/config.js';

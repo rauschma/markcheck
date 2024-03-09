@@ -1,5 +1,5 @@
-import { splitLinesExclEol } from '@rauschma/helpers/js/line.js';
-import { assertNonNullable, assertTrue } from '@rauschma/helpers/ts/type.js';
+import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
+import { assertNonNullable, assertTrue } from '@rauschma/helpers/typescript/type.js';
 import markdownit from 'markdown-it';
 import { ConfigMod } from '../entity/config-mod.js';
 import { ATTRS_APPLIABLE_LINE_MOD, ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT, ATTRS_CONFIG_MOD, ATTRS_LANGUAGE_LINE_MOD, ATTRS_SNIPPET, ATTRS_SNIPPET_BODY_LABEL_INSERT, ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, Directive } from '../entity/directive.js';

@@ -1,6 +1,6 @@
-import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
-import { type JsonValue } from '@rauschma/helpers/ts/json.js';
-import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/ts/type.js';
+import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
+import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
+import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/typescript/type.js';
 import type { Translator } from '../translation/translation.js';
 import { contextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';

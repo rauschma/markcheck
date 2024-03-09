@@ -1,5 +1,5 @@
-import { style } from '@rauschma/helpers/nodejs/text-style.js';
-import { UnsupportedValueError } from '@rauschma/helpers/ts/error.js';
+import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
+import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import * as os from 'node:os';
 import * as tty from 'node:tty';
 
