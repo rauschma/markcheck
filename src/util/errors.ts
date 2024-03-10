@@ -145,9 +145,9 @@ export class MarkcheckSyntaxError extends Error {
   }
 }
 
-//#################### ConfigurationError ####################
+//#################### StartupError ####################
 
-export class ConfigurationError extends Error {
+export class StartupError extends Error {
   constructor(message: string) {
     super(message);
   }

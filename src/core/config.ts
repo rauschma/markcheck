@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP, parseSearchAndReplaceString } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
-import { ConfigurationError, MarkcheckSyntaxError, contextDescription, type EntityContext } from '../util/errors.js';
+import { MarkcheckSyntaxError, contextDescription, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -57,7 +57,15 @@ export const TRANSLATOR_MAP = new Map<string, Translator>(
 
 //#################### Config ####################
 
+/**
+ * Issues such as cycles in "extends" and unknown language names are
+ * currently checked on demand: After (e.g.) the ConfigMod was parsed that
+ * caused them. Thus, we can’t provide a better context for errors in this
+ * class.
+ */
 export const CONFIG_PROP_BEFORE_LINES = 'beforeLines';
+
+const CONFIG_CONTEXT = contextDescription('Configuration');
 
 export class Config {
   searchAndReplaceFunc: (str: string) => string = (str) => str;
@@ -118,15 +126,17 @@ export class Config {
       }
       if (visitedLanguages.has(partialCommand.extends)) {
         const keyPath = [...visitedLanguages, partialCommand.extends];
-        throw new ConfigurationError(
-          `Cycle in property ${stringify(PROP_KEY_EXTENDS)} (object ${stringify(CONFIG_KEY_LANG)}): ${stringify(keyPath)}`
+        throw new MarkcheckSyntaxError(
+          `Cycle in property ${stringify(PROP_KEY_EXTENDS)} (object ${stringify(CONFIG_KEY_LANG)}): ${stringify(keyPath)}`,
+          { entityContext: CONFIG_CONTEXT }
         );
       }
       visitedLanguages.add(partialCommand.extends);
       const nextLangDef = this.#lang.get(partialCommand.extends);
       if (nextLangDef === undefined) {
-        throw new ConfigurationError(
-          `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(partialCommand.extends)}`
+        throw new MarkcheckSyntaxError(
+          `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(partialCommand.extends)}`,
+          { entityContext: CONFIG_CONTEXT }
         );
       }
       switch (nextLangDef.kind) {
@@ -146,13 +156,15 @@ export class Config {
       }
     } // while
     if (result.runFileName === undefined) {
-      throw new ConfigurationError(
-        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)}`
+      throw new MarkcheckSyntaxError(
+        `Language ${stringify(origParentKey)} does not have property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} (with ${stringify(PROP_KEY_EXTENDS)} taken into consideration)`,
+        { entityContext: CONFIG_CONTEXT }
       );
     }
     if (result.commands === undefined) {
-      throw new ConfigurationError(
-        `Language ${stringify(origParentKey)} does not have the property ${stringify(PROP_KEY_COMMANDS)}`
+      throw new MarkcheckSyntaxError(
+        `Language ${stringify(origParentKey)} does not have property ${stringify(PROP_KEY_COMMANDS)} (with ${stringify(PROP_KEY_EXTENDS)} taken into consideration)`,
+        { entityContext: CONFIG_CONTEXT }
       );
     }
     return result;

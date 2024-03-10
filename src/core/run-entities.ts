@@ -16,7 +16,7 @@ import { LineMod } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
-import { ConfigurationError, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
+import { StartupError, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { relPath } from '../util/path-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
@@ -188,7 +188,7 @@ function findMarkcheckDir(absFilePath: string, entities: Array<MarkcheckEntity>)
     }
     parentDir = nextParentDir;
   }
-  throw new ConfigurationError(
+  throw new StartupError(
     `Could not find a ${stringify(MARKCHECK_DIR_NAME)} directory neither configured nor in the following directory or its ancestors: ${stringify(startDir)}`
   );
 }
