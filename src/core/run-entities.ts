@@ -16,7 +16,7 @@ import { LineMod } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
-import { InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, StartupError, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
+import { EntityContextDescription, EntityContextLineNumber, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, StartupError, TestFailure } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { relPath } from '../util/path-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
@@ -50,11 +50,11 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
       const json = json5.parse(fs.readFileSync(configFilePath, 'utf-8'));
       const configModJson = ConfigModJsonSchema.parse(json);
       config.applyMod(
-        contextDescription('Config file ' + stringify(configFilePath)),
+        new EntityContextDescription('Config file ' + stringify(configFilePath)),
         configModJson
       );
     } catch (err) {
-      const entityContext = contextDescription(`File ${stringify(configFilePath)}`);
+      const entityContext = new EntityContextDescription(`File ${stringify(configFilePath)}`);
       if (err instanceof SyntaxError) {
         throw new MarkcheckSyntaxError(
           `Error while parsing JSON5 config data:${os.EOL}${err.message}`,
@@ -62,7 +62,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
         );
       } else if (err instanceof ZodError) {
         throw new MarkcheckSyntaxError(
-          `Config properties are wrong:${os.EOL}${json5.stringify(err.format(), {space: 2})}`,
+          `Config properties are wrong:${os.EOL}${json5.stringify(err.format(), { space: 2 })}`,
           { entityContext }
         );
       } else {
@@ -203,7 +203,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
     };
 
     if (entity instanceof ConfigMod) {
-      config.applyMod(contextLineNumber(entity.lineNumber), entity.configModJson);
+      config.applyMod(new EntityContextLineNumber(entity.lineNumber), entity.configModJson);
     } else if (entity instanceof LineMod) {
       const targetLanguage = entity.getTargetLanguage();
       if (targetLanguage !== undefined) {
@@ -223,7 +223,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
         out.writeLine(style.Bold(fileState.prevHeading.content));
         fileState.prevHeading = null; // used, not write again
       }
-      const description = describeEntityContext(entity.getEntityContext());
+      const description = entity.getEntityContext().describe();
       out.writeLine(`${description} ${STATUS_EMOJI_SUCCESS}`);
     }
     if (snippetState.verboseLines.length > 0) {
@@ -241,7 +241,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
       out.writeLine(style.Bold(fileState.prevHeading.content));
       fileState.prevHeading = null; // used, not write again
     }
-    const description = describeEntityContext(entity.getEntityContext());
+    const description = entity.getEntityContext().describe();
     out.writeLine(`${description} ${STATUS_EMOJI_FAILURE}`);
 
     if (err instanceof MarkcheckSyntaxError) {
@@ -257,7 +257,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
         writeStdStream(out, 'stderr', err.actualStderrLines, err.expectedStderrLines);
       }
     } else {
-      const description = describeEntityContext(entity.getEntityContext());
+      const description = entity.getEntityContext().describe();
       throw new Error(`Unexpected error in an entity (${description})`, { cause: err });
     }
   }

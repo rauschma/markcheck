@@ -7,7 +7,7 @@ import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { SequenceSnippet, SingleSnippet, Snippet } from '../entity/snippet.js';
-import { MarkcheckSyntaxError, describeEntityContext } from '../util/errors.js';
+import { MarkcheckSyntaxError } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -252,7 +252,7 @@ function createIdToSnippet(entities: Array<MarkcheckEntity>): Map<string, Snippe
     if (entity instanceof Snippet && entity.id) {
       const other = idToSnippet.get(entity.id);
       if (other) {
-        const description = describeEntityContext(other.getEntityContext());
+        const description = other.getEntityContext().describe();
         throw new MarkcheckSyntaxError(
           `Duplicate ${JSON.stringify(ATTR_KEY_ID)}: ${JSON.stringify(entity.id)} (other usage is ${description})`,
           { lineNumber: entity.lineNumber }
@@ -272,7 +272,7 @@ function createIdToLineMod(entities: Array<MarkcheckEntity>): Map<string, LineMo
       if (lineModId) {
         const other = idToLineMod.get(lineModId);
         if (other) {
-          const description = describeEntityContext(other.getEntityContext());
+          const description = other.getEntityContext().describe();
           throw new MarkcheckSyntaxError(
             `Duplicate ${JSON.stringify(ATTR_KEY_LINE_MOD_ID)}: ${JSON.stringify(entity.getLineModId())} (other usage is ${description})`,
             { entityContext: entity.context }

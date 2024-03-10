@@ -2,7 +2,7 @@ import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
 import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { extractCommentContent } from '../core/parse-markdown.js';
-import { contextLineNumber } from '../util/errors.js';
+import { EntityContextLineNumber } from '../util/errors.js';
 import { Directive, SearchAndReplaceSpec, parseExternalSpecs, type ExternalSpec } from './directive.js';
 
 const { raw } = String;
@@ -123,7 +123,7 @@ test('SearchAndReplaceSpec', () => {
   ];
   for (const testObj of testObjs) {
     const sar = SearchAndReplaceSpec.fromString(
-      contextLineNumber(1),
+      new EntityContextLineNumber(1),
       testObj.spec
     );
     assert.equal(

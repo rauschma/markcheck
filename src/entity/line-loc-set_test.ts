@@ -1,6 +1,6 @@
 import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
-import { contextLineNumber } from '../util/errors.js';
+import { EntityContextLineNumber } from '../util/errors.js';
 import { lineLocSetToLineNumberSet, parseLineLocSet } from './line-loc-set.js';
 
 const { raw } = String;
@@ -88,21 +88,21 @@ test('lineLocSetToLineNumberSet', () => {
   {
     const set = parseLineLocSet(1, `1..2,`);
     assert.deepEqual(
-      lineLocSetToLineNumberSet(contextLineNumber(1), set, lines),
+      lineLocSetToLineNumberSet(new EntityContextLineNumber(1), set, lines),
       new Set([1, 2])
     );
   }
   {
     const set = parseLineLocSet(1, `-2..-1`);
     assert.deepEqual(
-      lineLocSetToLineNumberSet(contextLineNumber(1), set, lines),
+      lineLocSetToLineNumberSet(new EntityContextLineNumber(1), set, lines),
       new Set([4, 5])
     );
   }
   {
     const set = parseLineLocSet(1, `'one'..'two', 5`);
     assert.deepEqual(
-      lineLocSetToLineNumberSet(contextLineNumber(1), set, lines),
+      lineLocSetToLineNumberSet(new EntityContextLineNumber(1), set, lines),
       new Set([1, 2, 5])
     );
   }

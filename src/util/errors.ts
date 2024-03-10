@@ -1,5 +1,4 @@
 import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
-import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import * as os from 'node:os';
 import * as tty from 'node:tty';
 
@@ -10,50 +9,32 @@ export const STATUS_EMOJI_FAILURE = '❌';
 
 export type LineNumber = number;
 
-export type EntityContext = EntityContextSnippet | EntityContextLineNumber | EntityContextDescription;
-export type EntityContextSnippet = {
-  kind: 'EntityContextSnippet',
-  lineNumber: number,
-  lang: string,
-};
-export type EntityContextLineNumber = {
-  kind: 'EntityContextLineNumber',
-  lineNumber: number,
-};
-export type EntityContextDescription = {
-  kind: 'EntityContextDescription',
-  description: string,
-};
+export abstract class EntityContext {
+  abstract describe(): string;
+}
 
-export function contextSnippet(lineNumber: number, lang: string): EntityContextSnippet {
-  return {
-    kind: 'EntityContextSnippet',
-    lineNumber,
-    lang,
-  };
+export class EntityContextSnippet extends EntityContext {
+  constructor(public lineNumber: number, public lang: string) {
+    super();
+  }
+  override describe(): string {
+    return `L${this.lineNumber} (${this.lang})`;
+  }
 }
-export function contextLineNumber(lineNumber: number): EntityContextLineNumber {
-  return {
-    kind: 'EntityContextLineNumber',
-    lineNumber,
-  };
+export class EntityContextLineNumber extends EntityContext {
+  constructor(public lineNumber: number) {
+    super();
+  }
+  override describe(): string {
+    return `L${this.lineNumber}`;
+  }
 }
-export function contextDescription(description: string): EntityContextDescription {
-  return {
-    kind: 'EntityContextDescription',
-    description,
-  };
-}
-export function describeEntityContext(context: EntityContext): string {
-  switch (context.kind) {
-    case 'EntityContextDescription':
-      return context.description;
-    case 'EntityContextLineNumber':
-      return `L${context.lineNumber}`;
-    case 'EntityContextSnippet':
-      return `L${context.lineNumber} (${context.lang})`;
-    default:
-      throw new UnsupportedValueError(context);
+export class EntityContextDescription extends EntityContext {
+  constructor(public description: string) {
+    super();
+  }
+  override describe(): string {
+    return this.description;
   }
 }
 
@@ -91,10 +72,7 @@ export class TestFailure extends Error {
       (opts.cause ? { cause: opts.cause } : undefined)
     );
     if (opts.lineNumber) {
-      this.context = {
-        kind: 'EntityContextLineNumber',
-        lineNumber: opts.lineNumber,
-      };
+      this.context = new EntityContextLineNumber(opts.lineNumber);
     }
     this.actualStdoutLines = opts[PROP_STDOUT]?.actualLines;
     this.expectedStdoutLines = opts[PROP_STDOUT]?.expectedLines;
@@ -129,16 +107,13 @@ export class MarkcheckSyntaxError extends Error {
     } else if (opts.entityContext) {
       this.context = opts.entityContext;
     } else if (opts.lineNumber) {
-      this.context = {
-        kind: 'EntityContextLineNumber',
-        lineNumber: opts.lineNumber,
-      };
+      this.context = new EntityContextLineNumber(opts.lineNumber);
     }
   }
   logTo(out: Output, prefix = ''): void {
     const description = (
       this.context
-        ? describeEntityContext(this.context)
+        ? this.context.describe()
         : 'unknown context'
     );
     out.writeLine(`${prefix}[${description}] ${this.message}`);

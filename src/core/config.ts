@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP, parseSearchAndReplaceString } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
-import { MarkcheckSyntaxError, contextDescription, type EntityContext } from '../util/errors.js';
+import { MarkcheckSyntaxError, type EntityContext, EntityContextDescription } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -65,7 +65,7 @@ export const TRANSLATOR_MAP = new Map<string, Translator>(
  */
 export const CONFIG_PROP_BEFORE_LINES = 'beforeLines';
 
-const CONFIG_CONTEXT = contextDescription('Configuration');
+const CONFIG_CONTEXT = new EntityContextDescription('Configuration');
 
 export class Config {
   searchAndReplaceFunc: (str: string) => string = (str) => str;
@@ -171,7 +171,7 @@ export class Config {
   }
   addDefaults(): this {
     this.#setSearchAndReplace(
-      contextDescription('Default config'),
+      CONFIG_CONTEXT,
       [
         '/[⎡⎤]//',
       ]

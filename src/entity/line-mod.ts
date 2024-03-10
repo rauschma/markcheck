@@ -2,7 +2,7 @@ import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/typescript/type.js';
 import type { Translator } from '../translation/translation.js';
-import { contextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
+import { EntityContextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, SearchAndReplaceSpec, type Directive } from './directive.js';
 import { InsertionRules, LineLocModifier, parseInsertionConditions } from './insertion-rules.js';
@@ -53,7 +53,7 @@ function emptyLineModProps(context: EntityContext): LineModProps {
 
 export class LineMod extends MarkcheckEntity {
   static parse(directive: Directive, kind: LineModKind): LineMod {
-    const context = contextLineNumber(directive.lineNumber);
+    const context = new EntityContextLineNumber(directive.lineNumber);
     const props = emptyLineModProps(context);
 
     const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);

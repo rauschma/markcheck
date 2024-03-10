@@ -3,7 +3,7 @@ import json5 from 'json5';
 import * as os from 'node:os';
 import { ZodError } from 'zod';
 import { ConfigModJsonSchema, type ConfigModJson } from '../core/config.js';
-import { MarkcheckSyntaxError, contextLineNumber, type EntityContext } from '../util/errors.js';
+import { EntityContextLineNumber, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { type Directive } from './directive.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
 
@@ -37,7 +37,7 @@ export class ConfigMod extends MarkcheckEntity {
     }
   }
   override getEntityContext(): EntityContext {
-    return contextLineNumber(this.lineNumber);
+    return new EntityContextLineNumber(this.lineNumber);
   }
   toJson(): JsonValue {
     return {

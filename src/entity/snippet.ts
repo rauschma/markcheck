@@ -4,7 +4,7 @@ import { assertNonNullable, assertTrue, type PublicDataProperties } from '@rausc
 import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { Config, CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { contextDescription, contextSnippet, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
+import { EntityContextDescription, EntityContextSnippet, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_ALL, ATTR_KEY_WRITE_LOCAL, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
@@ -78,7 +78,7 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
         if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
           outerLineMods.push(
             LineMod.fromBeforeLines(
-              contextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
+              new EntityContextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
               { tag: 'LineModKindConfig' },
               lang.beforeLines,
             )
@@ -112,7 +112,7 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
 
 export abstract class Snippet extends MarkcheckEntity {
   override getEntityContext(): EntityContext {
-    return contextSnippet(this.lineNumber, this.lang);
+    return new EntityContextSnippet(this.lineNumber, this.lang);
   }
 
   abstract get lineNumber(): number;

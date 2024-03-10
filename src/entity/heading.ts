@@ -1,6 +1,6 @@
 import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
+import { EntityContextLineNumber, type EntityContext } from '../util/errors.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
-import { type EntityContext, contextLineNumber } from '../util/errors.js';
 
 //#################### Heading ####################
 
@@ -9,7 +9,7 @@ export class Heading extends MarkcheckEntity {
     super();
   }
   override getEntityContext(): EntityContext {
-    return contextLineNumber(this.lineNumber);
+    return new EntityContextLineNumber(this.lineNumber);
   }
 
   toJson(): JsonValue {

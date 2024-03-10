@@ -1,7 +1,7 @@
 import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { CMD_VAR_FILE_NAME } from '../entity/directive.js';
-import { contextDescription, contextLineNumber } from '../util/errors.js';
+import { EntityContextDescription, EntityContextLineNumber } from '../util/errors.js';
 import { Config } from './config.js';
 
 createSuite(import.meta.url);
@@ -9,7 +9,7 @@ createSuite(import.meta.url);
 test('config.toJson()', () => {
   const config = new Config();
   config.applyMod(
-    contextDescription('Test'),
+    new EntityContextDescription('Test'),
     {
       searchAndReplace: [
         '/[⎡⎤]//',
@@ -55,7 +55,7 @@ test('config.toJson()', () => {
 
 test('config.getLang()', () => {
   const config = new Config().addDefaults();
-  config.applyMod(contextLineNumber(1), {
+  config.applyMod(new EntityContextLineNumber(1), {
     "lang": {
       "js": {
         "extends": "babel",
