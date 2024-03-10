@@ -68,6 +68,7 @@ test('stdout: failure', () => {
   });
 
   const mockShellData = new MarkcheckMockData({
+    passOnUserExceptions: false,
     lastCommandResult: {
       stdout: 'red\ngreen\nblue',
       stderr: '',

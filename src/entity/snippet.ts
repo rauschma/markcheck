@@ -646,8 +646,11 @@ export class MarkcheckMockData {
     this.lastCommandResult = props.lastCommandResult ?? null;
     this.passOnUserExceptions = props.passOnUserExceptions ?? true;
   }
+  withPassOnUserExceptions(passOnUserExceptions: boolean): this {
+    this.passOnUserExceptions = passOnUserExceptions;
+    return this;
+  }
 };
-
 
 export type CommandResult = {
   stdout: string,

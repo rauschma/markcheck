@@ -25,6 +25,7 @@ test('exitStatus: expecting 0 fails if actual is 1', () => {
   // We don’t actually run the code, we only state what its output would be
   // – if it were to run!
   const mockShellData = new MarkcheckMockData({
+    passOnUserExceptions: false,
     lastCommandResult: {
       stdout: '',
       stderr: '',

@@ -1,10 +1,11 @@
-import { dirToJson, jsonToCleanDir } from '@rauschma/nodejs-tools/testing/dir-json.js';
-import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
+import { createSuite } from '@rauschma/helpers/testing/mocha.js';
+import { dirToJson, jsonToCleanDir } from '@rauschma/nodejs-tools/testing/dir-json.js';
 import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/nodejs-tools/testing/install-mem-node-fs.js';
+import { MarkcheckMockData } from '../../src/entity/snippet.js';
 const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
@@ -32,8 +33,7 @@ test('containedInFile: success', () => {
   );
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
-    {
-    }
+    {}
   );
 });
 
@@ -54,8 +54,9 @@ test('containedInFile: failure', () => {
     `,
   });
 
+  const markcheckMockData = new MarkcheckMockData().withPassOnUserExceptions(false);
   assert.deepEqual(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme).toJson(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, {markcheckMockData}).toJson(),
     {
       relFilePath: '/tmp/markdown/readme.md',
       syntaxErrors: 0,
