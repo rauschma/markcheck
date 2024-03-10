@@ -388,7 +388,7 @@ export const LangDefCommandPartialJsonSchema = z.object({
   translator: z.optional(z.string()),
   runFileName: z.optional(z.string()),
   commands: z.optional(z.array(z.array(z.string()))),
-});
+}).strict();
 
 export const LangDefPartialJsonSchema = z.union([
   LangDefCommandPartialJsonSchema,
@@ -404,4 +404,4 @@ export const ConfigModJsonSchema = z.object({
       LangDefPartialJsonSchema
     )
   ),
-});
+}).strict();

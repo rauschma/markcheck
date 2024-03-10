@@ -75,6 +75,9 @@ export type TestFailureOptions = {
   cause?: any,
 }
 
+/**
+ * Thrown when running code did work as expected.
+ */
 export class TestFailure extends Error {
   override name = this.constructor.name;
   context: undefined | EntityContext;
@@ -109,6 +112,10 @@ export interface MarkcheckSyntaxErrorOptions {
   cause?: any;
 }
 
+/**
+ * Thrown when any aspect of Markcheck’s syntax is wrong: unknown
+ * attributes, wrong format for `searchAndReplace`, etc.
+ */
 export class MarkcheckSyntaxError extends Error {
   override name = this.constructor.name;
   context: undefined | EntityContext;
@@ -135,9 +142,6 @@ export class MarkcheckSyntaxError extends Error {
         : 'unknown context'
     );
     out.writeLine(`${prefix}[${description}] ${this.message}`);
-    if (this.stack) {
-      out.writeLine(this.stack);
-    }
   }
 }
 

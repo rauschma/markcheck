@@ -16,6 +16,7 @@ import { relPath } from './util/path-tools.js';
 
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: 'json' };
+import { ZodError } from 'zod';
 
 const {stringify} = JSON;
 
@@ -82,6 +83,9 @@ export function main() {
       const parsedMarkdown = parseMarkdown(text);
       runParsedMarkdown(out, absFilePath, logLevel, parsedMarkdown, statusCounts);
     } catch (err) {
+      // runParsedMarkdown() handles many exceptions (incl. `TestFailure`).
+      // Here, we only need to handle exceptions that happen during
+      // parseMarkdown().
       if (err instanceof MarkcheckSyntaxError) {
         statusCounts.syntaxErrors++;
         err.logTo(out, `${STATUS_EMOJI_FAILURE} `);

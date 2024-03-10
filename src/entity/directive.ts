@@ -229,7 +229,7 @@ export const ATTRS_CONFIG_MOD: ExpectedAttributeValues = new Map([
 // - Use case – body label `insert:`: `at="before:'With \'single\' quotes'"`
 // - Use case: `searchAndReplace="/ \/\/ \([A-Z]\)//"`
 
-const MARKTEST_MARKER = 'markcheck';
+const MARKCHECK_MARKER = 'markcheck';
 const RE_BODY_LABEL = re`/(?<bodyLabel>${RE_LABEL}:)/`;
 const RE_QUOTED_VALUE = re`/"(?<value>(\\.|[^"])*)"/`;
 const RE_KEY_VALUE = re`/(?<key>${RE_LABEL})([ \t]*=[ \t]*${RE_QUOTED_VALUE})?/`;
@@ -238,16 +238,16 @@ const RE_TOKEN = re`/[ \t]+(${RE_BODY_LABEL}|${RE_KEY_VALUE})/uy`;
 export class Directive {
   static parse(lineNumber: LineNumber, commentLines: Array<string>): null | Directive {
     let [firstLine, ...remainingLines] = commentLines;
-    if (!firstLine.startsWith(MARKTEST_MARKER)) {
+    if (!firstLine.startsWith(MARKCHECK_MARKER)) {
       return null;
     }
     // Due to RE_TOKEN:
     // - We need a leading space: That’s why it isn‘t part of
-    //   MARKTEST_MARKER.
+    //   MARKCHECK_MARKER.
     // - We don’t want trailing whitespace: Matching should stop at the
     //   very end of the input but RE_TOKEN doesn’t account for trailing
     //   whitespace. That’s why we .trimEnd().
-    firstLine = firstLine.slice(MARKTEST_MARKER.length).trimEnd();
+    firstLine = firstLine.slice(MARKCHECK_MARKER.length).trimEnd();
     const body = remainingLines;
     const directive = new Directive(lineNumber, body);
     RE_TOKEN.lastIndex = 0;

@@ -37,7 +37,6 @@ test('containedInFile: success', () => {
   );
 });
 
-
 test('containedInFile: failure', () => {
   const readme = outdent`
     <!--markcheck containedInFile="other.js" skip-->

@@ -1,4 +1,4 @@
-# Marktest demos
+# Markcheck demos
 
 Check files like this:
 

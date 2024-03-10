@@ -1,11 +1,11 @@
-import { dirToJson, jsonToCleanDir } from '@rauschma/nodejs-tools/testing/dir-json.js';
-import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
+import { createSuite } from '@rauschma/helpers/testing/mocha.js';
+import { dirToJson, jsonToCleanDir } from '@rauschma/nodejs-tools/testing/dir-json.js';
 import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/nodejs-tools/testing/install-mem-node-fs.js';
-import { emptyMockShellData } from '../../src/entity/snippet.js';
+const { MarkcheckMockData } = await import('../../src/entity/snippet.js');
 const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
@@ -61,9 +61,9 @@ test('Assemble snippet with body LineMod and applyToOuter', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  const mockShellData = emptyMockShellData();
+  const mockShellData = new MarkcheckMockData();
   assert.equal(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
     0
   );
   // Per file: config lines, language LineMods
@@ -129,9 +129,9 @@ test('Assemble snippet with runLocalLines and applyToOuter: must include applyTo
     '/tmp/markdown/readme.md': readme,
   });
 
-  const mockShellData = emptyMockShellData();
+  const mockShellData = new MarkcheckMockData();
   assert.equal(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
     0
   );
   // Per file: config lines, language LineMods
@@ -207,9 +207,9 @@ test('Assemble snippet with applyToBody LineMod', () => {
     '/tmp/markdown/readme.md': readme,
   });
 
-  const mockShellData = emptyMockShellData();
+  const mockShellData = new MarkcheckMockData();
   assert.equal(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme, { mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
     0
   );
   // Per file: config lines, language LineMods

@@ -1,19 +1,20 @@
 import { setDifference } from '@rauschma/helpers/collection/set.js';
 import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
-import { MissingDirectoryMode, clearDirectorySync, ensureParentDirectory } from '@rauschma/nodejs-tools/misc/file.js';
-import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { assertTrue } from '@rauschma/helpers/typescript/type.js';
+import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
+import { MissingDirectoryMode, clearDirectorySync, ensureParentDirectory } from '@rauschma/nodejs-tools/misc/file.js';
 import json5 from 'json5';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { ZodError } from 'zod';
 import { ConfigMod } from '../entity/config-mod.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, type StdStreamContentSpec } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MockShellData } from '../entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
 import { ConfigurationError, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
@@ -22,18 +23,18 @@ import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
 import { type ParsedMarkdown } from './parse-markdown.js';
 
-const MARKTEST_DIR_NAME = 'markcheck-data';
-const MARKTEST_TMP_DIR_NAME = 'tmp';
+const MARKCHECK_DIR_NAME = 'markcheck-data';
+const MARKCHECK_TMP_DIR_NAME = 'tmp';
 const CONFIG_FILE_NAME = 'markcheck-config.json5';
 const { stringify } = JSON;
 
 //#################### runParsedMarkdown() ####################
 
-export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: LogLevel, parsedMarkdown: ParsedMarkdown, statusCounts: StatusCounts, mockShellData: null | MockShellData = null): void {
+export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: LogLevel, parsedMarkdown: ParsedMarkdown, statusCounts: StatusCounts, mockShellData: null | MarkcheckMockData = null): void {
   const markcheckDir = findMarkcheckDir(absFilePath, parsedMarkdown.entities);
   out.writeLine(style.FgBrightBlack`Markcheck directory: ${relPath(markcheckDir)}`);
 
-  const tmpDir = path.resolve(markcheckDir, MARKTEST_TMP_DIR_NAME);
+  const tmpDir = path.resolve(markcheckDir, MARKCHECK_TMP_DIR_NAME);
   // `markcheck/` must exist, `markcheck/tmp/` may not exist
   clearDirectorySync(tmpDir, MissingDirectoryMode.Create);
 
@@ -45,12 +46,30 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
   const config = new Config().addDefaults();
   const configFilePath = path.resolve(markcheckDir, CONFIG_FILE_NAME);
   if (fs.existsSync(configFilePath)) {
-    const json = json5.parse(fs.readFileSync(configFilePath, 'utf-8'));
-    const configModJson = ConfigModJsonSchema.parse(json);
-    config.applyMod(
-      contextDescription('Config file ' + stringify(configFilePath)),
-      configModJson
-    );
+    try {
+      const json = json5.parse(fs.readFileSync(configFilePath, 'utf-8'));
+      const configModJson = ConfigModJsonSchema.parse(json);
+      config.applyMod(
+        contextDescription('Config file ' + stringify(configFilePath)),
+        configModJson
+      );
+    } catch (err) {
+      const entityContext = contextDescription(`File ${stringify(configFilePath)}`);
+      if (err instanceof SyntaxError) {
+        throw new MarkcheckSyntaxError(
+          `Error while parsing JSON5 config data:${os.EOL}${err.message}`,
+          { entityContext }
+        );
+      } else if (err instanceof ZodError) {
+        throw new MarkcheckSyntaxError(
+          `Config properties are wrong:${os.EOL}${json5.stringify(err.format(), {space: 2})}`,
+          { entityContext }
+        );
+      } else {
+        // Unexpected error
+        throw err;
+      }
+    }
   }
 
   const fileState: FileState = {
@@ -62,7 +81,7 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
     globalRunningMode,
     languageLineMods: new Map(),
     statusCounts,
-    mockShellData,
+    markcheckMockData: mockShellData,
     prevHeading: null,
   };
 
@@ -159,7 +178,7 @@ function findMarkcheckDir(absFilePath: string, entities: Array<MarkcheckEntity>)
   const startDir = path.dirname(absFilePath);
   let parentDir = startDir;
   while (true) {
-    const mtd = path.resolve(parentDir, MARKTEST_DIR_NAME);
+    const mtd = path.resolve(parentDir, MARKCHECK_DIR_NAME);
     if (fs.existsSync(mtd)) {
       return mtd;
     }
@@ -170,7 +189,7 @@ function findMarkcheckDir(absFilePath: string, entities: Array<MarkcheckEntity>)
     parentDir = nextParentDir;
   }
   throw new ConfigurationError(
-    `Could not find a ${stringify(MARKTEST_DIR_NAME)} directory neither configured nor in the following directory or its ancestors: ${stringify(startDir)}`
+    `Could not find a ${stringify(MARKCHECK_DIR_NAME)} directory neither configured nor in the following directory or its ancestors: ${stringify(startDir)}`
   );
 }
 
@@ -219,6 +238,10 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
       }
     }
   } catch (err) {
+    if (fileState.markcheckMockData?.passOnUserExceptions) {
+      throw err;
+    }
+
     if (fileState.prevHeading) {
       out.writeLine(style.Bold(fileState.prevHeading.content));
       fileState.prevHeading = null; // used, not write again
@@ -377,11 +400,11 @@ function runShellCommands(fileState: FileState, config: Config, snippetState: Sn
       snippetState.verboseLines.push('Run: ' + commandParts.join(' '));
     }
 
-    if (fileState.mockShellData) {
-      fileState.mockShellData.interceptedCommands.push(
+    if (fileState.markcheckMockData) {
+      fileState.markcheckMockData.interceptedCommands.push(
         commandParts.join(' ')
       );
-      const lastCommandResult = fileState.mockShellData.lastCommandResult;
+      const lastCommandResult = fileState.markcheckMockData.lastCommandResult;
       if (isLastCommand && lastCommandResult) {
         checkShellCommandResult(fileState, config, snippet, lastCommandResult, isLastCommand);
       }
