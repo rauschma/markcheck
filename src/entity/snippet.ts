@@ -85,9 +85,9 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
           );
         }
       }
-      const languageLineMods = fileState.languageLineMods.get(snippet.lang);
-      if (languageLineMods) {
-        outerLineMods.push(...languageLineMods);
+      const languageLineMod = fileState.languageLineMods.get(snippet.lang);
+      if (languageLineMod !== undefined) {
+        outerLineMods.push(languageLineMod);
       }
     }
 
@@ -666,7 +666,7 @@ export type FileState = {
   idToSnippet: Map<string, Snippet>;
   idToLineMod: Map<string, LineMod>;
   globalRunningMode: GlobalRunningMode;
-  languageLineMods: Map<string, Array<LineMod>>;
+  languageLineMods: Map<string, LineMod>;
   statusCounts: StatusCounts;
   markcheckMockData: null | MarkcheckMockData;
   prevHeading: null | Heading;

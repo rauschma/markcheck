@@ -16,7 +16,7 @@ import { LineMod } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
-import { StartupError, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
+import { InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, StartupError, TestFailure, contextDescription, contextLineNumber, describeEntityContext } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { relPath } from '../util/path-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
@@ -207,12 +207,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
     } else if (entity instanceof LineMod) {
       const targetLanguage = entity.getTargetLanguage();
       if (targetLanguage !== undefined) {
-        let lineModArr = fileState.languageLineMods.get(targetLanguage);
-        if (!lineModArr) {
-          lineModArr = [];
-          fileState.languageLineMods.set(targetLanguage, lineModArr);
-        }
-        lineModArr.push(entity);
+        fileState.languageLineMods.set(targetLanguage, entity);
       }
     } else if (entity instanceof Snippet) {
       handleSnippet(fileState, config, snippetState, entity);
