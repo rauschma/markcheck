@@ -66,4 +66,4 @@ Example: [`demo-bash.md`](https://github.com/rauschma/markcheck/blob/main/demo/d
 
 ### Configuring languages via config files
 
-You can also store language definitions in `markcheck-data/markcheck-config.jsonc`
+You can also store language definitions in `markcheck-data/markcheck-config.json5`

@@ -76,22 +76,25 @@ npm install --global markcheck
 Markcheck writes each code block to disk and applies shell commands to it. The commands are determined by the language of the code block:
 
 * You can check out the defaults via `markcheck --print-config`.
-* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.jsonc`
+* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.json5`
 
 The defaults look like this:
 
 <!--markcheck skip-->
-```jsonc
+```json5
 {
-  "lang": {
-    "js": {
-      "before": [
-        "import assert from 'node:assert/strict';"
+  lang: {
+    js: {
+      before: [
+        "import assert from 'node:assert/strict';",
       ],
-      "runFileName": "main.mjs",
-      "commands": [
-        ["node", "$FILE_NAME"]
-      ]
+      runFileName: "main.mjs",
+      commands: [
+        [
+          "node",
+          "$FILE_NAME",
+        ],
+      ],
     },
     // ···
   },

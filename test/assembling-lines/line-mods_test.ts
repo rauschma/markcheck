@@ -40,7 +40,7 @@ test('Assemble snippet with body LineMod and applyToOuter', () => {
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {
-      'markcheck-config.jsonc': outdent`
+      'markcheck-config.json5': outdent`
         {
           "lang": {
             "": "[skip]",
@@ -108,7 +108,7 @@ test('Assemble snippet with runLocalLines and applyToOuter: must include applyTo
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {
-      'markcheck-config.jsonc': outdent`
+      'markcheck-config.json5': outdent`
         {
           "lang": {
             "": "[skip]",
@@ -186,7 +186,7 @@ test('Assemble snippet with applyToBody LineMod', () => {
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
     '/tmp/markcheck-data': {
-      'markcheck-config.jsonc': outdent`
+      'markcheck-config.json5': outdent`
         {
           "lang": {
             "": "[skip]",

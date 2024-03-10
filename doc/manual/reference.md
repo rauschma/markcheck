@@ -16,7 +16,7 @@ Options:
 
 * `markcheck-data/`: must exist, can be empty
   * `tmp/`: created on demand, cleared before a file is run.
-  * `markcheck-config.jsonc`: overrides the built-in defaults.
+  * `markcheck-config.json5`: overrides the built-in defaults.
     * Show built-in defaults via: `markcheck --print-config`
 
 ## Syntax
@@ -247,7 +247,7 @@ All global lines are outer lines. But snippets can also contribute local outer l
 Locations:
 
 * Defaults
-* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.jsonc`
+* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.json5`
 
 
 See all defaults: `markcheck --print-config`

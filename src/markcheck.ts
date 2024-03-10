@@ -1,8 +1,9 @@
 #!/usr/bin/env -S node --enable-source-maps --no-warnings=ExperimentalWarning
 // Importing JSON is experimental
 
-import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { assertTrue } from '@rauschma/helpers/typescript/type.js';
+import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
+import json5 from 'json5';
 import * as fs from 'node:fs';
 import path from 'path';
 import { parseArgs, type ParseArgsConfig } from 'util';
@@ -46,7 +47,7 @@ export function main() {
     return;
   }
   if (args.values['print-config']) {
-    out.writeLine(JSON.stringify(new Config().addDefaults().toJson(), null, 2));
+    out.writeLine(json5.stringify(new Config().addDefaults().toJson(), {space: 2, quote: `"`}));
     return;
   }
   if (args.values.help || args.positionals.length === 0) {
