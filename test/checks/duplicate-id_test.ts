@@ -1,11 +1,10 @@
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import { createSuite } from '@rauschma/helpers/testing/mocha.js';
-import { jsonToCleanDir } from '@rauschma/nodejs-tools/testing/dir-json.js';
 import assert from 'node:assert/strict';
-import * as util from 'node:util';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/nodejs-tools/testing/install-mem-node-fs.js';
+const { jsonToCleanDir } = await import('@rauschma/nodejs-tools/testing/dir-json.js');
 const { EntityContextLineNumber, MarkcheckSyntaxError } = await import('../../src/util/errors.js');
 const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 

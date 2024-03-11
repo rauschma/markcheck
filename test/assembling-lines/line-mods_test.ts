@@ -1,10 +1,10 @@
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import { createSuite } from '@rauschma/helpers/testing/mocha.js';
-import { dirToJson, jsonToCleanDir } from '@rauschma/nodejs-tools/testing/dir-json.js';
 import assert from 'node:assert/strict';
 
 // Only dynamically imported modules use the patched `node:fs`!
 import { mfs } from '@rauschma/nodejs-tools/testing/install-mem-node-fs.js';
+const { dirToJson, jsonToCleanDir } = await import('@rauschma/nodejs-tools/testing/dir-json.js');
 const { MarkcheckMockData } = await import('../../src/entity/snippet.js');
 const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
@@ -69,7 +69,7 @@ test('Assemble snippet with body LineMod and applyToOuter', () => {
   // Per file: config lines, language LineMods
   // Per snippet: applied line mod, local line mod
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson('/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'my-module.mjs': outdent`
         // Config line BEFORE
@@ -137,7 +137,7 @@ test('Assemble snippet with runLocalLines and applyToOuter: must include applyTo
   // Per file: config lines, language LineMods
   // Per snippet: applied line mod, local line mod
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson('/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'main.mjs': outdent`
         // Outer applied LineMod BEFORE
@@ -215,7 +215,7 @@ test('Assemble snippet with applyToBody LineMod', () => {
   // Per file: config lines, language LineMods
   // Per snippet: applied line mod, local line mod
   assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    dirToJson('/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
       'my-module.mjs': outdent`
         // Config line BEFORE
