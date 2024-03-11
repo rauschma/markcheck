@@ -41,7 +41,7 @@ function functionThatShouldThrow() {
 ```js
 ```
 
-<!--markcheck writeLocal="some-file.txt" body:
+<!--markcheck writeLocalLines="some-file.txt" body:
 Content of some-file.txt
 -->
 ``````
@@ -107,7 +107,7 @@ After directives were paired with code blocks, we get the following entities:
 Phases of visitation:
 
 * Checks: `sameAsId`, `containedInFile`
-* Writing to disk via `writeLocal`, `writeAll`
+* Writing to disk via `writeLocalLines`, `write`
   * Skips running. Use `runFileName` to change the snippet’s default filename and run it.
 * Running:
   * Writing to disk:
@@ -125,7 +125,7 @@ Running:
   * Visitation mode `normal` (not an attribute): active if none of the previous attributes are present.
 * `id` sets running mode to `skip`.
   * Override via `alwaysRun` or `only`
-* `writeLocal`, `writeAll` always prevent running. Alternatives:
+* `writeLocalLines`, `write` always prevent running. Alternatives:
   * `runFileName="file-name"` changes the filename that is used when running a snippet. It overrides the default set by the config.
   * `runLocalLines` excludes global lines when writing a file to disk for running.
 
@@ -202,10 +202,11 @@ All global lines are outer lines. But snippets can also contribute local outer l
     * `filePath` is either relative to the Markdown file or absolute.
     * The outer LineMods are not applied.
 * Writing and referring to files:
-  * `writeLocal="filePath"`
-  * `writeAll="filePath"`
+  * `write="filePath"`
+  * `writeLocalLines="filePath"`
   * `runFileName="filePath"`
   * `external="id1>lib1.js, lib2.js"`
+  * `externalLocalLines="id1>lib1.js, lib2.js"`
 * Checking output: To hide line from human readers, we can use LineMod operations to change the expected content or the actual content. Uses local lines.
   * `stdout="|lineModId=snippet-id"`
   * `stderr="snippet-id"`

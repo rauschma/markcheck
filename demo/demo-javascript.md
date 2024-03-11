@@ -105,7 +105,7 @@ export const GRINNING_FACE = '😀';
 
 Setting up an external file:
 
-<!--markcheck writeLocal="some-file.txt" body:
+<!--markcheck write="some-file.txt" body:
 Content of some-file.txt
 -->
 

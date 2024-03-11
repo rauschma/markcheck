@@ -51,9 +51,8 @@ export const ATTR_KEY_CONTAINED_IN_FILE = 'containedInFile';
 
 //----- Writing and referring to files -----
 
-export const ATTR_KEY_WRITE_LOCAL = 'writeLocal';
-export const ATTR_KEY_WRITE_ALL = 'writeAll';
-
+export const ATTR_KEY_WRITE = 'write';
+export const ATTR_KEY_WRITE_LOCAL_LINES = 'writeLocalLines';
 export const ATTR_KEY_RUN_FILE_NAME = 'runFileName';
 
 /**
@@ -63,13 +62,19 @@ export const ATTR_KEY_RUN_FILE_NAME = 'runFileName';
  * ```
  */
 export const ATTR_KEY_EXTERNAL = 'external';
+/**
+ * - Local version of {@link ATTR_KEY_EXTERNAL}
+ */
+export const ATTR_KEY_EXTERNAL_LOCAL_LINES = 'externalLocalLines';
 
+export enum LineScope { all, local };
 export type ExternalSpec = {
   id: null | string,
-  fileName: string
+  fileName: string,
+  lineScope: LineScope,
 };
 const RE_EXTERNAL_SPEC = re`/^((?<id>${RE_LABEL}) *> *)?(?<fileName>[^>]+)$/u`;
-export function parseExternalSpecs(lineNumber: number, str: string): Array<ExternalSpec> {
+export function parseExternalSpecs(lineNumber: number, lineScope: LineScope, str: string): Array<ExternalSpec> {
   const specs = new Array<ExternalSpec>();
 
   const parts = str.split(/ *, */);
@@ -82,7 +87,7 @@ export function parseExternalSpecs(lineNumber: number, str: string): Array<Exter
       );
     }
     const id = match.groups.id ?? null;
-    specs.push({ id, fileName: match.groups.fileName });
+    specs.push({ id, fileName: match.groups.fileName, lineScope });
   }
   return specs;
 }
@@ -188,10 +193,11 @@ export const ATTRS_SNIPPET: ExpectedAttributeValues = new Map<string, AttrValue 
   [ATTR_KEY_SAME_AS_ID, AttrValue.String],
   [ATTR_KEY_CONTAINED_IN_FILE, AttrValue.String],
   //
-  [ATTR_KEY_WRITE_LOCAL, AttrValue.String],
-  [ATTR_KEY_WRITE_ALL, AttrValue.String],
+  [ATTR_KEY_WRITE_LOCAL_LINES, AttrValue.String],
+  [ATTR_KEY_WRITE, AttrValue.String],
   [ATTR_KEY_RUN_FILE_NAME, AttrValue.String],
   [ATTR_KEY_EXTERNAL, AttrValue.String],
+  [ATTR_KEY_EXTERNAL_LOCAL_LINES, AttrValue.String],
   //
   [ATTR_KEY_EXIT_STATUS, AttrValue.String],
   [ATTR_KEY_STDOUT, AttrValue.String],

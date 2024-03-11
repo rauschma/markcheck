@@ -6,7 +6,7 @@ import { Config, CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, PROP_KEY_DEFAULT_FIL
 import type { Translator } from '../translation/translation.js';
 import { EntityContextDescription, EntityContextSnippet, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE_ALL, ATTR_KEY_WRITE_LOCAL, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
 import { LineMod } from './line-mod.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
@@ -42,16 +42,20 @@ export function assembleInnerLines(fileState: FileState, config: Config, snippet
   return lines;
 }
 
+export function assembleLocalLines(fileState: FileState, config: Config, snippet: Snippet): Array<string> {
+  return assembleAllLines(fileState, config, snippet, true);
+}
+
 /**
  * Outer lines (once per file):
  * - `applyToOuter` LineMod
  * - Language LineMod
  * - Config before lines
  */
-export function assembleAllLines(fileState: FileState, config: Config, snippet: Snippet, runLocalLines=snippet.runLocalLines) {
+export function assembleAllLines(fileState: FileState, config: Config, snippet: Snippet, onlyLocalLines=snippet.runLocalLines): Array<string> {
   const lines = new Array<string>();
 
-  const outerLineMods = collectOuterLineMods(runLocalLines);
+  const outerLineMods = collectOuterLineMods(onlyLocalLines);
 
   for (let i = 0; i < outerLineMods.length; i++) {
     outerLineMods[i].pushBeforeLines(lines);
@@ -69,10 +73,10 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
   }
   return lines;
 
-  function collectOuterLineMods(runLocalLines: boolean): Array<LineMod> {
+  function collectOuterLineMods(onlyLocalLines: boolean): Array<LineMod> {
     const outerLineMods = new Array<LineMod>();
 
-    if (!runLocalLines) {
+    if (!onlyLocalLines) {
       if (snippet.lang) {
         const lang = config.getLang(snippet.lang);
         if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
@@ -92,7 +96,7 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
     }
 
     // `applyToOuter` contributes outer lines but is applied locally (by
-    // the snippet). That’s why it is not affected `runLocalLines`.
+    // the snippet). That’s why it is not affected by `onlyLocalLines`.
     const applyOuterId = snippet.applyToOuterId;
     if (applyOuterId) {
       const applyLineMod = fileState.idToLineMod.get(applyOuterId);
@@ -128,8 +132,8 @@ export abstract class Snippet extends MarkcheckEntity {
   abstract get sameAsId(): null | string;
   abstract get containedInFile(): null | string;
   //
-  abstract get writeLocal(): null | string;
-  abstract get writeAll(): null | string;
+  abstract get writeLocalLines(): null | string;
+  abstract get write(): null | string;
   abstract get externalSpecs(): Array<ExternalSpec>;
   //
   abstract get exitStatus(): null | 'nonzero' | number;
@@ -217,12 +221,16 @@ export class SingleSnippet extends Snippet {
     }
 
     { // File names
-      snippet.writeLocal = directive.getString(ATTR_KEY_WRITE_LOCAL);
-      snippet.writeAll = directive.getString(ATTR_KEY_WRITE_ALL);
+      snippet.writeLocalLines = directive.getString(ATTR_KEY_WRITE_LOCAL_LINES);
+      snippet.write = directive.getString(ATTR_KEY_WRITE);
       snippet.#internalFileName = directive.getString(ATTR_KEY_RUN_FILE_NAME);
       const external = directive.getString(ATTR_KEY_EXTERNAL);
       if (external) {
-        snippet.externalSpecs = parseExternalSpecs(directive.lineNumber, external);
+        snippet.externalSpecs.push(...parseExternalSpecs(directive.lineNumber, LineScope.all, external));
+      }
+      const externalLocalLines = directive.getString(ATTR_KEY_EXTERNAL_LOCAL_LINES);
+      if (externalLocalLines) {
+        snippet.externalSpecs.push(...parseExternalSpecs(directive.lineNumber, LineScope.local, externalLocalLines));
       }
     }
 
@@ -280,8 +288,8 @@ export class SingleSnippet extends Snippet {
   //
   #lang: null | string = null;
   //
-  override writeLocal: null | string = null;
-  override writeAll: null | string = null;
+  override writeLocalLines: null | string = null;
+  override write: null | string = null;
   override externalSpecs = new Array<ExternalSpec>();
   #internalFileName: null | string = null;
   //
@@ -566,11 +574,11 @@ export class SequenceSnippet extends Snippet {
   override getAllFileNames(langDef: LangDefCommand): Array<string> {
     return this.firstElement.getAllFileNames(langDef);
   }
-  override get writeLocal(): null | string {
-    return this.firstElement.writeLocal;
+  override get writeLocalLines(): null | string {
+    return this.firstElement.writeLocalLines;
   }
-  override get writeAll(): null | string {
-    return this.firstElement.writeAll;
+  override get write(): null | string {
+    return this.firstElement.write;
   }
   override get externalSpecs(): Array<ExternalSpec> {
     return this.firstElement.externalSpecs;

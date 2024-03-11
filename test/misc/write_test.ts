@@ -9,10 +9,10 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Written snippet', () => {
+test('writeLocalLines', () => {
   const readme = outdent`
-    <!--markcheck writeLocal="test-file.txt" body:
-    Test file content
+    <!--markcheck writeLocalLines="code.js" lang="js" body:
+    // JavaScript code
     -->
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
@@ -26,7 +26,34 @@ test('Written snippet', () => {
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
-      'test-file.txt': 'Test file content',
+      'code.js': outdent`
+        // JavaScript code
+      `,
+    }
+  );
+});
+
+test('write', () => {
+  const readme = outdent`
+    <!--markcheck write="code.js" lang="js" body:
+    // JavaScript code
+    -->
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'code.js': outdent`
+        import assert from 'node:assert/strict';
+        // JavaScript code
+      `,
     }
   );
 });

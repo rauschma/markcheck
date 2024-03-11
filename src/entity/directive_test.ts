@@ -3,7 +3,7 @@ import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { extractCommentContent } from '../core/parse-markdown.js';
 import { EntityContextLineNumber } from '../util/errors.js';
-import { Directive, SearchAndReplaceSpec, parseExternalSpecs, type ExternalSpec } from './directive.js';
+import { Directive, SearchAndReplaceSpec, parseExternalSpecs, type ExternalSpec, LineScope } from './directive.js';
 
 const { raw } = String;
 
@@ -70,18 +70,41 @@ test('Directive.parse()', () => {
 
 test('parseExternalSpecs', () => {
   assert.deepEqual(
-    parseExternalSpecs(1, 'file0.js, id1>file1.js, id2>file2.js'),
+    parseExternalSpecs(1, LineScope.all, 'file0.js, id1>file1.js, id2>file2.js'),
     [
       {
         id: null,
+        lineScope: LineScope.all,
         fileName: 'file0.js',
       },
       {
         id: 'id1',
+        lineScope: LineScope.all,
         fileName: 'file1.js',
       },
       {
         id: 'id2',
+        lineScope: LineScope.all,
+        fileName: 'file2.js',
+      },
+    ] satisfies Array<ExternalSpec>
+  );
+  assert.deepEqual(
+    parseExternalSpecs(1, LineScope.local, 'file0.js, id1>file1.js, id2>file2.js'),
+    [
+      {
+        id: null,
+        lineScope: LineScope.local,
+        fileName: 'file0.js',
+      },
+      {
+        id: 'id1',
+        lineScope: LineScope.local,
+        fileName: 'file1.js',
+      },
+      {
+        id: 'id2',
+        lineScope: LineScope.local,
         fileName: 'file2.js',
       },
     ] satisfies Array<ExternalSpec>

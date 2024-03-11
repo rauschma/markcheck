@@ -9,39 +9,69 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('searchAndReplace slashes', () => {
+test('Subdirectory: writeLocalLines', () => {
   const readme = outdent`
-    <!--markcheck searchAndReplace="/ \/\/ \([A-Z]\)//"-->
+    <!--markcheck writeLocalLines="dir/code.js" lang="js" body:
+    // JavaScript code
+    -->
+  `;
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'dir': {
+        'code.js': outdent`
+          // JavaScript code
+        `,
+      },
+    }
+  );
+});
+
+test('Subdirectory: write', () => {
+  const readme = outdent`
+    <!--markcheck write="dir/code.js" lang="js" body:
+    // JavaScript code
+    -->
+  `;
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'dir': {
+        'code.js': outdent`
+          import assert from 'node:assert/strict';
+          // JavaScript code
+        `,
+      },
+    }
+  );
+});
+
+test('Subdirectory: runFileName, external', () => {
+  const readme = outdent`
+    <!--markcheck runFileName="dir/my-code.js" external="other>dir/other.js" -->
     ▲▲▲js
-    console.log('First'); // (A)
-    console.log('Second'); // (B)
+    import {func} from './other.js';
     ▲▲▲
-  `.replaceAll('▲', '`');
-  jsonToCleanDir(mfs, {
-    '/tmp/markcheck-data': {},
-    '/tmp/markdown/readme.md': readme,
-  });
 
-  assert.ok(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
-  );
-  assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
-    {
-      'main.mjs': outdent`
-        import assert from 'node:assert/strict';
-        console.log('First');
-        console.log('Second');
-      `,
-    }
-  );
-});
-
-test('searchAndReplace double quotes', () => {
-  const readme = outdent`
-    <!--markcheck searchAndReplace="/\"/X/" runLocalLines-->
+    <!--markcheck id="other" -->
     ▲▲▲js
-    "abc"
+    export func() {}
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
@@ -55,18 +85,30 @@ test('searchAndReplace double quotes', () => {
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
-      'main.mjs': outdent`
-        XabcX
-      `,
+      'dir': {
+        'my-code.js': outdent`
+          import assert from 'node:assert/strict';
+          import {func} from './other.js';
+        `,
+        'other.js': outdent`
+          import assert from 'node:assert/strict';
+          export func() {}
+        `,
+      },
     }
   );
 });
 
-test('searchAndReplace not ignoring case', () => {
+test('Subdirectory: runFileName, externalLocalLines', () => {
   const readme = outdent`
-    <!--markcheck writeLocalLines="text-file.txt" searchAndReplace="/[abc]/x/"-->
-    ▲▲▲txt
-    AaBbZz
+    <!--markcheck runLocalLines runFileName="dir/my-code.js" externalLocalLines="other>dir/other.js" -->
+    ▲▲▲js
+    import {func} from './other.js';
+    ▲▲▲
+
+    <!--markcheck id="other" -->
+    ▲▲▲js
+    export func() {}
     ▲▲▲
   `.replaceAll('▲', '`');
   jsonToCleanDir(mfs, {
@@ -80,61 +122,14 @@ test('searchAndReplace not ignoring case', () => {
   assert.deepEqual(
     dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
     {
-      'text-file.txt': outdent`
-        AxBxZz
-      `,
-    }
-  );
-});
-
-test('searchAndReplace ignoring case', () => {
-  const readme = outdent`
-    <!--markcheck writeLocalLines="text-file.txt" searchAndReplace="/[abc]/x/i"-->
-    ▲▲▲txt
-    AaBbZz
-    ▲▲▲
-  `.replaceAll('▲', '`');
-  jsonToCleanDir(mfs, {
-    '/tmp/markcheck-data': {},
-    '/tmp/markdown/readme.md': readme,
-  });
-
-  assert.ok(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
-  );
-  assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
-    {
-      'text-file.txt': outdent`
-        xxxxZz
-      `,
-    }
-  );
-});
-
-test('searchAndReplace via applyToBody LineMod', () => {
-  const readme = outdent`
-    <!--markcheck writeLocalLines="text-file.txt" applyToBody="applied-LineMod"-->
-    ▲▲▲txt
-    ABC
-    ▲▲▲
-
-    <!--markcheck lineModId="applied-LineMod" searchAndReplace="/B/X/"-->
-  `.replaceAll('▲', '`');
-  jsonToCleanDir(mfs, {
-    '/tmp/markcheck-data': {},
-    '/tmp/markdown/readme.md': readme,
-  });
-
-  assert.ok(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
-  );
-  assert.deepEqual(
-    dirToJson(mfs, '/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
-    {
-      'text-file.txt': outdent`
-        AXC
-      `,
+      'dir': {
+        'my-code.js': outdent`
+          import {func} from './other.js';
+        `,
+        'other.js': outdent`
+          export func() {}
+        `,
+      },
     }
   );
 });

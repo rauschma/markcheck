@@ -1,5 +1,6 @@
 import { setDifference } from '@rauschma/helpers/collection/set.js';
 import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
+import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { assertTrue } from '@rauschma/helpers/typescript/type.js';
 import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { MissingDirectoryMode, clearDirectorySync, ensureParentDirectory } from '@rauschma/nodejs-tools/misc/file.js';
@@ -10,11 +11,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { ZodError } from 'zod';
 import { ConfigMod } from '../entity/config-mod.js';
-import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, type StdStreamContentSpec } from '../entity/directive.js';
+import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, LineScope, type StdStreamContentSpec } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { LineMod } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
 import { EntityContextDescription, EntityContextLineNumber, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, StartupError, TestFailure } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
@@ -303,16 +304,16 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
 
   //----- Writing -----
 
-  const writeAll: null | string = snippet.writeAll;
-  if (writeAll) {
+  const write: null | string = snippet.write;
+  if (write) {
     const lines = assembleAllLines(fileState, config, snippet);
-    writeOneFile(fileState, config, snippetState, writeAll, lines);
+    writeOneFile(fileState, config, snippetState, write, lines);
     return;
   }
-  const writeLocal: null | string = snippet.writeLocal;
-  if (writeLocal) {
-    const lines = assembleAllLines(fileState, config, snippet);
-    writeOneFile(fileState, config, snippetState, writeLocal, lines);
+  const writeLocalLines: null | string = snippet.writeLocalLines;
+  if (writeLocalLines) {
+    const lines = assembleLocalLines(fileState, config, snippet);
+    writeOneFile(fileState, config, snippetState, writeLocalLines, lines);
     return;
   }
 
@@ -364,10 +365,21 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
 function writeFilesForRunning(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, fileName: string, lines: Array<string>): void {
   writeOneFile(fileState, config, snippetState, fileName, lines);
 
-  for (const { id, fileName } of snippet.externalSpecs) {
-    if (!id) continue;
-    const lines = assembleAllLinesForId(fileState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL, id);
-    writeOneFile(fileState, config, snippetState, fileName, lines);
+  for (const { id, lineScope, fileName } of snippet.externalSpecs) {
+    if (id !== null) {
+      let lines;
+      switch (lineScope) {
+        case LineScope.all:
+          lines = assembleAllLinesForId(fileState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL, id);
+          break;
+        case LineScope.local:
+          lines = assembleLocalLinesForId(fileState, config, snippet.lineNumber, ATTR_KEY_EXTERNAL_LOCAL_LINES, id);
+          break;
+        default:
+          throw new UnsupportedValueError(lineScope);
+      }
+      writeOneFile(fileState, config, snippetState, fileName, lines);
+    }
   }
 }
 
@@ -510,7 +522,7 @@ function writeStdStream(out: Output, name: string, actualLines: Array<string>, e
   }
   const title = `----- ${name} -----`;
   out.writeLine(title);
-  writeAllLines(out, actualLines);
+  write(out, actualLines);
   out.writeLine('-'.repeat(title.length));
   if (expectedLines) {
     logDiff(out, expectedLines, actualLines);
@@ -518,7 +530,7 @@ function writeStdStream(out: Output, name: string, actualLines: Array<string>, e
   }
 }
 
-function writeAllLines(out: Output, lines: Array<string>) {
+function write(out: Output, lines: Array<string>) {
   for (const line of lines) {
     out.writeLine(line);
   }

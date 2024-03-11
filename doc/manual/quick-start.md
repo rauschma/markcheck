@@ -18,7 +18,7 @@ More demos are here: [`markcheck/demo/`](../../demo/)
 
 We create the following Markdown file that we want to check with Markcheck:
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 ```js
 assert.equal(
@@ -126,7 +126,7 @@ We can install the commands `ts-expect-error` and `tsx` in several ways:
 
 ### Checking standard output via `stdout`
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 <!--markcheck stdout="stdout-hello"-->
 ```js
@@ -141,7 +141,7 @@ Hello!
 
 ### Hiding code via `before:`
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 <!--markcheck before:
 function functionThatShouldThrow() {
@@ -160,7 +160,7 @@ try {
 
 ### Assembling code fragments sequentially via `sequence`
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 <!--markcheck sequence="1/3" stdout="sequence-output"-->
 ```js
@@ -189,7 +189,7 @@ Snippet 3/3
 
 ### Assembling code fragments out of order
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 <!--markcheck include="step1, step2, $THIS"-->
 ```js
@@ -215,7 +215,7 @@ steps.push('Step 2');
 
 ### External files
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 <!--markcheck external="other>other.mjs"-->
 ```js
@@ -237,9 +237,9 @@ Sometimes readers should not see how a file is set up or that the output is chec
 
 Setting up an external file:
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
-<!--markcheck writeLocal="some-file.txt" body:
+<!--markcheck write="some-file.txt" body:
 Content of some-file.txt
 -->
 
@@ -254,7 +254,7 @@ assert.equal(
 
 Checking output:
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 <!--markcheck stdout="stdout-how-are-you"-->
 ```js
@@ -268,7 +268,7 @@ How are you?
 
 ### Asynchronous code and hiding test code via ⎡half-brackets⎤
 
-<!--markcheck containedInFile="demo/demo-javascript.md"-->
+<!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 ```js
 ⎡await ⎤Promise.allSettled([

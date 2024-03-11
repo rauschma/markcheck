@@ -24,6 +24,7 @@
     "clean": "shx rm -rf ./dist/*",
     "chmod": "chmod u+x ./dist/src/markcheck.js",
     "\n========== Testing ==========": "",
+    "checkmd": "markcheck doc/manual/quick-start.md demo/demo-*.md",
     "test": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning",
     "testall": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
     "circular": "npx madge --circular src/markcheck.ts"
