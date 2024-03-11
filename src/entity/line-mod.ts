@@ -1,4 +1,3 @@
-import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/typescript/type.js';
 import type { Translator } from '../translation/translation.js';
@@ -16,29 +15,29 @@ const { stringify } = JSON;
 const RE_AROUND_MARKER = /^[ \t]*•••[ \t]*$/;
 const STR_AROUND_MARKER = '•••';
 
-export type LineModKind = LineModKindConfig |
-  LineModKindLanguage |
-  LineModKindAppliable |
-  LineModKindBody;
-export type LineModKindConfig = {
-  tag: 'LineModKindConfig';
-};
-export type LineModKindLanguage = {
-  tag: 'LineModKindLanguage';
-  targetLanguage: string;
-};
-export type LineModKindAppliable = {
-  tag: 'LineModKindAppliable';
-  lineModId: string;
-};
-export type LineModKindBody = {
-  tag: 'LineModKindBody';
-};
+// export type LineModKind = LineModKindConfig |
+//   LineModKindLanguage |
+//   LineModKindAppliable |
+//   LineModKindBody;
+// export type LineModKindConfig = {
+//   tag: 'LineModKindConfig';
+// };
+// export type LineModKindLanguage = {
+//   tag: 'LineModKindLanguage';
+//   targetLanguage: string;
+// };
+// export type LineModKindAppliable = {
+//   tag: 'LineModKindAppliable';
+//   lineModId: string;
+// };
+// export type LineModKindBody = {
+//   tag: 'LineModKindBody';
+// };
 
 //#################### LineMod ####################
 
 type LineModProps = PublicDataProperties<LineMod>;
-function emptyLineModProps(context: EntityContext): LineModProps {
+function lineModPropsEmpty(context: EntityContext): LineModProps {
   return {
     context,
     //
@@ -51,83 +50,78 @@ function emptyLineModProps(context: EntityContext): LineModProps {
   };
 }
 
-export class LineMod extends MarkcheckEntity {
-  static parse(directive: Directive, kind: LineModKind): LineMod {
-    const context = new EntityContextLineNumber(directive.lineNumber);
-    const props = emptyLineModProps(context);
+function lineModPropsFromDirective(directive: Directive, allowBodyLabelInsert: boolean): LineModProps {
+  const context = new EntityContextLineNumber(directive.lineNumber);
+  const props = lineModPropsEmpty(context);
 
-    const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
-    if (ignoreLinesStr) {
-      props.ignoreLines = parseLineLocSet(directive.lineNumber, ignoreLinesStr);
-    }
-    const searchAndReplaceStr = directive.getString(ATTR_KEY_SEARCH_AND_REPLACE);
-    if (searchAndReplaceStr) {
-      props.searchAndReplace = SearchAndReplaceSpec.fromString(
-        context, searchAndReplaceStr
-      );
-    }
-
-    const body = trimTrailingEmptyLines(directive.body.slice());
-    switch (directive.bodyLabel) {
-      case null:
-        // No body label – e.g.: <!--markcheck ignoreLines="1-3, 5"-->
-        break;
-      case BODY_LABEL_BEFORE: {
-        props.beforeLines = body;
-        break;
-      }
-      case BODY_LABEL_AFTER: {
-        props.afterLines = body;
-        break;
-      }
-      case BODY_LABEL_AROUND: {
-        const l = splitAroundLines(directive.lineNumber, body);
-        props.beforeLines = l.beforeLines;
-        props.afterLines = l.afterLines;
-        break;
-      }
-      case BODY_LABEL_INSERT: {
-        if (!(kind.tag === 'LineModKindBody' || kind.tag === 'LineModKindAppliable')) {
-          throw new MarkcheckSyntaxError(
-            `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for body LineMods and appliable LineMods`
-          );
-        }
-
-        const atStr = directive.getString(ATTR_KEY_AT);
-        if (atStr === null) {
-          throw new MarkcheckSyntaxError(
-            `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but not attribute ${stringify(ATTR_KEY_AT)}`,
-            { lineNumber: directive.lineNumber }
-          );
-        }
-        const conditions = parseInsertionConditions(directive.lineNumber, atStr);
-        const lineGroups = splitInsertedLines(body);
-        if (conditions.length !== lineGroups.length) {
-          throw new MarkcheckSyntaxError(
-            `Attribute ${stringify(ATTR_KEY_AT)} mentions ${conditions.length} condition(s) but the body after ${stringify(BODY_LABEL_INSERT)} has ${lineGroups.length} line group(s) (separated by ${stringify(STR_AROUND_MARKER)})`,
-            { lineNumber: directive.lineNumber }
-          );
-        }
-        for (const [index, condition] of conditions.entries()) {
-          const lineGroup = lineGroups[index];
-          assertNonNullable(lineGroup);
-          props.insertionRules.pushRule({ condition, lineGroup });
-        }
-        break;
-      }
-      default:
-        throw new InternalError();
-    }
-    return new LineMod(kind, props);
+  const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
+  if (ignoreLinesStr) {
+    props.ignoreLines = parseLineLocSet(directive.lineNumber, ignoreLinesStr);
   }
-  static fromBeforeLines(context: EntityContext, kind: LineModKind, beforeLines: Array<string>) {
-    return new LineMod(kind, {
-      ...emptyLineModProps(context),
-      beforeLines,
-    });
+  const searchAndReplaceStr = directive.getString(ATTR_KEY_SEARCH_AND_REPLACE);
+  if (searchAndReplaceStr) {
+    props.searchAndReplace = SearchAndReplaceSpec.fromString(
+      context, searchAndReplaceStr
+    );
   }
 
-  #kind: LineModKind;
+  const body = trimTrailingEmptyLines(directive.body.slice());
+  switch (directive.bodyLabel) {
+    case null:
+      // No body label – e.g.: <!--markcheck ignoreLines="1-3, 5"-->
+      break;
+    case BODY_LABEL_BEFORE: {
+      props.beforeLines = body;
+      break;
+    }
+    case BODY_LABEL_AFTER: {
+      props.afterLines = body;
+      break;
+    }
+    case BODY_LABEL_AROUND: {
+      const l = splitAroundLines(directive.lineNumber, body);
+      props.beforeLines = l.beforeLines;
+      props.afterLines = l.afterLines;
+      break;
+    }
+    case BODY_LABEL_INSERT: {
+      if (!allowBodyLabelInsert) {
+        throw new MarkcheckSyntaxError(
+          `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for body LineMods and appliable LineMods`
+        );
+      }
+
+      const atStr = directive.getString(ATTR_KEY_AT);
+      if (atStr === null) {
+        throw new MarkcheckSyntaxError(
+          `Directive has the body label ${stringify(BODY_LABEL_INSERT)} but not attribute ${stringify(ATTR_KEY_AT)}`,
+          { lineNumber: directive.lineNumber }
+        );
+      }
+      const conditions = parseInsertionConditions(directive.lineNumber, atStr);
+      const lineGroups = splitInsertedLines(body);
+      if (conditions.length !== lineGroups.length) {
+        throw new MarkcheckSyntaxError(
+          `Attribute ${stringify(ATTR_KEY_AT)} mentions ${conditions.length} condition(s) but the body after ${stringify(BODY_LABEL_INSERT)} has ${lineGroups.length} line group(s) (separated by ${stringify(STR_AROUND_MARKER)})`,
+          { lineNumber: directive.lineNumber }
+        );
+      }
+      for (const [index, condition] of conditions.entries()) {
+        const lineGroup = lineGroups[index];
+        assertNonNullable(lineGroup);
+        props.insertionRules.pushRule({ condition, lineGroup });
+      }
+      break;
+    }
+    default:
+      throw new InternalError();
+  }
+  return props;
+}
+
+//#################### LineMod ####################
+
+abstract class LineMod extends MarkcheckEntity {
 
   /**
    * LineMods can be created from line in Config. Then they don’t have a
@@ -142,9 +136,8 @@ export class LineMod extends MarkcheckEntity {
   beforeLines: Array<string>;
   afterLines: Array<string>;
 
-  private constructor(kind: LineModKind, props: LineModProps) {
+  protected constructor(props: LineModProps) {
     super();
-    this.#kind = kind;
     this.context = props.context;
     //
     this.ignoreLines = props.ignoreLines;
@@ -165,34 +158,6 @@ export class LineMod extends MarkcheckEntity {
       this.beforeLines.length === 0 &&
       this.afterLines.length === 0
     );
-  }
-  getLineModId(): undefined | string {
-    switch (this.#kind.tag) {
-      case 'LineModKindAppliable':
-        return this.#kind.lineModId;
-      case 'LineModKindLanguage':
-        return undefined;
-      // Not among entities
-      case 'LineModKindConfig': // created on-demand from Config
-      case 'LineModKindBody': // inside a SingleSnippet
-        throw new InternalError('Unsupported operation');
-      default:
-        throw new UnsupportedValueError(this.#kind);
-    }
-  }
-  getTargetLanguage(): undefined | string {
-    switch (this.#kind.tag) {
-      case 'LineModKindLanguage':
-        return this.#kind.targetLanguage;
-      case 'LineModKindAppliable':
-        return undefined;
-      // Not among entities
-      case 'LineModKindConfig': // created on-demand from Config
-      case 'LineModKindBody': // inside a SingleSnippet
-        throw new InternalError('Unsupported operation');
-      default:
-        throw new UnsupportedValueError(this.#kind);
-    }
   }
 
   pushModifiedBodyTo(lineNumber: number, body: Array<string>, translator: Translator | undefined, linesOut: Array<string>) {
@@ -241,34 +206,64 @@ export class LineMod extends MarkcheckEntity {
   }
 
   toJson(): JsonValue {
-    let props;
-    switch (this.#kind.tag) {
-      case 'LineModKindLanguage':
-        props = {
-          targetLanguage: this.#kind.targetLanguage,
-        };
-        break;
-      case 'LineModKindAppliable':
-        props = {
-          lineModId: this.#kind.lineModId,
-        };
-        break;
-      case 'LineModKindConfig':
-        props = {};
-        break;
-      case 'LineModKindBody':
-        props = {
-          insertionRules: this.insertionRules.toJson(),
-        };
-        break;
-      default:
-        throw new UnsupportedValueError(this.#kind);
-    }
     return {
+      ...this.getSubclassProps(),
       beforeLines: this.beforeLines,
       afterLines: this.afterLines,
-      ...props,
     };
+  }
+  protected abstract getSubclassProps(): Record<string, JsonValue>;
+}
+
+export class LineModBody extends LineMod {
+  constructor(directive: Directive) {
+    super(lineModPropsFromDirective(directive, true));
+  }
+  protected override getSubclassProps(): Record<string, JsonValue> {
+    return {
+      insertionRules: this.insertionRules.toJson(),
+    };
+  }
+}
+
+export class LineModAppliable extends LineMod {
+  lineModId: string;
+  constructor(directive: Directive, lineModId: string) {
+    super(lineModPropsFromDirective(directive, true));
+    this.lineModId = lineModId;
+  }
+  protected override getSubclassProps(): Record<string, JsonValue> {
+    return {
+      lineModId: this.lineModId,
+    };
+  }
+}
+
+export class LineModLanguage extends LineMod {
+  targetLanguage: string;
+  constructor(directive: Directive, targetLanguage: string) {
+    super(lineModPropsFromDirective(directive, true));
+    this.targetLanguage = targetLanguage;
+  }
+  protected override getSubclassProps(): Record<string, JsonValue> {
+    return {
+      targetLanguage: this.targetLanguage,
+    };
+  }
+}
+
+/**
+ * Created on the fly for the “before” lines from the Config.
+ */
+export class LineModConfig extends LineMod {
+  constructor(context: EntityContext, beforeLines: Array<string>) {
+    super({
+      ...lineModPropsEmpty(context),
+      beforeLines,
+    });
+  }
+  protected override getSubclassProps(): Record<string, JsonValue> {
+    return {};
   }
 }
 

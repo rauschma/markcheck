@@ -8,7 +8,7 @@ import { EntityContextDescription, EntityContextSnippet, MarkcheckSyntaxError, t
 import { getEndTrimmedLength } from '../util/string.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
-import { LineMod } from './line-mod.js';
+import { LineModAppliable, LineModBody, LineModConfig, LineModLanguage } from './line-mod.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
 
 const { stringify } = JSON;
@@ -73,18 +73,17 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
   }
   return lines;
 
-  function collectOuterLineMods(onlyLocalLines: boolean): Array<LineMod> {
-    const outerLineMods = new Array<LineMod>();
+  function collectOuterLineMods(onlyLocalLines: boolean): Array<OuterLineMod> {
+    const outerLineMods = new Array<OuterLineMod>();
 
     if (!onlyLocalLines) {
       if (snippet.lang) {
         const lang = config.getLang(snippet.lang);
         if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
           outerLineMods.push(
-            LineMod.fromBeforeLines(
+            new LineModConfig(
               new EntityContextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
-              { tag: 'LineModKindConfig' },
-              lang.beforeLines,
+              lang.beforeLines
             )
           );
         }
@@ -111,6 +110,8 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
     return outerLineMods;
   }
 }
+
+type OuterLineMod = LineModConfig | LineModAppliable | LineModLanguage;
 
 //#################### Snippet ####################
 
@@ -142,7 +143,7 @@ export abstract class Snippet extends MarkcheckEntity {
 
   abstract getInternalFileName(langDef: LangDef): string;
   abstract isRun(globalRunningMode: GlobalRunningMode): boolean;
-  abstract assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
+  abstract assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, lines: Array<string>, pathOfIncludeIds: Set<string>): void;
   abstract getAllFileNames(langDef: LangDefCommand): Array<string>;
 
   abstract toJson(): JsonValue;
@@ -278,7 +279,7 @@ export class SingleSnippet extends Snippet {
   //
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
-  bodyLineMod: null | LineMod = null;
+  bodyLineMod: null | LineModBody = null;
   applyToBodyId: null | string = null;
   override applyToOuterId: null | string = null;
   override runLocalLines = false;
@@ -370,7 +371,7 @@ export class SingleSnippet extends Snippet {
     return this;
   }
 
-  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     let thisWasIncluded = false;
     for (const includeId of this.includeIds) {
       if (includeId === INCL_ID_THIS) {
@@ -386,7 +387,7 @@ export class SingleSnippet extends Snippet {
     }
   }
 
-  #assembleOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
+  #assembleOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
     if (pathOfIncludeIds.has(includeId)) {
       const idPath = [...pathOfIncludeIds, includeId];
       throw new MarkcheckSyntaxError(`Cycle of includedIds ` + JSON.stringify(idPath));
@@ -403,8 +404,8 @@ export class SingleSnippet extends Snippet {
     pathOfIncludeIds.delete(includeId);
   }
 
-  #assembleThis(config: Config, idToLineMod: Map<string, LineMod>, linesOut: Array<string>) {
-    let applyToBodyLineMod = this.#getApplyToBodyLineMod(idToLineMod);
+  #assembleThis(config: Config, idToLineMod: Map<string, LineModAppliable>, linesOut: Array<string>) {
+    let applyToBodyLineMod: LineModAppliable | LineModBody | null = this.#getApplyToBodyLineMod(idToLineMod);
     if (applyToBodyLineMod) {
       if (this.bodyLineMod && !this.bodyLineMod.isEmpty()) {
         throw new MarkcheckSyntaxError(
@@ -428,7 +429,7 @@ export class SingleSnippet extends Snippet {
     }
   }
 
-  #getApplyToBodyLineMod(idToLineMod: Map<string, LineMod>): null | LineMod {
+  #getApplyToBodyLineMod(idToLineMod: Map<string, LineModAppliable>): null | LineModAppliable {
     const id = this.applyToBodyId;
     if (!id) {
       return null;
@@ -525,7 +526,7 @@ export class SequenceSnippet extends Snippet {
     return num.total;
   }
 
-  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineMod>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
+  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
     for (const element of this.elements) {
       element.assembleInnerLines(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds);
     }
@@ -672,9 +673,9 @@ export type FileState = {
   tmpDir: string;
   logLevel: LogLevel;
   idToSnippet: Map<string, Snippet>;
-  idToLineMod: Map<string, LineMod>;
+  idToLineMod: Map<string, LineModAppliable>;
   globalRunningMode: GlobalRunningMode;
-  languageLineMods: Map<string, LineMod>;
+  languageLineMods: Map<string, LineModLanguage>;
   statusCounts: StatusCounts;
   markcheckMockData: null | MarkcheckMockData;
   prevHeading: null | Heading;

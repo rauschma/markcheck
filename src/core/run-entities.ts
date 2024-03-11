@@ -13,16 +13,16 @@ import { ZodError } from 'zod';
 import { ConfigMod } from '../entity/config-mod.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, LineScope, type StdStreamContentSpec } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
-import { LineMod } from '../entity/line-mod.js';
+import { LineModAppliable, LineModLanguage } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
-import { EntityContextDescription, EntityContextLineNumber, InternalError, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, StartupError, TestFailure } from '../util/errors.js';
+import { EntityContextDescription, EntityContextLineNumber, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, StartupError, TestFailure } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { relPath } from '../util/path-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { Config, ConfigModJsonSchema, PROP_KEY_COMMANDS, fillInCommandVariables, type LangDefCommand } from './config.js';
-import { type ParsedMarkdown } from './parse-markdown.js';
+import { type ParsedEntity, type ParsedMarkdown } from './parse-markdown.js';
 
 const MARKCHECK_DIR_NAME = 'markcheck-data';
 const MARKCHECK_TMP_DIR_NAME = 'tmp';
@@ -137,11 +137,8 @@ function checkLineModIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
   const declaredIds = new Set<string>();
   const referencedIds = new Set<string>();
   for (const entity of parsedMarkdown.entities) {
-    if (entity instanceof LineMod) {
-      const lineModId = entity.getLineModId();
-      if (lineModId) {
-        declaredIds.add(lineModId);
-      }
+    if (entity instanceof LineModAppliable) {
+      declaredIds.add(entity.lineModId);
     }
     if (entity instanceof Snippet) {
       entity.visitSingleSnippet((snippet) => {
@@ -196,7 +193,7 @@ function findMarkcheckDir(absFilePath: string, entities: Array<MarkcheckEntity>)
 
 //#################### handleOneEntity() ####################
 
-function handleOneEntity(out: Output, fileState: FileState, config: Config, entity: MarkcheckEntity) {
+function handleOneEntity(out: Output, fileState: FileState, config: Config, entity: ParsedEntity) {
   try {
     const snippetState: SnippetState = {
       checksWerePerformed: false,
@@ -205,18 +202,17 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
 
     if (entity instanceof ConfigMod) {
       config.applyMod(new EntityContextLineNumber(entity.lineNumber), entity.configModJson);
-    } else if (entity instanceof LineMod) {
-      const targetLanguage = entity.getTargetLanguage();
-      if (targetLanguage !== undefined) {
-        fileState.languageLineMods.set(targetLanguage, entity);
-      }
+    } else if (entity instanceof LineModLanguage) {
+      const targetLanguage = entity.targetLanguage;
+      fileState.languageLineMods.set(targetLanguage, entity);
     } else if (entity instanceof Snippet) {
       handleSnippet(fileState, config, snippetState, entity);
-
     } else if (entity instanceof Heading) {
       fileState.prevHeading = entity; // update
+    } else if (entity instanceof LineModAppliable) {
+      // Nothing to do
     } else {
-      throw new InternalError();
+      throw new UnsupportedValueError(entity);
     }
 
     if (snippetState.checksWerePerformed) {

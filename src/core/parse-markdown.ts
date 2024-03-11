@@ -4,8 +4,7 @@ import markdownit from 'markdown-it';
 import { ConfigMod } from '../entity/config-mod.js';
 import { ATTRS_APPLIABLE_LINE_MOD, ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT, ATTRS_CONFIG_MOD, ATTRS_LANGUAGE_LINE_MOD, ATTRS_SNIPPET, ATTRS_SNIPPET_BODY_LABEL_INSERT, ATTR_KEY_EACH, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_BODY, BODY_LABEL_CONFIG, BODY_LABEL_INSERT, Directive } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
-import { LineMod } from '../entity/line-mod.js';
-import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
+import { LineModAppliable, LineModBody, LineModLanguage } from '../entity/line-mod.js';
 import { SequenceSnippet, SingleSnippet, Snippet } from '../entity/snippet.js';
 import { MarkcheckSyntaxError } from '../util/errors.js';
 
@@ -13,10 +12,12 @@ const { stringify } = JSON;
 
 //#################### parseMarkdown() ####################
 
+export type ParsedEntity = Snippet | LineModAppliable | LineModLanguage | ConfigMod | Heading;
+
 export type ParsedMarkdown = {
-  entities: Array<MarkcheckEntity>,
+  entities: Array<ParsedEntity>,
   idToSnippet: Map<string, Snippet>,
-  idToLineMod: Map<string, LineMod>,
+  idToLineMod: Map<string, LineModAppliable>,
 };
 
 class ParsingState {
@@ -28,7 +29,7 @@ class ParsingState {
 
 export function parseMarkdown(text: string): ParsedMarkdown {
   const md = markdownit({ html: true });
-  const result = new Array<MarkcheckEntity>();
+  const result = new Array<ParsedEntity>();
   const tokens = md.parse(text, { html: true });
 
   let state = new ParsingState();
@@ -49,7 +50,7 @@ export function parseMarkdown(text: string): ParsedMarkdown {
 
         //----- ConfigMod | LineMod -----
 
-        if (entity instanceof ConfigMod || entity instanceof LineMod) {
+        if (entity instanceof ConfigMod || entity instanceof LineModAppliable || entity instanceof LineModLanguage) {
           result.push(entity);
           continue;
         }
@@ -118,7 +119,7 @@ export function parseMarkdown(text: string): ParsedMarkdown {
 
 }
 
-function pushSingleSnippet(result: Array<MarkcheckEntity>, state: ParsingState, snippet: SingleSnippet): void {
+function pushSingleSnippet(result: Array<ParsedEntity>, state: ParsingState, snippet: SingleSnippet): void {
   // This function always sets state.prevHeading to `null` – so that we
   // show each heading at most once.
 
@@ -165,7 +166,7 @@ function pushSingleSnippet(result: Array<MarkcheckEntity>, state: ParsingState, 
 /**
  * Returned snippets are open or closed
  */
-export function directiveToEntity(directive: Directive): null | ConfigMod | SingleSnippet | LineMod {
+export function directiveToEntity(directive: Directive): null | ConfigMod | SingleSnippet | LineModAppliable | LineModLanguage {
   switch (directive.bodyLabel) {
     case BODY_LABEL_CONFIG:
       directive.checkAttributes(ATTRS_CONFIG_MOD);
@@ -190,10 +191,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
       if (each !== null) {
         // Language LineMod
         directive.checkAttributes(ATTRS_LANGUAGE_LINE_MOD);
-        return LineMod.parse(directive, {
-          tag: 'LineModKindLanguage',
-          targetLanguage: each,
-        });
+        return new LineModLanguage(directive, each);
       }
 
       const lineModId = directive.getString(ATTR_KEY_LINE_MOD_ID);
@@ -204,10 +202,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         } else {
           directive.checkAttributes(ATTRS_APPLIABLE_LINE_MOD);
         }
-        return LineMod.parse(directive, {
-          tag: 'LineModKindAppliable',
-          lineModId,
-        });
+        return new LineModAppliable(directive, lineModId);
       }
 
       // Open snippet with local LineMod
@@ -217,9 +212,7 @@ export function directiveToEntity(directive: Directive): null | ConfigMod | Sing
         directive.checkAttributes(ATTRS_SNIPPET);
       }
       const snippet = SingleSnippet.createOpen(directive);
-      snippet.bodyLineMod = LineMod.parse(directive, {
-        tag: 'LineModKindBody',
-      });
+      snippet.bodyLineMod = new LineModBody(directive);
       return snippet;
     }
 
@@ -246,7 +239,7 @@ export function extractCommentContent(html: string): null | string {
 
 //#################### Indices into entities ####################
 
-function createIdToSnippet(entities: Array<MarkcheckEntity>): Map<string, Snippet> {
+function createIdToSnippet(entities: Array<ParsedEntity>): Map<string, Snippet> {
   const idToSnippet = new Map<string, Snippet>();
   for (const entity of entities) {
     if (entity instanceof Snippet && entity.id) {
@@ -264,17 +257,17 @@ function createIdToSnippet(entities: Array<MarkcheckEntity>): Map<string, Snippe
   return idToSnippet;
 }
 
-function createIdToLineMod(entities: Array<MarkcheckEntity>): Map<string, LineMod> {
-  const idToLineMod = new Map<string, LineMod>();
+function createIdToLineMod(entities: Array<ParsedEntity>): Map<string, LineModAppliable> {
+  const idToLineMod = new Map<string, LineModAppliable>();
   for (const entity of entities) {
-    if (entity instanceof LineMod) {
-      const lineModId = entity.getLineModId();
+    if (entity instanceof LineModAppliable) {
+      const lineModId = entity.lineModId;
       if (lineModId) {
         const other = idToLineMod.get(lineModId);
         if (other) {
           const description = other.getEntityContext().describe();
           throw new MarkcheckSyntaxError(
-            `Duplicate ${JSON.stringify(ATTR_KEY_LINE_MOD_ID)}: ${JSON.stringify(entity.getLineModId())} (other usage is ${description})`,
+            `Duplicate ${JSON.stringify(ATTR_KEY_LINE_MOD_ID)}: ${JSON.stringify(entity.lineModId)} (other usage is ${description})`,
             { entityContext: entity.context }
           );
         }

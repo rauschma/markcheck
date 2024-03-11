@@ -3,7 +3,7 @@ import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js'
 import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { Directive } from '../entity/directive.js';
-import { LineMod } from '../entity/line-mod.js';
+import { LineModLanguage } from '../entity/line-mod.js';
 import { MarkcheckSyntaxError } from '../util/errors.js';
 import { directiveToEntity, extractCommentContent, parseMarkdown } from './parse-markdown.js';
 
@@ -29,7 +29,7 @@ test('parseMarkdown(): LineMod', () => {
     -->
   `);
   const lineMod = entities[0];
-  assert.ok(lineMod instanceof LineMod);
+  assert.ok(lineMod instanceof LineModLanguage);
   assert.deepEqual(
     lineMod.toJson(),
     {
