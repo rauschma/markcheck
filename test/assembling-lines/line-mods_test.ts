@@ -155,7 +155,7 @@ test('Assemble snippet with runLocalLines and applyToOuter: must include applyTo
   );
 });
 
-test('Assemble snippet with applyToBody LineMod', () => {
+test('Assemble snippet with applyToBody LineMod from a snippet', () => {
   const readme = outdent`
     <!--markcheck each="js" around:
     // Language LineMod BEFORE
@@ -235,6 +235,69 @@ test('Assemble snippet with applyToBody LineMod', () => {
     [
       'js-command1 my-module.mjs',
       'js-command2 my-module.mjs',
+    ]
+  );
+});
+
+test('Assemble snippet with applyToBody LineMod from the config', () => {
+  const readme = outdent`
+    <!--markcheck applyToBody="asyncTest"-->
+    ▲▲▲js
+    test('Test with await', async () => {
+      const value = await Promise.resolve(123);
+      assert.equal(value, 123);
+    });
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {
+      'markcheck-config.json5': outdent`
+        {
+          lineMods: {
+            asyncTest: {
+              before: [
+                'function test(_name, callback) {',
+                '  return callback();',
+                '}',
+              ],
+              after: [
+                'await test();',
+              ],
+            },
+          },
+        }
+      `,
+    },
+    '/tmp/markdown/readme.md': readme,
+  });
+
+  const mockShellData = new MarkcheckMockData();
+  assert.equal(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
+    0
+  );
+  // Per file: config lines, language LineMods
+  // Per snippet: applied line mod, local line mod
+  assert.deepEqual(
+    dirToJson('/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        function test(_name, callback) {
+          return callback();
+        }
+        test('Test with await', async () => {
+          const value = await Promise.resolve(123);
+          assert.equal(value, 123);
+        });
+        await test();
+      `,
+    }
+  );
+  assert.deepEqual(
+    mockShellData.interceptedCommands,
+    [
+      'node main.mjs',
     ]
   );
 });

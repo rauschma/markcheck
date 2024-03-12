@@ -73,6 +73,7 @@ test('config.getLang()', () => {
       beforeLines: [
         "import assert from 'node:assert/strict';"
       ],
+      afterLines: undefined,
       commands: [
         [
           'node',

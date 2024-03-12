@@ -19,6 +19,13 @@ Options:
   * `markcheck-config.json5`: overrides the built-in defaults.
     * Print built-in defaults via: `markcheck -p`
 
+## How Markcheck works
+
+Quick overview:
+
+* A Markdown file is parsed.
+* One by one, code blocks are written to `markcheck-data/tmp/` and run via shell commands such as `node` (for JavaScript).
+
 ## Syntax
 
 Only two Markdown constructs are considered by Markcheck:
@@ -29,9 +36,14 @@ Only two Markdown constructs are considered by Markcheck:
 The following Markdown contains both constructs:
 
 ``````md
-<!--markcheck sequence="1/3" stdout="sequence-output"-->
+<!--markcheck only stdout="stdout-hello"-->
 ```js
+console.log('Hello!');
 ```
+
+<!--markcheck id="stdout-hello" body:
+Hello!
+-->
 
 <!--markcheck before:
 function functionThatShouldThrow() {
@@ -39,11 +51,13 @@ function functionThatShouldThrow() {
 }
 -->
 ```js
+try {
+  functionThatShouldThrow();
+  assert.fail();
+} catch (_) {
+  // Success
+}
 ```
-
-<!--markcheck writeLocalLines="some-file.txt" body:
-Content of some-file.txt
--->
 ``````
 
 The syntax within a directive is inspired by HTML and Python:
@@ -51,70 +65,86 @@ The syntax within a directive is inspired by HTML and Python:
 * `<!--markcheck` is followed by zero or more _attributes_. Those look similar to HTML.
 * If the directive is more than one line long, the first line ends with a _body label_: a name followed by a colon. That is inspired by Python.
   * In the previous example, `before:` and `body:` are body labels.
-* A single-line directive ends with `-->`.
+
+The result of parsing is _entities_ – which are interpreted by Markcheck. The most common entity is the _snippet_ – a block of text:
+
+* A solo code block (without a directive) defines a snippet. Its language tag tells Markcheck how to run it.
+* We can also define a snippet via a directive with the body label `body:`. Such a directive is not followed by a code block. It is invisible to readers of the published Markdown content.
+  * We can assign a language to a `body:` directive via the attribute `lang`.
+* All other directives define attributes for code blocks.
+  * For example: If one snippet defines an id via `id="my-id"` then another snippet can “import” its text via `include="my-id"`. IDs are inspired by HTML.
 
 ### Attribute values
 
-Attribute values are passed on raw. Therefore, there is no first pass where we have to write two backslashes so that an attribute receives a single backslash (which is what happens in JSON):
+Attribute values are passed on raw. Therefore, there is no first pass where we have to write two backslashes so that an attribute receives a single backslash (which is required in JSON):
 
 * Example: `<!--markcheck searchAndReplace="/\([A-Z]\)//"-->`
   * JSON: `"/\\([A-Z]\\)//"`
 * Example: `<!--markcheck at="before:'With \'single\' quotes'" insert:`
-
-### Kinds of directives
-
-* Body directive: body label `body:`
-* Config directive: body label `config:`
-* LineMod directive:
-  * No body label or one of the body labels `before:`, `after:`, `around:`, `insert:`
-  * Body label `around:`:
-    * A combination of `before:` and `after:`.
-    * Two groups of lines are separated by the line `•••`.
-  * Body label `insert:`: requires attribute `at`
-    * One or more groups of lines. Same separator as for `around:`
-    * Required attribute: `at`
-  * Attributes: `ignoreLines`, `searchAndReplace`
-
-There are several kinds of LineMods:
-
-* Language LineMod: `each="some-lang"`
-  * Its modifications are applied to all code blocks with the specified language.
-  * It cannot use `insert:`
-* Appliable LineMod: `lineModId="lm-id"`
-  * Can be applied to snippets via `wrapOuter="lm-id"` or `applyInner="lm-id"`
-* Body LineMod: neither `each` nor `lineModId`
-  * The LineMod attributes define a _body LineMod_
-  * The remaining attributes apply to the following code block and produce a snippet that has the given body LineMod.
 
 ## Entities
 
 After directives were paired with code blocks, we get the following entities:
 
 * Snippets:
-  * Created by code block directive + code block or by a code block on its own.
-  * Can be written to disk and/or executed.
-* Config mods:
-  * Created by config directives.
+  * Created by:
+    * Solo code block (without directive)
+    * `body:` directive (without code block)
+    * Directive + code block
+  * Can be run, imported by other snippets, written to disk without running (which is useful for configuration files), etc.
+* ConfigMods:
+  * Created by `config:` directives.
   * Change the configuration data (which commands to run for a given language, etc.).
-* LineMods:
-  * Created by line mod directives that are not also code block directives.
+  * The configuration syntax is explained in [section “Configuration”](#configuration).
+* LineMods contain instructions for changing snippets.
+  * A LineMod has:
+    * At most one of these body labels that add text to snippets: `before:`, `after:`, `around:`, `insert:`
+    * Zero or more of these attributes: `ignoreLines`, `searchAndReplace`
   * Kinds of LineMods:
-    * Language LineMod (attribute `each`): Can be activated globally.
-    * Appliable line mod (attribute `id`): Can be applied by snippets via the attributes `applyInner` and `applyOuter`.
+    * Language LineMod (attribute `each`): Applied to all snippets with the specified language.
+    * Appliable LineMod (attribute `lineModId`): Can be applied by snippets to themselves via the attributes `applyToBody` and `applyToOuter`.
+    * Body LineMod (neither attribute `each` nor attribute `lineModId`): Defined by the directive before a code block and applied to the content of the code block.
 
-## Snippet modes: What can be done with snippets?
+### Example: body LineMod
 
-Phases of visitation:
+The following example shows how `around:` works.
+
+``````md
+<!--markcheck stdout="stdout-rgb" around:
+console.log('red');
+•••
+console.log('blue');
+-->
+```js
+console.log('green');
+```
+
+<!--markcheck id="stdout-rgb"-->
+```
+red
+green
+blue
+```
+``````
+
+* The first directive defines a body LineMod.
+* The second directive defines attributes for the following code block but not a LineMod.
+
+## How does Markcheck interpret snippets?
+
+Phases of interpreting a snippet:
 
 * Checks: `sameAsId`, `containedInFile`
 * Writing to disk via `writeLocalLines`, `write`
   * Skips running. Use `runFileName` to change the snippet’s default filename and run it.
 * Running:
+  * Translating: Translates the snippet text to a target language.
+    * Currently, there is only one translator, `node-repl-to-js`, which translates Node.js REPL interactions to `assert.deepEqual()` statements in plain JavaScript. See `demo-node-repl.md` for an example.
   * Writing to disk:
-    * External snippets whose IDs are mentioned by `external`.
+    * External snippets whose IDs are mentioned by `external`, `externalLocalLines`.
     * Current snippet
       * Override its default filename via `runFileName="file-name"`
-  * Running shell commands
+  * Executing shell commands
 
 Running: 
 
@@ -125,7 +155,7 @@ Running:
   * Visitation mode `normal` (not an attribute): active if none of the previous attributes are present.
 * `id` sets running mode to `skip`.
   * Override via `alwaysRun` or `only`
-* `writeLocalLines`, `write` always prevent running. Alternatives:
+* `write`, `writeLocalLines`always prevent running. Alternatives to using these attributes:
   * `runFileName="file-name"` changes the filename that is used when running a snippet. It overrides the default set by the config.
   * `runLocalLines` excludes global lines when writing a file to disk for running.
 
@@ -142,14 +172,14 @@ For assembling lines, two dimensions are important:
   * Inner are the lines of each snippet. Multiple snippets can exist per file that is written to disk (via sequences and includes).
   * Outer are lines that exist once per file.
 
-All global lines are outer lines. But snippets can also contribute local outer lines. This is an exhaustive list:
+All global lines are outer lines. But snippets can also contribute local outer lines. This is an exhaustive list of all sources of lines:
 
 * Inner lines from SingleSnippet
   * Body
   * Body LineMod
   * Applied LineMod: `applyToBody`
     * Example: Wrap a function around a body that includes other functions that it calls.
-  * Includes
+  * Inner lines of included other snippets
 * Inner lines from SequenceSnippet:
   * Inner lines of sequence elements, concatenated
 * Outer lines from Snippet (either a SequenceSnippet or a SingleSnippet)
@@ -159,26 +189,17 @@ All global lines are outer lines. But snippets can also contribute local outer l
   * Language LineMod
   * Config lines
 
-❌ TODO:
+Various other details:
 
-* Translator (not translated: before, after, around)
-* Outer LineMods only wrap
-* Only one of them is used: body LineMod, applyToBody LineMod
-
-
-
-
-
-
-
-
-
-
-
+* `ignoreLines`, `searchAndReplace`, `insert:` are only supported for body LineMods and `applyToBody`.
+  * We cannot use both a body LineMod and `applyToBody`. If the latter is there, the former cannot be present.
+  * In other words: outer LineMods only wrap lines around content via `before:`, `after:`, `around:`.
+* The lines added via `before:`, `after:`, `around:` are not translated.
+  * Rationale: You can add plain JavaScript to `node-repl` snippets and don’t have to use the limiting `node-repl` syntax.
 
 ## Attributes
 
-### Code snippets
+### Snippets
 
 * Running mode:
   * `only`
@@ -186,125 +207,224 @@ All global lines are outer lines. But snippets can also contribute local outer l
   * `alwaysRun`
 * Language: `lang`
   * For body directives
-  * To override code blocks
+  * To override the language defined by a code block
 * Assembling lines:
   * `id="my-id"`
-    * Referenced by attributes: external, sameAsId, include, stdout, stderr
+    * Referenced by attributes: `external`, `externalLocalLines`, `sameAsId`, `include`, `stdout`, `stderr`
   * `sequence="1/3"`
   * `include="id1, $THIS, id2"`:
-    * `$THIS` refers to the current snippet. If you omit it, it is included at the end.
-  * `applyInner="id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
-  * `applyOuter="id"`: applies an appliable line mod once per file. Only the value of the “root” snippet (where line assembly started) is used.
-  * `runLocalLines`: when a snippet is self-contained and does not need config lines and language LineMod lines.
+    * `$THIS` refers to the current snippet. If it is omitted, it is included at the end.
+  * `applyToBody="line-mod-id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
+  * `applyToOuter="line-mod-id"`: applies an appliable line mod once per file.
+    * This attribute is only considered if a “root” snippet (where line assembly started) has it and ignored elsewhere.
+  * `runLocalLines`: Used when a snippet is self-contained and does not need or want config lines and language LineMod lines.
 * Additional checks:
-  * `sameAsId="id"`
+  * `sameAsId="id"`: Compares the content of the current snippet with the content of another snippet.
   * `containedInFile="filePath"`:
     * `filePath` is either relative to the Markdown file or absolute.
-    * The outer LineMods are not applied.
+    * Only local lines are considered.
 * Writing and referring to files:
-  * `write="filePath"`
-  * `writeLocalLines="filePath"`
-  * `runFileName="filePath"`
-  * `external="id1>lib1.js, lib2.js"`
-  * `externalLocalLines="id1>lib1.js, lib2.js"`
-* Checking output: To hide line from human readers, we can use LineMod operations to change the expected content or the actual content. Uses local lines.
-  * `stdout="|lineModId=snippet-id"`
-  * `stderr="snippet-id"`
+  * `write="filePath"`: Write a complete snippet to disk. Don’t run it.
+  * `writeLocalLines="filePath"`: Write the local lines of a snippet to disk. Don’t run it.
+  * `runFileName="filePath"`: When writing a snippet to disk to run it, use the file name `filePath` (and not the default file name that is configured per language).
+  * `external="id1>lib1.js, lib2.js"`: Which external files are needed by the current snippet?
+    * An element with `>` writes a file to disk.
+    * An element without `>` only tells Markcheck that the file exists. That is useful for some language – e.g., TypeScript where the shell command `ts-expect-error` must know all files that make up a program.
+  * `externalLocalLines="id1>lib1.js, lib2.js"`: Same as `external` but only local lines are written to disk.
+* Checking output:
+  * `stdout="|lineModId=stdout-id"`
+  * `stderr="stderr-id"`
+  * We have two options for configuring which part of the actual output human readers see:
+    * We can use LineMod operations to change the expected content of the snippets `stdout-id` and `stderr-id`.
+    * We can use the LineMod `lineModId` to change (e.g.) `stdout` before it is compared to the expected content.
+  * Only local lines are considered.
 
-### Body LineMods and applyToBody LineMods
+### Body LineMods and appliable LineMods used via `applyToBody`
 
-* Required for body label `insert:`: `at="before:1, after:-1, before:'console.log'"`
-  * `-1` is the last line (etc.)
-* `ignoreLines="1, 3..-2, 'xyz', 'a'..'b'"`: omits lines.
+Ways of specifying lines:
+
+* _Line locations_:
+  * Line numbers: `1, 5, -1`.  `-1` is the last line (etc.)
+  * Text fragments: `'a', 'debug'`. They refer to the lines that contain them (only the first occurrence counts).
+* _Line location modifiers_ tell `insert:` whether to insert text before or after a given line: `before:1, after:-1, before:'console.log'`
+* _Line ranges_: `3..-2, 'a'..'b'`
   * A range includes start and end – i.e.: `1..3` is equivalent to `1,2,3`.
+
+* Required attribute for body label `insert:`:
+  * `at="before:1, after:-1, before:'console.log'"`
+* `ignoreLines="1, 3..-2, 'xyz', 'a'..'b'"`: omits lines.
 * `searchAndReplace="/[a-z]/-/i"`
 
 ### Language LineMods
 
-* Required: `each="lang-name"`
+* Required attribute: `each="lang-name"`
 
 ### Appliable LineMods
 
-* Required: `lineModId="my-id"`
-  * Referenced by attributes: applyInner, applyOuter
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+* Required attribute: `lineModId="my-id"`
+  * Referenced by attributes: `applyToBody`, `applyToOuter`
 
 ## Configuration
 
-Locations:
+You can check Markcheck’s default configuration via:
 
-* Defaults
-* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.json5`
+```
+markcheck --print-config
+```
+
+The output looks like this (excerpt):
+
+```json5
+{
+  searchAndReplace: [
+    "/[⎡⎤]//",
+  ],
+  lang: {
+    "": "[errorIfRun]",
+    txt: "[skip]",
+    js: {
+      before: [
+        "import assert from 'node:assert/strict';",
+      ],
+      runFileName: "main.mjs",
+      commands: [
+        [
+          "node",
+          "$FILE_NAME",
+        ],
+      ],
+    },
+    "node-repl": {
+      extends: "js",
+      translator: "node-repl-to-js",
+    },
+    // ···
+  },
+  // ···
+}
+```
+
+### Schemas for config data
+
+* TypeScript types: see `ConfigModJson` in [`config.ts`](https://github.com/rauschma/markcheck/blob/main/src/core/config.ts)
 
 
-See all defaults: `markcheck --print-config`
+### Changing the defaults
 
-```md
+How can we change the default config data?
+
+* Via the file `markcheck-data/markcheck-config.json5`
+* Via ConfigMods inside Markdown.
+
+This is the ConfigMod used in `demo-babel.md` (it tells Markcheck that `js` snippets should be run as defined for the “language” `babel`):
+
+``````md
 <!--markcheck config:
 {
   "lang": {
-    "": "[skip]",
     "js": {
-      "before": [
-        "import assert from 'node:assert/strict';"
-      ],
-      "runFileName": "main.mjs",
-      "commands": [
-        [ "node", "$FILE_NAME" ]
-      ]
+      "extends": "babel",
     },
   },
 }
 -->
-```
+``````
 
-Variables for `commands`:
+This is the ConfigMod used in `demo-bash.md` (it defines the new language `bash`):
+
+``````md
+<!--markcheck config:
+{
+  "lang": {
+    "bash": {
+      "runFileName": "main.sh",
+      "commands": [
+        ["bash", "$FILE_NAME"]
+      ],
+    },
+  },
+}
+-->
+``````
+
+### Property `commands`
+
+Two variables are available:
 
 * `$FILE_NAME`
 * `$ALL_FILE_NAMES`
 
-Property `"lang"`:
+### Property `lang`
 
 * Empty key `""`: for “bare” code blocks without languages
 * Value `"[skip]"`: Don’t run the snippets.
-* Value `"[errorIfRun]"`: Snippets must not be run – which can, e.g., be avoided via attribute `skip`.
+* Value `"[errorIfRun]"`: Snippets must not be run. One way to prevent errors is via attribute `skip`.
 
-### Search and replace
+### Property `searchAndReplace`
 
-```json
+```json5
 {
-  "searchAndReplace": [
+  searchAndReplace: [
     "/[⎡⎤]//"
   ],
 }
 ```
 
-### Translators
+### Property `translator`
 
-```json
+Currently only `"node-repl-to-js"` is supported.
+
+```json5
+"node-repl": {
+  extends: "js",
+  translator: "node-repl-to-js",
+},
+```
+
+### Property `lineMods`
+
+We can define a LineMod with the id `asyncTest` in two ways.
+
+First, via an in-file LineMod:
+
+``````md
+<!--markcheck id="asyncTest" around:
+function test(_name, callback) {
+  return callback();
+}
+•••
+await test();
+-->
+``````
+
+Second via a config file:
+
+```json5
+// markcheck-data/markcheck-config.json5
 {
-  "lang": {
-    "node-repl": {
-      "extends": "js",
-      "translator": "node-repl-to-js"
+  lineMods: {
+    asyncTest: {
+      before: [
+        'function test(_name, callback) {',
+        '  return callback();',
+        '}',
+      ],
+      after: [
+        'await test();',
+      ],
     },
-  }
+  },
 }
 ```
 
-* Only the core code is translated.
-  * Rationale for Node.js REPL: Let users write wrapping code as plain JavaScript.
+The LineMod is applied the same either way:
+
+``````md
+<!--markcheck applyToBody="asyncTest"-->
+```js
+test('Test with await', async () => {
+  const value = await Promise.resolve(123);
+  assert.equal(value, 123);
+});
+```
+``````

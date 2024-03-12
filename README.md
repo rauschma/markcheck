@@ -22,3 +22,10 @@ Markcheck runs the code inside Markdown code blocks – to help ensure that they
   * [More demo files](demo/)
 * [Quick start](doc/manual/quick-start.md)
 * [Manual](doc/manual/)
+
+## Caveats
+
+* ⚠️ There is currently no sandboxing of any kind: Only use Markcheck with files you trust.
+* Checking TypeScript code:
+  * Downside: slow
+  * Upside: You can write very expressive code that works well for explaining language mechanisms. See [`demo/demo-typescript.md`](demo/demo-typescript.md?plain=1) for more information.

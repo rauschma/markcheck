@@ -2,9 +2,9 @@ import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import { assertNonNullable, assertTrue, type PublicDataProperties } from '@rauschma/helpers/typescript/type.js';
 import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
-import { Config, CONFIG_KEY_LANG, CONFIG_PROP_BEFORE_LINES, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
+import { Config, CONFIG_ENTITY_CONTEXT, CONFIG_KEY_LANG, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { EntityContextDescription, EntityContextSnippet, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
+import { EntityContextSnippet, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
@@ -79,11 +79,12 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
     if (!onlyLocalLines) {
       if (snippet.lang) {
         const lang = config.getLang(snippet.lang);
-        if (lang && lang.kind === 'LangDefCommand' && lang.beforeLines) {
+        if (lang && lang.kind === 'LangDefCommand' && (lang.beforeLines !== undefined || lang.afterLines !== undefined)) {
           outerLineMods.push(
             new LineModConfig(
-              new EntityContextDescription(`Config property ${CONFIG_PROP_BEFORE_LINES}`),
-              lang.beforeLines
+              CONFIG_ENTITY_CONTEXT,
+              lang.beforeLines ?? [],
+              lang.afterLines ?? [],
             )
           );
         }
@@ -405,7 +406,7 @@ export class SingleSnippet extends Snippet {
   }
 
   #assembleThis(config: Config, idToLineMod: Map<string, LineModAppliable>, linesOut: Array<string>) {
-    let applyToBodyLineMod: LineModAppliable | LineModBody | null = this.#getApplyToBodyLineMod(idToLineMod);
+    let applyToBodyLineMod: LineModAppliable | LineModBody | LineModConfig | null = this.#getApplyToBodyLineMod(config, idToLineMod);
     if (applyToBodyLineMod) {
       if (this.bodyLineMod && !this.bodyLineMod.isEmpty()) {
         throw new MarkcheckSyntaxError(
@@ -429,12 +430,22 @@ export class SingleSnippet extends Snippet {
     }
   }
 
-  #getApplyToBodyLineMod(idToLineMod: Map<string, LineModAppliable>): null | LineModAppliable {
-    const id = this.applyToBodyId;
-    if (!id) {
+  #getApplyToBodyLineMod(config: Config, idToLineMod: Map<string, LineModAppliable>): null | LineModConfig | LineModAppliable {
+    const lineModId = this.applyToBodyId;
+    if (!lineModId) {
       return null;
     }
-    const lineMod = idToLineMod.get(id);
+    let lineMod: undefined | LineModConfig | LineModAppliable = idToLineMod.get(lineModId);
+    if (lineMod === undefined) {
+      const lineModJson = config.idToLineMod.get(lineModId);
+      if (lineModJson) {
+        lineMod = new LineModConfig(
+          CONFIG_ENTITY_CONTEXT,
+          lineModJson.before ?? [],
+          lineModJson.after ?? [],
+        );
+      }
+    }
     if (lineMod === undefined) {
       throw new MarkcheckSyntaxError(
         `Attribute ${ATTR_KEY_APPLY_TO_BODY} contains an ID that either doesn’t exist or does not refer to a line mod`,

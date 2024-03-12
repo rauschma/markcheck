@@ -256,10 +256,11 @@ export class LineModLanguage extends LineMod {
  * Created on the fly for the “before” lines from the Config.
  */
 export class LineModConfig extends LineMod {
-  constructor(context: EntityContext, beforeLines: Array<string>) {
+  constructor(context: EntityContext, beforeLines: Array<string>, afterLines: Array<string>) {
     super({
       ...lineModPropsEmpty(context),
       beforeLines,
+      afterLines,
     });
   }
   protected override getSubclassProps(): Record<string, JsonValue> {

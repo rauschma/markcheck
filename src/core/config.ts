@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP, parseSearchAndReplaceString } from '../entity/directive.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
-import { MarkcheckSyntaxError, type EntityContext, EntityContextDescription } from '../util/errors.js';
+import { EntityContextDescription, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 
 const { stringify } = JSON;
 
@@ -24,6 +24,7 @@ export type LangDefCommand = {
   kind: 'LangDefCommand',
   extends?: string,
   beforeLines?: Array<string>,
+  afterLines?: Array<string>,
   translator?: Translator,
   runFileName?: string,
   commands?: Array<Array<string>>,
@@ -63,14 +64,16 @@ export const TRANSLATOR_MAP = new Map<string, Translator>(
  * caused them. Thus, we can’t provide a better context for errors in this
  * class.
  */
-export const CONFIG_PROP_BEFORE_LINES = 'beforeLines';
+export const CONFIG_ENTITY_CONTEXT = new EntityContextDescription('Configuration');
 
-const CONFIG_CONTEXT = new EntityContextDescription('Configuration');
+export const CONFIG_PROP_BEFORE_LINES = 'beforeLines';
+export const CONFIG_PROP_AFTER_LINES = 'afterLines';
 
 export class Config {
   searchAndReplaceFunc: (str: string) => string = (str) => str;
   #searchAndReplaceData: Array<string> = [];
   #lang = new Map<string, LangDef>();
+  idToLineMod = new Map<string, LineModJson>();
   toJson(): ConfigModJson {
     return {
       "searchAndReplace": this.#searchAndReplaceData,
@@ -95,6 +98,11 @@ export class Config {
     if (configModJson.lang) {
       for (const [key, langDefJson] of Object.entries(configModJson.lang)) {
         this.#lang.set(key, langDefFromJson(entityContext, langDefJson));
+      }
+    }
+    if (configModJson.lineMods) {
+      for (const [key, lineModJson] of Object.entries(configModJson.lineMods)) {
+        this.idToLineMod.set(key, lineModJson);
       }
     }
   }
@@ -128,7 +136,7 @@ export class Config {
         const keyPath = [...visitedLanguages, partialCommand.extends];
         throw new MarkcheckSyntaxError(
           `Cycle in property ${stringify(PROP_KEY_EXTENDS)} (object ${stringify(CONFIG_KEY_LANG)}): ${stringify(keyPath)}`,
-          { entityContext: CONFIG_CONTEXT }
+          { entityContext: CONFIG_ENTITY_CONTEXT }
         );
       }
       visitedLanguages.add(partialCommand.extends);
@@ -136,7 +144,7 @@ export class Config {
       if (nextLangDef === undefined) {
         throw new MarkcheckSyntaxError(
           `Language definition ${stringify(parentKey)} refers to unknown language ${stringify(partialCommand.extends)}`,
-          { entityContext: CONFIG_CONTEXT }
+          { entityContext: CONFIG_ENTITY_CONTEXT }
         );
       }
       switch (nextLangDef.kind) {
@@ -158,20 +166,20 @@ export class Config {
     if (result.runFileName === undefined) {
       throw new MarkcheckSyntaxError(
         `Language ${stringify(origParentKey)} does not have property ${stringify(PROP_KEY_DEFAULT_FILE_NAME)} (with ${stringify(PROP_KEY_EXTENDS)} taken into consideration)`,
-        { entityContext: CONFIG_CONTEXT }
+        { entityContext: CONFIG_ENTITY_CONTEXT }
       );
     }
     if (result.commands === undefined) {
       throw new MarkcheckSyntaxError(
         `Language ${stringify(origParentKey)} does not have property ${stringify(PROP_KEY_COMMANDS)} (with ${stringify(PROP_KEY_EXTENDS)} taken into consideration)`,
-        { entityContext: CONFIG_CONTEXT }
+        { entityContext: CONFIG_ENTITY_CONTEXT }
       );
     }
     return result;
   }
   addDefaults(): this {
     this.#setSearchAndReplace(
-      CONFIG_CONTEXT,
+      CONFIG_ENTITY_CONTEXT,
       [
         '/[⎡⎤]//',
       ]
@@ -280,6 +288,7 @@ function merge(extending: LangDefCommand, extended: LangDefCommand): LangDefComm
     kind: 'LangDefCommand',
     extends: extending.extends ?? extended.extends,
     beforeLines: extending.beforeLines ?? extended.beforeLines,
+    afterLines: extending.afterLines ?? extended.afterLines,
     translator: extending.translator ?? extended.translator,
     runFileName: extending.runFileName ?? extended.runFileName,
     commands: extending.commands ?? extended.commands,
@@ -308,19 +317,26 @@ export type ConfigModJson = {
    */
   markcheckDirectory?: string,
   searchAndReplace?: Array<string>,
-  lang?: Record<string, LangDefPartialJson>,
+  lang?: Record<string, LangDefJson>,
+  lineMods?: Record<string, LineModJson>,
 };
 export const CONFIG_KEY_LANG = 'lang';
 
-export type LangDefPartialJson =
-  | LangDefCommandPartialJson
+export type LineModJson = {
+  before?: Array<string>,
+  after?: Array<string>,
+};
+
+export type LangDefJson =
+  | LangDefCommandJson
   | typeof LANG_SKIP
   | typeof LANG_ERROR_IF_RUN
   ;
 
-export type LangDefCommandPartialJson = {
+export type LangDefCommandJson = {
   extends?: string,
   before?: Array<string>,
+  after?: Array<string>,
   translator?: string,
   runFileName?: string,
   commands?: Array<Array<string>>,
@@ -330,7 +346,7 @@ export type LangDefCommandPartialJson = {
  * @param context `configModJson` comes from a config file or a ConfigMod
  * (inside a Markdown file).
  */
-function langDefFromJson(context: EntityContext, langDefJson: LangDefPartialJson): LangDef {
+function langDefFromJson(context: EntityContext, langDefJson: LangDefJson): LangDef {
   if (typeof langDefJson === 'string') {
     switch (langDefJson) {
       case LANG_SKIP:
@@ -355,26 +371,30 @@ function langDefFromJson(context: EntityContext, langDefJson: LangDefPartialJson
     kind: 'LangDefCommand',
     extends: langDefJson.extends,
     beforeLines: langDefJson.before,
+    afterLines: langDefJson.after,
     translator,
     runFileName: langDefJson.runFileName,
     commands: langDefJson.commands,
   };
 }
 
-function langDefToJson(langDef: LangDef): LangDefPartialJson {
+function langDefToJson(langDef: LangDef): LangDefJson {
   switch (langDef.kind) {
     case 'LangDefSkip':
       return LANG_SKIP;
     case 'LangDefErrorIfRun':
       return LANG_ERROR_IF_RUN;
     case 'LangDefCommand': {
-      const result: LangDefPartialJson = {
+      const result: LangDefJson = {
       };
       if (langDef.extends) {
         result.extends = langDef.extends;
       }
       if (langDef.beforeLines) {
         result.before = langDef.beforeLines;
+      }
+      if (langDef.afterLines) {
+        result.before = langDef.afterLines;
       }
       if (langDef.translator) {
         result.translator = langDef.translator.key;
@@ -394,26 +414,33 @@ function langDefToJson(langDef: LangDef): LangDefPartialJson {
 
 //#################### ConfigModJsonSchema ####################
 
-export const LangDefCommandPartialJsonSchema = z.object({
+export const LangDefCommandJsonSchema = z.object({
   extends: z.optional(z.string()),
   before: z.optional(z.array(z.string())),
+  after: z.optional(z.array(z.string())),
   translator: z.optional(z.string()),
   runFileName: z.optional(z.string()),
   commands: z.optional(z.array(z.array(z.string()))),
 }).strict();
 
-export const LangDefPartialJsonSchema = z.union([
-  LangDefCommandPartialJsonSchema,
+export const LangDefJsonSchema = z.union([
   z.literal(LANG_SKIP),
   z.literal(LANG_ERROR_IF_RUN),
+  LangDefCommandJsonSchema,
 ]);
+
+export const LineModJsonSchema = z.object({
+  before: z.optional(z.array(z.string())),
+  after: z.optional(z.array(z.string())),
+}).strict();
 
 export const ConfigModJsonSchema = z.object({
   markcheckDirectory: z.optional(z.string()),
   searchAndReplace: z.optional(z.array(z.string())),
   lang: z.optional(
-    z.record(
-      LangDefPartialJsonSchema
-    )
+    z.record(LangDefJsonSchema)
+  ),
+  lineMods: z.optional(
+    z.record(LineModJsonSchema)
   ),
 }).strict();
