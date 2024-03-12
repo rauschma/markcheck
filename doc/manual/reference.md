@@ -17,7 +17,7 @@ Options:
 * `markcheck-data/`: must exist, can be empty
   * `tmp/`: created on demand, cleared before a file is run.
   * `markcheck-config.json5`: overrides the built-in defaults.
-    * Show built-in defaults via: `markcheck --print-config`
+    * Print built-in defaults via: `markcheck -p`
 
 ## Syntax
 

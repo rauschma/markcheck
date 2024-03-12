@@ -1,8 +1,7 @@
 {
   "name": "markcheck",
-  "version": "1.0.0",
-  "author": "",
-  "description": "",
+  "version": "0.1.0",
+  "author": "Axel Rauschmayer",
   "license": "MIT",
   "type": "module",
   "files": [
