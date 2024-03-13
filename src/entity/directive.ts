@@ -167,12 +167,19 @@ export enum AttrValue {
 }
 export type ExpectedAttributeValues = Map<string, AttrValue | RegExp>;
 
-export const ATTRS_LOCAL_LM_APPLIABLE_LM: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
+function expectedAttrs(nameTypePairs: Array<[string, AttrValue | RegExp]>): ExpectedAttributeValues {
+  nameTypePairs.sort(
+    ([name1, _type1], [name2, _type2]) => name1.localeCompare(name2)
+  );
+  return new Map(nameTypePairs);
+}
+
+export const ATTRS_LOCAL_LM_APPLIABLE_LM = expectedAttrs([
   [ATTR_KEY_IGNORE_LINES, AttrValue.String],
   [ATTR_KEY_SEARCH_AND_REPLACE, AttrValue.String],
 ]);
 
-export const ATTRS_SNIPPET: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
+export const ATTRS_SNIPPET = expectedAttrs([
   // Snippet attributes are fed to local LineMod!
   ...ATTRS_LOCAL_LM_APPLIABLE_LM,
   //
@@ -204,7 +211,7 @@ export const ATTRS_SNIPPET: ExpectedAttributeValues = new Map<string, AttrValue 
   [ATTR_KEY_STDERR, AttrValue.String],
 ]);
 
-export const ATTRS_SNIPPET_BODY_LABEL_INSERT: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
+export const ATTRS_SNIPPET_BODY_LABEL_INSERT = expectedAttrs([
   ...ATTRS_SNIPPET,
   // Body label `insert:` (only local LineMods and appliable LineMods)
   [ATTR_KEY_AT, AttrValue.String],
@@ -215,7 +222,7 @@ export const ATTRS_APPLIABLE_LINE_MOD: ExpectedAttributeValues = new Map([
   [ATTR_KEY_LINE_MOD_ID, AttrValue.String],
 ]);
 
-export const ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT: ExpectedAttributeValues = new Map<string, AttrValue | RegExp>([
+export const ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT = expectedAttrs([
   ...ATTRS_APPLIABLE_LINE_MOD,
   // Body label `insert:` (only local LineMods and appliable LineMods)
   [ATTR_KEY_AT, AttrValue.String],
