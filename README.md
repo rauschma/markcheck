@@ -43,5 +43,8 @@ Checking JavaScript is reasonably fast:
 
 I have rewritten Markcheck several times over the years, until I arrived at the current version. If you find this tool or [any of my other free work](https://dr-axel.de) useful, I would appreciate a donation:
 
-* One-time donation: [Paypal](https://paypal.me/rauschma)
-* Recurring donation: [Liberapay](https://liberapay.com/rauschma/donate)
+* One-time donation:
+  * [Paypal](https://paypal.me/rauschma)
+  * [Stripe](https://buy.stripe.com/bIY4hd5etaYZ9d6cMM)
+* Recurring donation:
+  * [Liberapay](https://liberapay.com/rauschma/donate)

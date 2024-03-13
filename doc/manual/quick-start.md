@@ -333,5 +333,5 @@ How are you?
 
 The ⎡half-brackets⎤ are used for hiding test code from readers:
 
-* The program that processes the Markdown (e.g., converts it to HTML) must remove the half-brackets and what’s inside them.
-* Markcheck only removes individual half-brackets.
+* Markcheck removes individual half-brackets before writing the code to disk.
+* Before you publish the Markdown (e.g. to HTML), you need to remove the half-brackets and what’s inside them. See [the reference](reference.md#config-property-searchandreplace) for more information.

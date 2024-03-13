@@ -282,7 +282,7 @@ The output looks like this (excerpt):
     "/[⎡⎤]//",
   ],
   lang: {
-    "": "[errorIfRun]",
+    "": "[skip]",
     txt: "[skip]",
     js: {
       before: [
@@ -349,31 +349,22 @@ This is the ConfigMod used in `demo-bash.md` (it defines the new language `bash`
 -->
 ``````
 
-### Property `commands`
+### Config property `commands`
 
 Two variables are available:
 
 * `$FILE_NAME`
 * `$ALL_FILE_NAMES`
 
-### Property `lang`
+### Config property `lang`
 
 * Empty key `""`: for “bare” code blocks without languages
 * Value `"[skip]"`: Don’t run the snippets.
-  * Use case: content that should be ignored. (It can still be written to disk.)
+  * Use case: content that should not be run. Checks (such as `containedInFile`) and writing to disk (e.g. via `write`) still work.
 * Value `"[errorIfRun]"`: Running the snippets is an error.
-  * Use case: content where Markcheck should warn you if you run it. The error can be switched off via `id`, `write`, `writeLocalLines`, and `skip`.
+  * Use case: You want to avoid a certain language and would like Markcheck to warn you if you accidentally use it. You can suppress an error via `id`, `write`, `writeLocalLines`, and `skip`.
 
-Why were the following choices made for the defaults?
-
-```json5
-"": "[errorIfRun]",
-txt: "[skip]",
-```
-
-These settings nudge users away from bare code blocks: If you want to display plain text to users, use the language `txt` and your code blocks will simply be ignored by Markcheck.
-
-### Property `searchAndReplace`
+### Config property `searchAndReplace`
 
 ```json5
 {
@@ -383,7 +374,33 @@ These settings nudge users away from bare code blocks: If you want to display pl
 }
 ```
 
-### Property `translator`
+Use case – hide test code from readers:
+
+``````md
+```js
+⎡await ⎤Promise.allSettled([
+  Promise.resolve('a'),
+  Promise.reject('b'),
+])
+.then(
+  (arr) => assert.deepEqual(
+    arr,
+    [
+      { status: 'fulfilled', value:  'a' },
+      { status: 'rejected',  reason: 'b' },
+    ]
+  )
+);
+```
+``````
+
+* Markcheck removes individual half-brackets before writing the code to disk.
+* Before you publish the Markdown (e.g. to HTML), you need to remove the half-brackets and what’s inside them – e.g.:
+  ```
+  cat book.md | sed -e 's/⎡[^⎡⎤]*⎤//g' | pandoc book.html
+  ```
+
+### Config property `translator`
 
 Currently only `"node-repl-to-js"` is supported.
 
@@ -394,7 +411,7 @@ Currently only `"node-repl-to-js"` is supported.
 },
 ```
 
-### Property `lineMods`
+### Config property `lineMods`
 
 We can define a LineMod with the id `asyncTest` in two ways.
 
