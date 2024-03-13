@@ -9,7 +9,7 @@ Requirement for using Markcheck:
 
 There are demos for several languages in [`markcheck/demo/`](../../demo/README.md)
 
-As an example – [`demo/demo-javascript.md`](../../demo/demo-javascript.md?plain=1) is a file with JavaScript code:
+As an example – [`demo/demo-javascript.md`](../../demo/demo-javascript.md?plain=1) is a file with JavaScript code blocks:
 
 ```txt
 cd markcheck/

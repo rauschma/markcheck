@@ -203,45 +203,60 @@ Various other details:
 
 ### Snippets
 
-* Running mode:
-  * `only`
-  * `skip`
-  * `alwaysRun`
-* Language: `lang`
-  * For body directives
-  * To override the language defined by a code block
-* Assembling lines:
-  * `id="my-id"`
-    * Referenced by attributes: `external`, `externalLocalLines`, `sameAsId`, `include`, `stdout`, `stderr`
-  * `sequence="1/3"`
-  * `include="id1, $THIS, id2"`:
-    * `$THIS` refers to the current snippet. If it is omitted, it is included at the end.
-  * `applyToBody="line-mod-id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
-  * `applyToOuter="line-mod-id"`: applies an appliable line mod once per file.
-    * This attribute is only considered if a “root” snippet (where line assembly started) has it and ignored elsewhere.
-  * `runLocalLines`: Used when a snippet is self-contained and does not need or want config lines and language LineMod lines.
-* Additional checks:
-  * `sameAsId="id"`: Compares the content of the current snippet with the content of another snippet.
-  * `containedInFile="filePath"`:
-    * `filePath` is either relative to the Markdown file or absolute.
-    * Only local lines are considered.
-* Writing and referring to files:
-  * `write="filePath"`: Write a complete snippet to disk. Don’t run it.
-  * `writeLocalLines="filePath"`: Write the local lines of a snippet to disk. Don’t run it.
-  * `runFileName="filePath"`: When writing a snippet to disk to run it, use the file name `filePath` (and not the default file name that is configured per language).
-  * `external="id1>lib1.js, lib2.js"`: Which external files are needed by the current snippet?
-    * An element with `>` writes a file to disk.
-    * An element without `>` only tells Markcheck that the file exists. That is useful for some language – e.g., TypeScript where the shell command `ts-expect-error` must know all files that make up a program.
-  * `externalLocalLines="id1>lib1.js, lib2.js"`: Same as `external` but only local lines are written to disk.
-* Checking output:
-  * `stdout="|lineModId=stdout-id"`
-  * `stderr="stderr-id"`
-  * We have two options for configuring which part of the actual output human readers see:
-    * We can use LineMod operations to change the expected content of the snippets `stdout-id` and `stderr-id`.
-    * We can use the LineMod `lineModId` to change (e.g.) `stdout` before it is compared to the expected content.
+Running mode:
+
+* `only`
+* `skip`
+* `alwaysRun`
+
+Miscellaneous attributes:
+
+* `lang` has two use cases:
+  * Specifying a language for `body:` directives
+  * Overriding the language defined by a code block
+
+Assembling lines:
+
+* `id="my-id"`
+  * Referenced by attributes: `external`, `externalLocalLines`, `sameAsId`, `include`, `stdout`, `stderr`
+* `sequence="1/3"`
+* `include="id1, $THIS, id2"`:
+  * `$THIS` refers to the current snippet. If the keyword is omitted, the snippet is included at the end.
+* `applyToBody="line-mod-id"`: applies an appliable line mod to the core snippet (vs. included snippets or other sequence members)
+* `applyToOuter="line-mod-id"`: applies an appliable line mod once per file.
+  * This attribute is only considered if a “root” snippet (where line assembly started) has it and ignored elsewhere.
+* `runLocalLines`: Used when a snippet is self-contained and does not need or want config lines and language LineMod lines.
+
+Performing checks:
+
+* `sameAsId="id"`: Compares the content of the current snippet with the content of another snippet.
+* `containedInFile="filePath"`:
+  * `filePath` is either relative to the Markdown file or absolute.
   * Only local lines are considered.
+  
+Writing and referring to files:
+
+* `write="filePath"`: Write a complete snippet to disk. Don’t run it.
+* `writeLocalLines="filePath"`: Write the local lines of a snippet to disk. Don’t run it.
+* `runFileName="filePath"`: When writing a snippet to disk to run it, use the file name `filePath` (and not the default file name that is configured per language).
+* `external="id1>lib1.js, lib2.js"`: Which external files are needed by the current snippet?
+  * An element with `>` writes a file to disk.
+  * An element without `>` only tells Markcheck that the file exists. That is useful for some language – e.g., TypeScript where the shell command `ts-expect-error` must know all files that make up a program.
+* `externalLocalLines="id1>lib1.js, lib2.js"`: Same as `external` but only local lines are written to disk.
+
+Checking output:
+
+* Only local lines are considered.
+* `stdout="snippet-id"`: Standard output must be the same as the snippet with the ID `snippet-id`.
+* `stderr="snippet-id"`
+* We have two options for configuring which part of the actual output human readers see. Consider, as an example, `stderr="snippet-id"`:
+  * Changing the expected output: We can use LineMod operations such as `before:` to change the snippet with the ID `snippet-id`.
+  * Changing the actual output: There is special syntax that lets us apply a LineMod to the actual output before it is compared with the expected output.
+    * Example: `stdout="|line-mod-id=snippet-id"`
 
 ### Body LineMods and appliable LineMods used via `applyToBody`
+
+Note that a body LineMod is defined by a directive immediately before a code block. (This directive can also contain attributes for the code block itself such as `include` or `id`.)
 
 Ways of specifying lines:
 
@@ -252,10 +267,28 @@ Ways of specifying lines:
 * _Line ranges_: `3..-2, 'a'..'b'`
   * A range includes start and end – i.e.: `1..3` is equivalent to `1,2,3`.
 
-* Required attribute for body label `insert:`:
-  * `at="before:1, after:-1, before:'console.log'"`
+Attributes:
+
+* `at="before:1, after:-1, before:'console.log'"`
+  * This attribute specifies where to insert the line groups defined via body label `insert:`.
 * `ignoreLines="1, 3..-2, 'xyz', 'a'..'b'"`: omits lines.
 * `searchAndReplace="/[a-z]/-/i"`
+
+Example:
+
+``````md
+<!--markcheck at="before:1, after:'first', after:-1" insert:
+// START
+•••
+// MIDDLE
+•••
+// END
+-->
+```js
+// first
+// second
+```
+``````
 
 ### Language LineMods
 
@@ -263,7 +296,7 @@ Ways of specifying lines:
 
 ### Appliable LineMods
 
-* Required attribute: `lineModId="my-id"`
+* Required attribute: `lineModId="some-id"`
   * Referenced by attributes: `applyToBody`, `applyToOuter`
 
 ## Configuration
@@ -308,6 +341,7 @@ The output looks like this (excerpt):
 
 ### Schemas for config data
 
+* JSON schema: `markcheck --print-schema`
 * TypeScript types: see `ConfigModJson` in [`config.ts`](https://github.com/rauschma/markcheck/blob/main/src/core/config.ts)
 
 ### Changing the defaults

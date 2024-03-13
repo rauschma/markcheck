@@ -75,7 +75,7 @@ test('Insert single line at a line number (applyToBody LineMod)', () => {
 
 test('Insert multiple lines at line numbers', () => {
   const readme = outdent`
-    <!--markcheck at="before:1, after:1, after:-1" insert:
+    <!--markcheck at="before:1, after:'first', after:-1" insert:
     // START
     •••
     // MIDDLE
