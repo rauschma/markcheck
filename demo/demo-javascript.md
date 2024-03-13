@@ -128,7 +128,7 @@ console.log('How are you?');
 How are you?
 -->
 
-### Asynchronous code and hiding test code via ⎡half-brackets⎤
+### Hiding test code via ⎡half-brackets⎤
 
 ```js
 ⎡await ⎤Promise.allSettled([

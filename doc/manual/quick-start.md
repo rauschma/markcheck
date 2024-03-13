@@ -1,6 +1,11 @@
 # Quick start
 
-## Trying out Markcheck without installing it
+Requirement for using Markcheck:
+
+* [Node.js](https://nodejs.org/) must be installed. It runs Markcheck’s code.
+* Node.js comes bundled with npm which provides the `npx` command for running Markcheck without installing it permanently.
+
+## Trying out Markcheck without installing it permanently
 
 There are demos for several languages in [`markcheck/demo/`](../../demo/)
 
@@ -226,7 +231,7 @@ Snippet 3/3
 ```
 ``````
 
-### Assembling code fragments out of order
+### Assembling code fragments out of order via `include`
 
 `$THIS` is optional if it is last among the `include` values.
 
@@ -254,7 +259,7 @@ steps.push('Step 2');
 ```
 ``````
 
-### External files
+### Setting up external files
 
 <!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
@@ -307,7 +312,7 @@ How are you?
 -->
 ``````
 
-### Asynchronous code and hiding test code via ⎡half-brackets⎤
+### Hiding test code via ⎡half-brackets⎤
 
 <!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md

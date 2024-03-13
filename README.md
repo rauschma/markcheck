@@ -24,20 +24,56 @@ Checking JavaScript is reasonably fast:
 * Checking all the code examples in my book “JavaScript for impatient programmers” takes 49.9 seconds on a MacBook Pro with an M1 Pro processor. And there is a lot of code in the book’s 639 pages.
 * Checking one of the longer chapters takes 4.7 seconds.
 
-## Documentation
-
-* What does Markcheck’s syntax look like?
-  * See [`demo/demo-javascript.md`](demo/demo-javascript.md?plain=1)
-  * [More demo files](demo/)
-* [Quick start with many examples](doc/manual/quick-start.md)
-* [Manual](doc/manual/)
-
-## Caveats
+**Caveats:**
 
 * ⚠️ There is currently no sandboxing of any kind: Only use Markcheck with files you trust.
 * Checking TypeScript code:
   * Downside: slow
   * Upside: You can write very expressive code that works well for explaining language mechanisms. See [`demo/demo-typescript.md`](demo/demo-typescript.md?plain=1) for more information.
+
+## What does Markcheck’s syntax look like?
+
+The following subsections show two common patterns. For more examples, see [the quick start part of Markcheck’s manual](doc/manual/quick-start.md#markdown-examples).
+
+### Checking standard output via `stdout`
+
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
+``````md
+<!--markcheck stdout="stdout-hello"-->
+```js
+console.log('Hello!');
+```
+
+<!--markcheck id="stdout-hello"-->
+```
+Hello!
+```
+``````
+
+### Hiding code via `before:`
+
+<!--markcheck containedInFile="demo/demo-javascript.md"-->
+``````md
+<!--markcheck before:
+function functionThatShouldThrow() {
+  throw new Error();
+}
+-->
+```js
+try {
+  functionThatShouldThrow();
+  assert.fail();
+} catch (_) {
+  // Success
+}
+```
+``````
+
+## More information on Markcheck
+
+* [Demo files](demo/) with code blocks in these languages: JavaScript, TypeScript, Babel, Node.js REPL, Bash
+* [Quick start with many examples](doc/manual/quick-start.md)
+* [Manual](doc/manual/)
 
 ## Donations
 
@@ -47,4 +83,5 @@ I have rewritten Markcheck several times over the years, until I arrived at the 
   * [Paypal](https://paypal.me/rauschma)
   * [Stripe](https://buy.stripe.com/bIY4hd5etaYZ9d6cMM)
 * Recurring donation:
+  * [GitHub Sponsors](https://github.com/sponsors/rauschma)
   * [Liberapay](https://liberapay.com/rauschma/donate)
