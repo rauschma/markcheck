@@ -1,10 +1,9 @@
 ---
-name: bug, feature suggestion or question
-about: Tell people who submit an issue what to do
+name: Bug, feature suggestion or question
+about: Submit an issue for a bug or a feature. Create discussion if you have a question.
 title: ''
 labels: ''
 assignees: ''
-
 ---
 
 What is your concern?
