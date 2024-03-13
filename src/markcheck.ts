@@ -110,7 +110,14 @@ export function main() {
         throw new Error(`Unexpected error in file ${stringify(relFilePath)}`, { cause: err });
       }
     }
-    out.writeLine(`----- Summary of ${stringify(relFilePath)} -----`);
+    const headingStyle = (
+      // Color distracts if there are many files and a total summary but
+      // helps if there is only a single file
+      mdFiles.length === 1
+      ? statusCounts.getHeadingStyle()
+      : style.Normal
+    );
+    out.writeLine(headingStyle`----- Summary of ${stringify(relFilePath)} -----`);
     if (globalRunningMode === GlobalRunningMode.Only) {
       out.writeLine(`(Running mode ${stringify(GlobalRunningMode.Only)} was active)`);
     }
