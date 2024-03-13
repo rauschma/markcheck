@@ -2,7 +2,7 @@
 
 ## Trying out Markcheck without installing it
 
-There are demos for several languages in [`markcheck/demo/`](../../demo/README.md)
+There are demos for several languages in [`markcheck/demo/`](../../demo/)
 
 As an example – [`demo/demo-javascript.md`](../../demo/demo-javascript.md?plain=1) is a file with JavaScript code:
 

@@ -9,7 +9,7 @@ const { raw } = String;
 
 createSuite(import.meta.url);
 
-test('Directive.parse()', () => {
+test('Directive.parse(): successes', () => {
   assert.deepEqual(
     parseDirective(raw`<!--markcheck noOuterLineMods-->`).toJson(),
     {
@@ -58,11 +58,14 @@ test('Directive.parse()', () => {
     },
     'Empty attribute value'
   );
+});
+
+test('Directive.parse(): failures', () => {
   assert.throws(
     () => parseDirective(raw`<!--markcheck key="unclosed-->`),
     {
       name: 'MarkcheckSyntaxError',
-      message: raw`Could not parse attributes: Stopped parsing before "=\"unclosed"`,
+      message: 'Could not parse attributes. Stopped parsing: ` key[HERE]="unclosed`',
     },
     'Unclosed attribute value'
   );

@@ -108,7 +108,7 @@ export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: 
   if (!match) {
     throw new MarkcheckSyntaxError(
       `Could not parse value of attribute ${stringify(attrKey)}: ${stringify(str)}`,
-      {lineNumber: directiveLineNumber}
+      { lineNumber: directiveLineNumber }
     );
   }
   assertNonNullable(match.groups);
@@ -271,7 +271,10 @@ export class Directive {
       if (!match) {
         if (lastIndex !== firstLine.length) {
           throw new MarkcheckSyntaxError(
-            `Could not parse attributes: Stopped parsing before ${stringify(firstLine.slice(lastIndex))}`,
+            'Could not parse attributes. Stopped parsing: `' +
+            firstLine.slice(0, lastIndex) + '[HERE]' + firstLine.slice(lastIndex) +
+            '`'
+            ,
             { lineNumber }
           );
         }
@@ -440,7 +443,7 @@ const RE_SEARCH_AND_REPLACE = re`/^[/](${RE_INNER})[/](${RE_INNER})[/]([i])?$/`;
  */
 export class SearchAndReplaceSpec {
   static fromString(entityContext: EntityContext, str: string): SearchAndReplaceSpec {
-    const {search, replace} = parseSearchAndReplaceString(entityContext, str);
+    const { search, replace } = parseSearchAndReplaceString(entityContext, str);
     return new SearchAndReplaceSpec(search, replace);
   }
   #search;

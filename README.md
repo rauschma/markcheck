@@ -28,8 +28,8 @@ Checking JavaScript is reasonably fast:
 
 * What does Markcheck’s syntax look like?
   * See [`demo/demo-javascript.md`](demo/demo-javascript.md?plain=1)
-  * [More demo files](demo/README.md)
-* [Quick start](doc/manual/quick-start.md)
+  * [More demo files](demo/)
+* [Quick start with many examples](doc/manual/quick-start.md)
 * [Manual](doc/manual/)
 
 ## Caveats
