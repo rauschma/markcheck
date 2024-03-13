@@ -308,13 +308,13 @@ The output looks like this (excerpt):
 
 * TypeScript types: see `ConfigModJson` in [`config.ts`](https://github.com/rauschma/markcheck/blob/main/src/core/config.ts)
 
-
 ### Changing the defaults
 
 How can we change the default config data?
 
 * Via the file `markcheck-data/markcheck-config.json5`
-* Via ConfigMods inside Markdown.
+  * This file has the same structure as the output of `--print-config`
+* Via ConfigMods inside Markdown. See examples below.
 
 This is the ConfigMod used in `demo-babel.md` (it tells Markcheck that `js` snippets should be run as defined for the “language” `babel`):
 
@@ -358,7 +358,18 @@ Two variables are available:
 
 * Empty key `""`: for “bare” code blocks without languages
 * Value `"[skip]"`: Don’t run the snippets.
-* Value `"[errorIfRun]"`: Snippets must not be run. One way to prevent errors is via attribute `skip`.
+  * Use case: content that should be ignored. (It can still be written to disk though.)
+* Value `"[errorIfRun]"`: Running the snippets is an error.
+  * Use case: content where Markcheck should warn you if you run it. You can switch of the error by writing the content to disk via `write` and `writeLocalLines` or by using `skip`.
+
+Why were the following choices made for the defaults?
+
+```json5
+"": "[errorIfRun]",
+txt: "[skip]",
+```
+
+These settings nudge users away from bare code blocks: If you want to display plain text to users, use the language `txt` and your code blocks will simply be ignored by Markcheck.
 
 ### Property `searchAndReplace`
 

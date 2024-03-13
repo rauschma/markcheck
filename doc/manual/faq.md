@@ -1,9 +1,9 @@
 # FAQ
 
-## How to configure location of `markcheck-data/` directory?
+## How do I configure the location of the `markcheck-data/` directory?
 
-* Normally, `markcheck-data/` is searched for relative to the location of a Markdown file.
-* But its location can also be specified in the first `config:` directive in a Markdown file.
+* Normally, `markcheck-data/` is searched for relatively to the location of a Markdown file.
+* But its location can also be specified in the first `config:` directive in a Markdown file (which doesn’t have to be the first directive overall).
 
 ```md
 <!--markcheck config:
@@ -13,7 +13,7 @@
 -->
 ```
 
-## How to set up a custom language?
+## Markcheck complains about an “unknown language”: How do I set up a new language?
 
 ### JSON format
 
@@ -67,3 +67,22 @@ Example: [`demo-bash.md`](https://github.com/rauschma/markcheck/blob/main/demo/d
 ### Configuring languages via config files
 
 You can also store language definitions in `markcheck-data/markcheck-config.json5`
+
+## One among many code blocks fails. What do I do?
+
+Use `<!--markcheck only-->`:
+
+* Then only one specific code block runs.
+* That allows you to inspect the files in `markcheck-data/tmp/`: The files produced by that code block are still there (because it ran last).
+
+## What files are written? What commands are run?
+
+Find out via option `--verbose`
+
+## How do I get CLI help?
+
+Via option `--help`
+
+## What is the format of config files?
+
+[The reference](./reference.md#configuration) has all the relevant information.

@@ -2,17 +2,59 @@
 
 ## Trying out Markcheck without installing it
 
+There are demos for several languages in [`markcheck/demo/`](../../demo/README.md)
+
+As an example – [`demo/demo-javascript.md`](../../demo/demo-javascript.md?plain=1) is a file with JavaScript code:
+
 ```txt
 cd markcheck/
 npx markcheck demo/demo-javascript.md
-npx markcheck demo/demo-node-repl.md
 ```
 
-More demos are here: [`markcheck/demo/`](../../demo/)
+The second command produces the following output. The lines with line numbers refer to code blocks and their languages. The bold lines between them are the most recent headings before the code blocks.
+
+<img src="screenshot-markcheck.jpg" width="415.5" height="343.5" alt="Screenshot of Markcheck output with colors, bold letters, etc. A unstyled version of the output is shown below.">
+
+Unstyled version of the previous screenshot:
+
+```txt
+========== demo/demo-javascript.md ==========
+Markcheck directory: markcheck-data
+Assertions
+L5 (js) ✔︎
+Checking standard output via `stdout`
+L14 (js) ✔︎
+Hiding code via `before:`
+L26 (js) ✔︎
+Assembling code fragments sequentially via `sequence`
+L42 (js) ✔︎
+Assembling code fragments out of order
+L68 (js) ✔︎
+External files
+L91 (js) ✔︎
+Comment-only (“invisible”) snippets via `body:`
+L112 (js) ✔︎
+L122 (js) ✔︎
+Asynchronous code and hiding test code via ⎡half-brackets⎤
+L133 (js) ✔︎
+----- Summary of "demo/demo-javascript.md" -----
+Syntax Errors: 0, Test failures: 0, Warnings: 0
+
+========== TOTAL SUMMARY ==========
+✅ All succeeded: 1 file
+```
+
+## What CLI options are available?
+
+Getting help for the command line interface of Markcheck:
+
+```txt
+npx markcheck -h
+```
 
 ## Using Markcheck for your own files
 
-* The remainder of this document explains the basics of using Markcheck.
+The remainder of this document explains the basics of using Markcheck – including [several common Markcheck patterns](#markdown-examples).
 
 ### Step 1: create a Markdown file
 
@@ -76,7 +118,7 @@ npm install --global markcheck
 Markcheck writes each code block to disk and applies shell commands to it. The commands are determined by the language of the code block:
 
 * You can check out the defaults via `markcheck --print-config`.
-* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.json5`
+* The defaults can be changed inside Markdown files and via `markcheck-data/markcheck-config.json5`. See [the reference](./reference.md#configuration) for more information.
 
 The defaults look like this:
 
@@ -189,6 +231,8 @@ Snippet 3/3
 
 ### Assembling code fragments out of order
 
+`$THIS` is optional if it is last among the `include` values.
+
 <!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
 <!--markcheck include="step1, step2, $THIS"-->
@@ -233,7 +277,7 @@ export const GRINNING_FACE = '😀';
 
 ### Comment-only (“invisible”) snippets via `body:`
 
-Sometimes readers should not see how a file is set up or that the output is checked.
+Sometimes readers should not see how a file is set up or that the output is checked. That can be done via `body:`
 
 Setting up an external file:
 
