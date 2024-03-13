@@ -4,7 +4,7 @@ import { assertNonNullable, assertTrue, type PublicDataProperties } from '@rausc
 import { style, type TextStyleResult } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { Config, CONFIG_ENTITY_CONTEXT, CONFIG_KEY_LANG, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
-import { EntityContextSnippet, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
+import { EntityContextSnippet, MarkcheckSyntaxError, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, STATUS_EMOJI_WARNING, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
@@ -693,14 +693,21 @@ export type FileState = {
 };
 
 export class StatusCounts {
-  relFilePath;
-  syntaxErrors = 0;
-  testFailures = 0;
+  relFilePath: null | string;
   testSuccesses = 0;
+  testFailures = 0;
+  syntaxErrors = 0;
   warnings = 0;
 
-  constructor(relFilePath: string) {
+  constructor(relFilePath: null | string = null) {
     this.relFilePath = relFilePath;
+  }
+
+  addOther(other: StatusCounts): void {
+    this.testSuccesses += other.testSuccesses;
+    this.testFailures += other.testFailures;
+    this.syntaxErrors += other.syntaxErrors;
+    this.warnings += other.warnings;
   }
 
   getTotalProblemCount(): number {
@@ -724,6 +731,27 @@ export class StatusCounts {
       warnings: this.warnings,
     };
   }
+  
+  getHeadingStyle(): TextStyleResult {
+    if (this.hasSucceeded()) {
+      return style.FgGreen.Bold;
+    }
+    if (this.testFailures > 0 || this.syntaxErrors > 0) {
+      return style.FgRed.Bold;
+    }
+    return style.FgYellow.Bold;
+  }
+
+  getStatusEmoji(): string {
+    if (this.getTotalProblemCount() === 0) {
+      return STATUS_EMOJI_SUCCESS;
+    }
+    if (this.testFailures > 0 || this.syntaxErrors > 0) {
+      return STATUS_EMOJI_FAILURE;
+    }
+    return STATUS_EMOJI_WARNING;
+  }
+
   describe(): string {
     const parts = [
       labeled('Successes', this.testSuccesses,
@@ -736,7 +764,7 @@ export class StatusCounts {
        this.syntaxErrors > 0, style.Bold.FgRed
       ),
       labeled('Warnings', this.warnings,
-       this.warnings > 0, style.Bold.FgRed
+       this.warnings > 0, style.Bold.FgYellow
       ),
     ];
     return parts.join(', ');

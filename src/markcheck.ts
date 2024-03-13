@@ -85,8 +85,10 @@ export function main() {
   const logLevel = (args.values.verbose ? LogLevel.Verbose : LogLevel.Normal);
   const failedFiles = new Array<StatusCounts>();
 
-  assertTrue(args.positionals.length > 0);
-  for (const filePath of args.positionals) {
+  const mdFiles = args.positionals;
+  assertTrue(mdFiles.length > 0);
+  const totalStatus = new StatusCounts();
+  for (const filePath of mdFiles) {
     const absFilePath = path.resolve(filePath);
     const relFilePath = relPath(absFilePath);
     out.writeLine();
@@ -108,34 +110,33 @@ export function main() {
         throw new Error(`Unexpected error in file ${stringify(relFilePath)}`, { cause: err });
       }
     }
-    const headingStyle = (
-      statusCounts.hasFailed() ? style.FgRed.Bold : style.FgGreen.Bold
-    );
-    out.writeLine(headingStyle`----- Summary of ${stringify(relFilePath)} -----`);
+    out.writeLine(`----- Summary of ${stringify(relFilePath)} -----`);
     if (globalRunningMode === GlobalRunningMode.Only) {
       out.writeLine(`(Running mode ${stringify(GlobalRunningMode.Only)} was active)`);
     }
     out.writeLine(statusCounts.describe());
+    totalStatus.addOther(statusCounts);
     if (statusCounts.hasFailed()) {
       failedFiles.push(statusCounts);
     }
   }
 
-  const headingStyle = (
-    failedFiles.length === 0 ? style.FgGreen.Bold : style.FgRed.Bold
-  );
-  out.writeLine();
-  out.writeLine(headingStyle`========== TOTAL SUMMARY ==========`);
-  const totalFileCount = args.positionals.length;
-  const totalString = totalFileCount + (
-    totalFileCount === 1 ? ' file' : ' files'
-  );
-  if (failedFiles.length === 0) {
-    out.writeLine(`✅ All succeeded: ${totalString}`);
-  } else {
-    out.writeLine(`❌ Failures: ${failedFiles.length} of ${totalString}`);
-    for (const failedFile of failedFiles) {
-      out.writeLine(`• ${failedFile}`);
+  if (mdFiles.length > 1) {
+    // Only show a total summary if there is more than one file
+    const headingStyle = totalStatus.getHeadingStyle();
+    out.writeLine();
+    out.writeLine(headingStyle`========== TOTAL SUMMARY ==========`);
+    const totalFileCount = args.positionals.length;
+    const totalString = totalFileCount + (
+      totalFileCount === 1 ? ' file' : ' files'
+    );
+    if (failedFiles.length === 0) {
+      out.writeLine(`${totalStatus.getStatusEmoji()} All succeeded: ${totalString}`);
+    } else {
+      out.writeLine(`${totalStatus.getStatusEmoji()} Failures: ${failedFiles.length} of ${totalString}`);
+      for (const failedFile of failedFiles) {
+        out.writeLine(`• ${failedFile}`);
+      }
     }
   }
 }

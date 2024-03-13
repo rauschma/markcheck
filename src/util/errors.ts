@@ -4,6 +4,7 @@ import * as tty from 'node:tty';
 
 export const STATUS_EMOJI_SUCCESS = style.FgGreen`✔︎`;
 export const STATUS_EMOJI_FAILURE = '❌';
+export const STATUS_EMOJI_WARNING = '⚠️';
 
 //#################### EntityContext ####################
 
