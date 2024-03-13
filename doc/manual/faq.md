@@ -15,7 +15,14 @@
 
 ## Markcheck complains about an “unknown language”: How do I set up a new language?
 
-### JSON format
+There are two ways in which you can do so:
+
+* Put JSON5 data inside a `config:` directive.
+* Put JSON5 data inside the file `markcheck-data/markcheck-config.json5`
+
+Next, we’ll explore what the JSON5 data looks like, then what a `config:` directive looks like.
+
+### JSON5 data format
 
 You can see examples of JSON language definitions via:
 
@@ -63,10 +70,6 @@ Example: [`demo-bash.md`](https://github.com/rauschma/markcheck/blob/main/demo/d
 }
 -->
 ```
-
-### Configuring languages via config files
-
-You can also store language definitions in `markcheck-data/markcheck-config.json5`
 
 ## One among many code blocks fails. What do I do?
 

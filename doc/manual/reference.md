@@ -8,7 +8,9 @@ markcheck «file1.md» «file2.md» ...
 Options:
 --help -h          get help
 --version          print version
---print-config -p  print configuration defaults
+--print-config -c  print configuration defaults
+--print-schema -s  print JSON schema for config data (in config: directives
+                   and markcheck-data/markcheck-config.json5)
 --verbose -v       show more information (e.g. which shell commands are run)
 ```
 
@@ -17,7 +19,7 @@ Options:
 * `markcheck-data/`: must exist, can be empty
   * `tmp/`: created on demand, cleared before a file is run.
   * `markcheck-config.json5`: overrides the built-in defaults.
-    * Print built-in defaults via: `markcheck -p`
+    * Print built-in defaults via: `markcheck --print-config`
 
 ## How Markcheck works
 

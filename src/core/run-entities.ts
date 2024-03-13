@@ -27,6 +27,7 @@ import { type ParsedEntity, type ParsedMarkdown } from './parse-markdown.js';
 const MARKCHECK_DIR_NAME = 'markcheck-data';
 const MARKCHECK_TMP_DIR_NAME = 'tmp';
 const CONFIG_FILE_NAME = 'markcheck-config.json5';
+export const CONFIG_FILE_REL_PATH = path.join(MARKCHECK_DIR_NAME, CONFIG_FILE_NAME);
 const { stringify } = JSON;
 
 //#################### runParsedMarkdown() ####################
