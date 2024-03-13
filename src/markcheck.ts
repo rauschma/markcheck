@@ -1,20 +1,20 @@
 #!/usr/bin/env -S node --no-warnings=ExperimentalWarning
 // Importing JSON is experimental
 
+import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import { assertTrue } from '@rauschma/helpers/typescript/type.js';
 import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
 import json5 from 'json5';
 import * as fs from 'node:fs';
 import path from 'path';
 import { parseArgs, type ParseArgsConfig } from 'util';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { Config, ConfigModJsonSchema } from './core/config.js';
 import { parseMarkdown } from './core/parse-markdown.js';
 import { CONFIG_FILE_REL_PATH, runParsedMarkdown } from './core/run-entities.js';
-import { GlobalRunningMode, LogLevel, RuningMode, StatusCounts } from './entity/snippet.js';
+import { GlobalRunningMode, LogLevel, StatusCounts } from './entity/snippet.js';
 import { MarkcheckSyntaxError, Output, STATUS_EMOJI_FAILURE } from './util/errors.js';
 import { relPath } from './util/path-tools.js';
-import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 //@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: 'json' };
