@@ -1,7 +1,7 @@
 import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import { assertNonNullable, assertTrue, type PublicDataProperties } from '@rauschma/helpers/typescript/type.js';
-import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
+import { style, type TextStyleResult } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { Config, CONFIG_ENTITY_CONTEXT, CONFIG_KEY_LANG, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
 import { EntityContextSnippet, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
@@ -696,20 +696,21 @@ export class StatusCounts {
   relFilePath;
   syntaxErrors = 0;
   testFailures = 0;
+  testSuccesses = 0;
   warnings = 0;
 
   constructor(relFilePath: string) {
     this.relFilePath = relFilePath;
   }
 
-  getTotalCount(): number {
+  getTotalProblemCount(): number {
     return this.syntaxErrors + this.testFailures + this.warnings;
   }
   hasFailed(): boolean {
-    return this.getTotalCount() > 0;
+    return this.getTotalProblemCount() > 0;
   }
   hasSucceeded(): boolean {
-    return this.getTotalCount() === 0;
+    return this.getTotalProblemCount() === 0;
   }
   toString(): string {
     return `File ${stringify(this.relFilePath)}. ${this.describe()}`
@@ -719,21 +720,31 @@ export class StatusCounts {
       relFilePath: this.relFilePath,
       syntaxErrors: this.syntaxErrors,
       testFailures: this.testFailures,
+      testSuccesses: this.testSuccesses,
       warnings: this.warnings,
     };
   }
   describe(): string {
     const parts = [
-      labeled('Syntax Errors', this.syntaxErrors),
-      labeled('Test failures', this.testFailures),
-      labeled('Warnings', this.warnings),
+      labeled('Successes', this.testSuccesses,
+       this.hasSucceeded(), style.Bold.FgGreen
+      ),
+      labeled('Failures', this.testFailures,
+       this.testFailures > 0, style.Bold.FgRed
+      ),
+      labeled('Syntax Errors', this.syntaxErrors,
+       this.syntaxErrors > 0, style.Bold.FgRed
+      ),
+      labeled('Warnings', this.warnings,
+       this.warnings > 0, style.Bold.FgRed
+      ),
     ];
     return parts.join(', ');
 
-    function labeled(label: string, count: number): string {
+    function labeled(label: string, count: number, condition: boolean, textStyle: TextStyleResult): string {
       const str = `${label}: ${count}`;
-      if (count > 0) {
-        return style.Bold.FgRed(str);
+      if (condition) {
+        return textStyle(str);
       } else {
         return str;
       }

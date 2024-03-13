@@ -32,7 +32,7 @@ const { stringify } = JSON;
 
 //#################### runParsedMarkdown() ####################
 
-export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: LogLevel, parsedMarkdown: ParsedMarkdown, statusCounts: StatusCounts, mockShellData: null | MarkcheckMockData = null): void {
+export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: LogLevel, parsedMarkdown: ParsedMarkdown, statusCounts: StatusCounts, mockShellData: null | MarkcheckMockData = null): GlobalRunningMode {
   const markcheckDir = findMarkcheckDir(absFilePath, parsedMarkdown.entities);
   out.writeLine(style.FgBrightBlack`Markcheck directory: ${relPath(markcheckDir)}`);
 
@@ -92,6 +92,8 @@ export function runParsedMarkdown(out: Output, absFilePath: string, logLevel: Lo
   }
   checkSnippetIds(parsedMarkdown, out, statusCounts);
   checkLineModIds(parsedMarkdown, out, statusCounts);
+
+  return globalRunningMode;
 }
 
 function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCounts: StatusCounts): void {
@@ -223,6 +225,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
       }
       const description = entity.getEntityContext().describe();
       out.writeLine(`${description} ${STATUS_EMOJI_SUCCESS}`);
+      fileState.statusCounts.testSuccesses++;
     }
     if (snippetState.verboseLines.length > 0) {
       for (const line of snippetState.verboseLines) {

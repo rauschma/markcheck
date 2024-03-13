@@ -59,8 +59,9 @@ test('containedInFile: failure', () => {
     runMarkdownForTests('/tmp/markdown/readme.md', readme, {markcheckMockData}).toJson(),
     {
       relFilePath: '/tmp/markdown/readme.md',
-      syntaxErrors: 0,
+      testSuccesses: 0,
       testFailures: 1,
+      syntaxErrors: 0,
       warnings: 0,
     }
   );

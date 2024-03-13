@@ -80,8 +80,9 @@ test('stdout: failure', () => {
     runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).toJson(),
     {
       relFilePath: '/tmp/markdown/readme.md',
-      syntaxErrors: 0,
       testFailures: 1,
+      testSuccesses: 0,
+      syntaxErrors: 0,
       warnings: 0,
     }
   );

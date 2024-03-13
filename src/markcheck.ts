@@ -10,7 +10,7 @@ import { parseArgs, type ParseArgsConfig } from 'util';
 import { Config, ConfigModJsonSchema } from './core/config.js';
 import { parseMarkdown } from './core/parse-markdown.js';
 import { CONFIG_FILE_REL_PATH, runParsedMarkdown } from './core/run-entities.js';
-import { LogLevel, StatusCounts } from './entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, StatusCounts } from './entity/snippet.js';
 import { MarkcheckSyntaxError, Output, STATUS_EMOJI_FAILURE } from './util/errors.js';
 import { relPath } from './util/path-tools.js';
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
@@ -93,9 +93,10 @@ export function main() {
     out.writeLine(style.FgBlue.Bold`========== ${relFilePath} ==========`);
     const statusCounts = new StatusCounts(relFilePath);
     const text = fs.readFileSync(absFilePath, 'utf-8');
+    let globalRunningMode = GlobalRunningMode.Normal;
     try {
       const parsedMarkdown = parseMarkdown(text);
-      runParsedMarkdown(out, absFilePath, logLevel, parsedMarkdown, statusCounts);
+      globalRunningMode = runParsedMarkdown(out, absFilePath, logLevel, parsedMarkdown, statusCounts);
     } catch (err) {
       // runParsedMarkdown() handles many exceptions (incl. `TestFailure`).
       // Here, we only need to handle exceptions that happen during
@@ -111,6 +112,9 @@ export function main() {
       statusCounts.hasFailed() ? style.FgRed.Bold : style.FgGreen.Bold
     );
     out.writeLine(headingStyle`----- Summary of ${stringify(relFilePath)} -----`);
+    if (globalRunningMode === GlobalRunningMode.Only) {
+      out.writeLine(`(Running mode ${stringify(GlobalRunningMode.Only)} was active)`);
+    }
     out.writeLine(statusCounts.describe());
     if (statusCounts.hasFailed()) {
       failedFiles.push(statusCounts);

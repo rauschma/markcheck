@@ -63,7 +63,7 @@ test('Assemble snippet with body LineMod and applyToOuter', () => {
 
   const mockShellData = new MarkcheckMockData();
   assert.equal(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalProblemCount(),
     0
   );
   // Per file: config lines, language LineMods
@@ -131,7 +131,7 @@ test('Assemble snippet with runLocalLines and applyToOuter: must include applyTo
 
   const mockShellData = new MarkcheckMockData();
   assert.equal(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalProblemCount(),
     0
   );
   // Per file: config lines, language LineMods
@@ -209,7 +209,7 @@ test('Assemble snippet with applyToBody LineMod from a snippet', () => {
 
   const mockShellData = new MarkcheckMockData();
   assert.equal(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalProblemCount(),
     0
   );
   // Per file: config lines, language LineMods
@@ -273,7 +273,7 @@ test('Assemble snippet with applyToBody LineMod from the config', () => {
 
   const mockShellData = new MarkcheckMockData();
   assert.equal(
-    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalCount(),
+    runMarkdownForTests('/tmp/markdown/readme.md', readme, { markcheckMockData: mockShellData }).getTotalProblemCount(),
     0
   );
   // Per file: config lines, language LineMods
