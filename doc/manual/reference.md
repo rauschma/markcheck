@@ -358,9 +358,9 @@ Two variables are available:
 
 * Empty key `""`: for “bare” code blocks without languages
 * Value `"[skip]"`: Don’t run the snippets.
-  * Use case: content that should be ignored. (It can still be written to disk though.)
+  * Use case: content that should be ignored. (It can still be written to disk.)
 * Value `"[errorIfRun]"`: Running the snippets is an error.
-  * Use case: content where Markcheck should warn you if you run it. You can switch of the error by writing the content to disk via `write` and `writeLocalLines` or by using `skip`.
+  * Use case: content where Markcheck should warn you if you run it. The error can be switched off via `id`, `write`, `writeLocalLines`, and `skip`.
 
 Why were the following choices made for the defaults?
 
