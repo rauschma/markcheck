@@ -13,7 +13,7 @@ npx markcheck demo/demo-javascript.md
 
 The second command produces the following output. The lines with line numbers refer to code blocks and their languages. The bold lines between them are the most recent headings before the code blocks.
 
-<img src="screenshot-markcheck.jpg" width="415.5" height="343.5" alt="Screenshot of Markcheck output with colors, bold letters, etc. A unstyled version of the output is shown below.">
+<img src="screenshot-markcheck.jpg" width="415.5" height="343.5" alt="Screenshot of Markcheck output with colors, bold letters, etc. An unstyled version of the output is shown below.">
 
 Unstyled version of the previous screenshot:
 
@@ -38,7 +38,7 @@ L122 (js) ✔︎
 Asynchronous code and hiding test code via ⎡half-brackets⎤
 L133 (js) ✔︎
 ----- Summary of "demo/demo-javascript.md" -----
-Syntax Errors: 0, Test failures: 0, Warnings: 0
+Successes: 9, Failures: 0, Syntax Errors: 0, Warnings: 0
 
 ========== TOTAL SUMMARY ==========
 ✅ All succeeded: 1 file
