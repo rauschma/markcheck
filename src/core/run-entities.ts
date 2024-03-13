@@ -17,7 +17,7 @@ import { LineModAppliable, LineModLanguage } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
-import { EntityContextDescription, EntityContextLineNumber, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, STATUS_EMOJI_FAILURE, STATUS_EMOJI_SUCCESS, STATUS_EMOJI_WARNING, StartupError, TestFailure } from '../util/errors.js';
+import { EntityContextDescription, EntityContextLineNumber, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, SnippetStatusEmoji, StartupError, TestFailure } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
 import { relPath } from '../util/path-tools.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
@@ -130,7 +130,7 @@ function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
     }
     const unusedIds = setDifference(declaredIds, referencedIds);
     if (unusedIds.size > 0) {
-      out.writeLine(`${STATUS_EMOJI_WARNING} Unused ${stringify(ATTR_KEY_ID)} values: ${
+      out.writeLine(`${SnippetStatusEmoji.Warning} Unused ${stringify(ATTR_KEY_ID)} values: ${
         Array.from(unusedIds, id => stringify(id)).join(', ')
       }`);
       statusCounts.warnings++;
@@ -164,7 +164,7 @@ function checkLineModIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
   }
   const unusedIds = setDifference(declaredIds, referencedIds);
   if (unusedIds.size > 0) {
-    out.writeLine(`${STATUS_EMOJI_WARNING} Unused ${stringify(ATTR_KEY_LINE_MOD_ID)} values: ${Array.from(unusedIds).join(', ')}`);
+    out.writeLine(`${SnippetStatusEmoji.Warning} Unused ${stringify(ATTR_KEY_LINE_MOD_ID)} values: ${Array.from(unusedIds).join(', ')}`);
     statusCounts.warnings++;
   }
 }
@@ -226,7 +226,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
         fileState.prevHeading = null; // used, not write again
       }
       const description = entity.getEntityContext().describe();
-      out.writeLine(`${description} ${STATUS_EMOJI_SUCCESS}`);
+      out.writeLine(`${description} ${SnippetStatusEmoji.Success}`);
       fileState.statusCounts.testSuccesses++;
     }
     if (snippetState.verboseLines.length > 0) {
@@ -245,7 +245,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
       fileState.prevHeading = null; // used, not write again
     }
     const description = entity.getEntityContext().describe();
-    out.writeLine(`${description} ${STATUS_EMOJI_FAILURE}`);
+    out.writeLine(`${description} ${SnippetStatusEmoji.FailureOrError}`);
 
     if (err instanceof MarkcheckSyntaxError) {
       fileState.statusCounts.syntaxErrors++;

@@ -2,9 +2,24 @@ import { style } from '@rauschma/nodejs-tools/cli/text-style.js';
 import * as os from 'node:os';
 import * as tty from 'node:tty';
 
-export const STATUS_EMOJI_SUCCESS = style.FgGreen`✔︎`;
-export const STATUS_EMOJI_FAILURE = '❌';
-export const STATUS_EMOJI_WARNING = '⚠️';
+/**
+ * For snippets, we don’t want to draw too much attention to the successes
+ * (which are usually the norm). Hence the smaller checkmark.
+ */
+export const SnippetStatusEmoji = {
+  Success: style.FgGreen`✔︎`,
+  FailureOrError: '❌',
+  Warning: '⚠️',
+};
+/**
+ * For summaries, we want strong feedback for whatever happened. That’s why
+ * `Success` uses a larger emoji.
+ */
+export const SummaryStatusEmoji = {
+  Success: '✅',
+  FailureOrError: '❌',
+  Warning: '⚠️',
+};
 
 //#################### EntityContext ####################
 

@@ -13,7 +13,7 @@ import { Config, ConfigModJsonSchema } from './core/config.js';
 import { parseMarkdown } from './core/parse-markdown.js';
 import { CONFIG_FILE_REL_PATH, runParsedMarkdown } from './core/run-entities.js';
 import { GlobalRunningMode, LogLevel, StatusCounts } from './entity/snippet.js';
-import { MarkcheckSyntaxError, Output, STATUS_EMOJI_FAILURE } from './util/errors.js';
+import { MarkcheckSyntaxError, Output, SnippetStatusEmoji } from './util/errors.js';
 import { relPath } from './util/path-tools.js';
 
 //@ts-expect-error: Module '#package_json' has no default export.
@@ -105,23 +105,25 @@ export function main() {
       // parseMarkdown().
       if (err instanceof MarkcheckSyntaxError) {
         statusCounts.syntaxErrors++;
-        err.logTo(out, `${STATUS_EMOJI_FAILURE} `);
+        err.logTo(out, `${SnippetStatusEmoji.FailureOrError} `);
       } else {
         throw new Error(`Unexpected error in file ${stringify(relFilePath)}`, { cause: err });
       }
     }
-    const headingStyle = (
-      // Color distracts if there are many files and a total summary but
-      // helps if there is only a single file
-      mdFiles.length === 1
-      ? statusCounts.getHeadingStyle()
-      : style.Normal
-    );
+    let headingStyle;
+    let statusEmoji;
+    if (mdFiles.length === 1) {
+      headingStyle = statusCounts.getHeadingStyle();
+      statusEmoji = statusCounts.getSummaryStatusEmoji() + ' ';
+    } else {
+      headingStyle = style.Normal;
+      statusEmoji = '';
+    }
     out.writeLine(headingStyle`----- Summary of ${stringify(relFilePath)} -----`);
     if (globalRunningMode === GlobalRunningMode.Only) {
       out.writeLine(`(Running mode ${stringify(GlobalRunningMode.Only)} was active)`);
     }
-    out.writeLine(statusCounts.describe());
+    out.writeLine(statusEmoji + statusCounts.describe());
     totalStatus.addOther(statusCounts);
     if (statusCounts.hasFailed()) {
       failedFiles.push(statusCounts);
@@ -138,9 +140,9 @@ export function main() {
       totalFileCount === 1 ? ' file' : ' files'
     );
     if (failedFiles.length === 0) {
-      out.writeLine(`${totalStatus.getStatusEmoji()} All succeeded: ${totalString}`);
+      out.writeLine(`${totalStatus.getSummaryStatusEmoji()} All succeeded: ${totalString}`);
     } else {
-      out.writeLine(`${totalStatus.getStatusEmoji()} Failures: ${failedFiles.length} of ${totalString}`);
+      out.writeLine(`${totalStatus.getSummaryStatusEmoji()} Failures: ${failedFiles.length} of ${totalString}`);
       for (const failedFile of failedFiles) {
         out.writeLine(`• ${failedFile}`);
       }
