@@ -7,7 +7,7 @@ Requirement for using Markcheck:
 
 ## Trying out Markcheck without installing it permanently
 
-There are demos for several languages in [`markcheck/demo/`](../../demo/)
+There are demos for several languages in [`markcheck/demo/`](../../demo/README.md)
 
 As an example – [`demo/demo-javascript.md`](../../demo/demo-javascript.md?plain=1) is a file with JavaScript code:
 

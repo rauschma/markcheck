@@ -71,7 +71,7 @@ try {
 
 ## More information on Markcheck
 
-* [Demo files](demo/) with code blocks in these languages: JavaScript, TypeScript, Babel, Node.js REPL, Bash
+* [Demo files](demo/README.md) with code blocks in these languages: JavaScript, TypeScript, Babel, Node.js REPL, Bash
 * [Quick start with many examples](doc/manual/quick-start.md)
 * [Manual](doc/manual/)
 
