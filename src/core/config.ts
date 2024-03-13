@@ -188,7 +188,7 @@ export class Config {
     this.#lang.set(
       '',
       {
-        kind: 'LangDefErrorIfRun'
+        kind: 'LangDefSkip'
       }
     );
     this.#lang.set(
