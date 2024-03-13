@@ -45,7 +45,11 @@ const ARG_OPTIONS = {
 } satisfies ParseArgsConfig['options'];
 
 export function main() {
-  const out = Output.fromStdout();
+  const out = (
+    process.stdout.isTTY
+    ? Output.toStdout()
+    : Output.toStdoutWithoutAnsiEscapes()
+  );
   const args = parseArgs({ allowPositionals: true, options: ARG_OPTIONS });
 
   if (args.values.version) {

@@ -51,5 +51,5 @@ if (isEntryModule(import.meta)) {
     Goodbye world!
     More text
   `;
-  logDiff(Output.fromStdout(), splitLinesExclEol(oldStr), splitLinesExclEol(newStr));
+  logDiff(Output.toStdout(), splitLinesExclEol(oldStr), splitLinesExclEol(newStr));
 }

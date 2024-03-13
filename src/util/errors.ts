@@ -136,11 +136,17 @@ export class InternalError extends Error {
 
 //#################### Output ####################
 
+/** @see https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters */
+const RE_ANSI_SGR_ESCAPE = /\x1B\[[0-9;]*m/g;
+
 export class Output {
-  static fromStdout(): Output {
-    return Output.fromWriteStream(process.stdout);
+  static toStdout(): Output {
+    return Output.toWriteStream(process.stdout);
   }
-  static fromWriteStream(writeStream: tty.WriteStream): Output {
+  static toStdoutWithoutAnsiEscapes(): Output {
+    return new Output((str) => process.stdout.write(str.replaceAll(RE_ANSI_SGR_ESCAPE, '')));
+  }
+  static toWriteStream(writeStream: tty.WriteStream): Output {
     return new Output((str) => writeStream.write(str));
   }
   static ignore(): Output {
