@@ -9,7 +9,7 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('ignoreLines: line numbers (body LineMod)', () => {
+test('ignoreLines: line numbers (internal LineMod)', () => {
   const readme = outdent`
     <!--markcheck runLocalLines ignoreLines="1..2, -1"-->
     ▲▲▲js
