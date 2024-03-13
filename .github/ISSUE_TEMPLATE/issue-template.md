@@ -1,6 +1,6 @@
 ---
 name: Bug, feature suggestion or question
-about: Submit an issue for a bug or a feature. Create discussion if you have a question.
+about: Submit an issue for a bug or a feature suggestion. Create a discussion if you have a question.
 title: ''
 labels: ''
 assignees: ''
