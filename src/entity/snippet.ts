@@ -8,7 +8,7 @@ import { EntityContextSnippet, MarkcheckSyntaxError, SummaryStatusEmoji, type En
 import { getEndTrimmedLength } from '../util/string.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
-import { LineModAppliable, LineModBody, LineModConfig, LineModLanguage } from './line-mod.js';
+import { LineModAppliable, LineModInternal, LineModConfig, LineModLanguage } from './line-mod.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
 
 const { stringify } = JSON;
@@ -62,7 +62,7 @@ export function assembleAllLines(fileState: FileState, config: Config, snippet: 
   }
   // Once per snippet:
   // - SingleSnippet:
-  //   - Body LineMod (before, after, inserted lines)
+  //   - Internal LineMod (before, after, inserted lines)
   //   - `applyToBody` LineMod
   //   - Includes
   // - SequenceSnippet:
@@ -280,7 +280,7 @@ export class SingleSnippet extends Snippet {
   //
   sequenceNumber: null | SequenceNumber = null;
   includeIds = new Array<string>();
-  bodyLineMod: null | LineModBody = null;
+  internalLineMod: null | LineModInternal = null;
   applyToBodyId: null | string = null;
   override applyToOuterId: null | string = null;
   override runLocalLines = false;
@@ -406,16 +406,16 @@ export class SingleSnippet extends Snippet {
   }
 
   #assembleThis(config: Config, idToLineMod: Map<string, LineModAppliable>, linesOut: Array<string>) {
-    let applyToBodyLineMod: LineModAppliable | LineModBody | LineModConfig | null = this.#getApplyToBodyLineMod(config, idToLineMod);
+    let applyToBodyLineMod: LineModAppliable | LineModInternal | LineModConfig | null = this.#getApplyToBodyLineMod(config, idToLineMod);
     if (applyToBodyLineMod) {
-      if (this.bodyLineMod && !this.bodyLineMod.isEmpty()) {
+      if (this.internalLineMod && !this.internalLineMod.isEmpty()) {
         throw new MarkcheckSyntaxError(
-          `If there is a ${stringify(ATTR_KEY_APPLY_TO_BODY)} then the body LineMod must be empty: No attributes ${stringify(ATTR_KEY_IGNORE_LINES)}, ${stringify(ATTR_KEY_SEARCH_AND_REPLACE)}. No body labels ${stringify(BODY_LABEL_BEFORE)}, ${stringify(BODY_LABEL_AFTER)}, ${stringify(BODY_LABEL_AROUND)}, ${stringify(BODY_LABEL_INSERT)}`,
+          `If there is a ${stringify(ATTR_KEY_APPLY_TO_BODY)} then the internal LineMod must be empty: No attributes ${stringify(ATTR_KEY_IGNORE_LINES)}, ${stringify(ATTR_KEY_SEARCH_AND_REPLACE)}. No body labels ${stringify(BODY_LABEL_BEFORE)}, ${stringify(BODY_LABEL_AFTER)}, ${stringify(BODY_LABEL_AROUND)}, ${stringify(BODY_LABEL_INSERT)}`,
           { lineNumber: this.lineNumber }
         );
       }
     } else {
-      applyToBodyLineMod = this.bodyLineMod;
+      applyToBodyLineMod = this.internalLineMod;
     }
 
     const translator = this.#getTranslator(config);

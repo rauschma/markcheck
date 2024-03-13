@@ -10,7 +10,7 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Assemble snippet with body LineMod and applyToOuter', () => {
+test('Assemble snippet with internal LineMod and applyToOuter', () => {
   const readme = outdent`
     <!--markcheck each="js" around:
     // Language LineMod BEFORE
@@ -19,9 +19,9 @@ test('Assemble snippet with body LineMod and applyToOuter', () => {
     -->
 
     <!--markcheck include="included-snippet" applyToOuter="outer-line-mod" runFileName="my-module.mjs" around:
-    // Body LineMod BEFORE
+    // Internal LineMod BEFORE
     •••
-    // Body LineMod AFTER
+    // Internal LineMod AFTER
     -->
     ▲▲▲js
     // Body
@@ -76,9 +76,9 @@ test('Assemble snippet with body LineMod and applyToOuter', () => {
         // Language LineMod BEFORE
         // Outer applied LineMod BEFORE
         // Included snippet
-        // Body LineMod BEFORE
+        // Internal LineMod BEFORE
         // Body
-        // Body LineMod AFTER
+        // Internal LineMod AFTER
         // Outer applied LineMod AFTER
         // Language LineMod AFTER
       `,

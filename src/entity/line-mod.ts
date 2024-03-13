@@ -87,7 +87,7 @@ function lineModPropsFromDirective(directive: Directive, allowBodyLabelInsert: b
     case BODY_LABEL_INSERT: {
       if (!allowBodyLabelInsert) {
         throw new MarkcheckSyntaxError(
-          `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for body LineMods and appliable LineMods`
+          `Body label ${stringify(BODY_LABEL_INSERT)} is only allowed for internal LineMods and appliable LineMods`
         );
       }
 
@@ -215,7 +215,7 @@ abstract class LineMod extends MarkcheckEntity {
   protected abstract getSubclassProps(): Record<string, JsonValue>;
 }
 
-export class LineModBody extends LineMod {
+export class LineModInternal extends LineMod {
   constructor(directive: Directive) {
     super(lineModPropsFromDirective(directive, true));
   }

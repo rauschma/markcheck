@@ -68,21 +68,27 @@ The syntax within a directive is inspired by HTML and Python:
 * If the directive is more than one line long, the first line ends with a _body label_: a name followed by a colon. That is inspired by Python.
   * In the previous example, `before:` and `body:` are body labels.
 
-The result of parsing is _entities_ – which are interpreted by Markcheck. The most common entity is the _snippet_ – a block of text:
+The result of parsing is _entities_ – which are interpreted by Markcheck. The most common entity is the _snippet_ – a block of text, which can be defined in three ways:
 
-* A solo code block (without a directive) defines a snippet. Its language tag tells Markcheck how to run it.
-* We can also define a snippet via a directive with the body label `body:`. Such a directive is not followed by a code block. It is invisible to readers of the published Markdown content.
-  * We can assign a language to a `body:` directive via the attribute `lang`.
-* All other directives define attributes for code blocks.
-  * For example: If one snippet defines an id via `id="my-id"` then another snippet can “import” its text via `include="my-id"`. IDs are inspired by HTML.
+* Via a code block on its own (without a directive). Its language tag tells Markcheck how to run the snippet.
+* Via a directive on its own, with the body label `body:`. Such a snippet is invisible to readers of the published Markdown content.
+  * We can specify a language via the attribute `lang`.
+* Via a directive followed by a code block. The attributes, body label and body of the directive enable us to configure how Markcheck runs the snippet.
 
 ### Attribute values
 
-Attribute values are passed on raw. Therefore, there is no first pass where we have to write two backslashes so that an attribute receives a single backslash (which is required in JSON):
+In JSON, we have to use two backslashes to produce a single backslash in the actual string:
 
-* Example: `<!--markcheck searchAndReplace="/\([A-Z]\)//"-->`
-  * JSON: `"/\\([A-Z]\\)//"`
-* Example: `<!--markcheck at="before:'With \'single\' quotes'" insert:`
+```json
+"/\\([A-Z]\\)//"
+```
+
+In contrast, Markcheck attribute values are “raw” and we don’t have to escape backslashes:
+
+```md
+<!--markcheck searchAndReplace="/\([A-Z]\)//"-->
+<!--markcheck at="before:'With \'single\' quotes'" insert:
+```
 
 ## Entities
 
@@ -105,14 +111,14 @@ After directives were paired with code blocks, we get the following entities:
   * Kinds of LineMods:
     * Language LineMod (attribute `each`): Applied to all snippets with the specified language.
     * Appliable LineMod (attribute `lineModId`): Can be applied by snippets to themselves via the attributes `applyToBody` and `applyToOuter`.
-    * Body LineMod (neither attribute `each` nor attribute `lineModId`): Defined by the directive before a code block and applied to the content of the code block.
+    * Internal LineMod (neither attribute `each` nor attribute `lineModId`): Defined by the directive before a code block and applied to the content of the code block. In other words: The directive plays double duty and defines both a LineMod and attributes for the snippet.
 
-### Example: body LineMod
+### Example: internal LineMod
 
 The following example shows how `around:` works.
 
 ``````md
-<!--markcheck stdout="stdout-rgb" around:
+<!--markcheck id="rgb" around:
 console.log('red');
 •••
 console.log('blue');
@@ -120,17 +126,10 @@ console.log('blue');
 ```js
 console.log('green');
 ```
-
-<!--markcheck id="stdout-rgb"-->
-```
-red
-green
-blue
-```
 ``````
 
-* The first directive defines a body LineMod.
-* The second directive defines attributes for the following code block but not a LineMod.
+* The directive in the first line defines a LineMod (body label `around:`). That LineMod is an internal LineMod and applied to the snippet.
+* The directive also specifies an ID for the snippet.
 
 ## How does Markcheck interpret snippets?
 
@@ -178,7 +177,7 @@ All global lines are outer lines. But snippets can also contribute local outer l
 
 * Inner lines from SingleSnippet
   * Body
-  * Body LineMod
+  * Internal LineMod
   * Applied LineMod: `applyToBody`
     * Example: Wrap a function around a body that includes other functions that it calls.
   * Inner lines of included other snippets
@@ -193,8 +192,8 @@ All global lines are outer lines. But snippets can also contribute local outer l
 
 Various other details:
 
-* `ignoreLines`, `searchAndReplace`, `insert:` are only supported for body LineMods and `applyToBody`.
-  * We cannot use both a body LineMod and `applyToBody`. If the latter is there, the former cannot be present.
+* `ignoreLines`, `searchAndReplace`, `insert:` are only supported for internal LineMods and `applyToBody`.
+  * We cannot use both a internal LineMod and `applyToBody`. If the latter is there, the former cannot be present.
   * In other words: outer LineMods only wrap lines around content via `before:`, `after:`, `around:`.
 * The lines added via `before:`, `after:`, `around:` are not translated.
   * Rationale: You can add plain JavaScript to `node-repl` snippets and don’t have to use the limiting `node-repl` syntax.
@@ -254,9 +253,9 @@ Checking output:
   * Changing the actual output: There is special syntax that lets us apply a LineMod to the actual output before it is compared with the expected output.
     * Example: `stdout="|line-mod-id=snippet-id"`
 
-### Body LineMods and appliable LineMods used via `applyToBody`
+### Internal LineMods and appliable LineMods used via `applyToBody`
 
-Note that a body LineMod is defined by a directive immediately before a code block. (This directive can also contain attributes for the code block itself such as `include` or `id`.)
+Note that a internal LineMod is defined by a directive immediately before a code block. (This directive can also contain attributes for the code block itself such as `include` or `id`.)
 
 Ways of specifying lines:
 

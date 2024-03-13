@@ -9,7 +9,7 @@ const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
 
 createSuite(import.meta.url);
 
-test('Insert single line at a line number (body LineMod)', () => {
+test('Insert single line at a line number (internal LineMod)', () => {
   const readme = outdent`
     <!--markcheck at="before:2" insert:
     err.stack = beautifyStackTrace(err.stack);
