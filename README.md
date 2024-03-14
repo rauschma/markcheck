@@ -1,6 +1,6 @@
 # Markcheck
 
-* Markcheck tests Markdown code blocks – to prevent errors in documentation (readmes etc.).
+* Markcheck tests Markdown code blocks – to prevent errors in documentation (readmes, blogs, books, etc.).
 * Name of npm package: [`markcheck`](https://www.npmjs.com/package/markcheck)
 
 ## Why Markcheck?
@@ -38,7 +38,7 @@ Checking JavaScript is reasonably fast:
 
 ## What does Markcheck’s syntax look like?
 
-The following subsections show two common patterns. For more examples, see [the quick start part of Markcheck’s manual](doc/manual/quick-start.md#markdown-examples).
+The following subsections contain three examples. For more examples, see [the quick start part of Markcheck’s manual](doc/manual/quick-start.md#markdown-examples).
 
 ### Checking basic code blocks
 
