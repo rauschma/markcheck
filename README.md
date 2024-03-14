@@ -1,6 +1,7 @@
 # Markcheck
 
-Markcheck runs the code within Markdown code blocks – to help ensure they don’t contain errors.
+* Markcheck runs the code within Markdown code blocks – to help ensure they don’t contain errors.
+* Name of npm package: [`markcheck`](https://www.npmjs.com/package/markcheck)
 
 ## Why Markcheck?
 
