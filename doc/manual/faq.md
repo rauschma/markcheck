@@ -17,10 +17,16 @@
 
 There are two ways in which you can do so:
 
-* Put JSON5 data inside a `config:` directive.
 * Put JSON5 data inside the file `markcheck-data/markcheck-config.json5`
+* Put JSON5 data inside a `config:` directive.
 
 Next, we’ll explore what the JSON5 data looks like, then what a `config:` directive looks like.
+
+Note that you can also simply skip code blocks with unknown languages – by putting a directive before the block:
+
+```md
+<!--markcheck skip-->
+```
 
 ### JSON5 data format
 
@@ -32,23 +38,28 @@ markcheck --print-config
 
 Examples:
 
-```json
+```json5
 {
-  "lang": {
-    "js": {
-      "before": [
-        "import assert from 'node:assert/strict';"
+  lang: {
+    "": "[skip]",
+    txt: "[skip]",
+    js: {
+      before: [
+        "import assert from 'node:assert/strict';",
       ],
-      "runFileName": "main.mjs",
-      "commands": [
-        ["node", "$FILE_NAME"]
-      ]
+      runFileName: "main.mjs",
+      commands: [
+        [
+          "node",
+          "$FILE_NAME",
+        ],
+      ],
     },
     "node-repl": {
-      "extends": "js",
-      "translator": "node-repl-to-js"
+      extends: "js",
+      translator: "node-repl-to-js",
     },
-  }
+  },
 }
 ```
 

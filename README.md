@@ -12,7 +12,7 @@ Highlights:
 * **No external files:** The Markdown file contains all the information that is needed to run it: Configuration files, demo text files, etc. can all be embedded in Markdown.
   * Exception: Some data remains external – e.g. npm packages.
 
-* **Works for most programming languages:** The only requirement is that there is a shell command that runs text files with the language’s code. See [`demo/demo-bash.md`](https://github.com/rauschma/markcheck/blob/main/demo/demo-bash.md?plain=1) for an example of testing a programming language that Markcheck has no built-in support for.
+* **Works for most programming languages:** The only requirement is that there is a shell command that runs text files with the language’s code. See [`demo/demo-bash.md`](demo/demo-bash.md?plain=1) for an example of testing a programming language that Markcheck has no built-in support for.
 
 * **Successfully used in a big project:** I tested most of the code shown in my book [“JavaScript for impatient programmers”](https://exploringjs.com/impatient-js/). Its PDF has 639 pages.
 
@@ -20,7 +20,7 @@ Highlights:
   * Check stderr and/or stdout.
   * Concatenate code blocks in any order.
   * Use code hidden from readers.
-  * Write arbitrary text files to disk.
+  * Write arbitrary text files to disk (example files, config files, etc.).
   * Etc.
 
 Checking JavaScript is reasonably fast:
@@ -30,7 +30,7 @@ Checking JavaScript is reasonably fast:
 
 **Caveats:**
 
-* Tested with Unix. I used cross-platform mechanisms where I could but I don’t know if Markcheck works on Windows. Please let me know either way.
+* Only tested on macOS. I used cross-platform mechanisms where I could but I don’t know if Markcheck works on Windows. Please let me know either way.
 * ⚠️ There is currently no sandboxing of any kind: Only use Markcheck with files you trust.
 * Checking TypeScript code:
   * Downside: slow
