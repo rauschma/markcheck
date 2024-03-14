@@ -1,6 +1,6 @@
 # Markcheck
 
-* Markcheck runs the code within Markdown code blocks – to help prevent errors.
+* Markcheck tests Markdown code blocks – to prevent errors in documentation (readmes etc.).
 * Name of npm package: [`markcheck`](https://www.npmjs.com/package/markcheck)
 
 ## Why Markcheck?
@@ -25,8 +25,8 @@ Highlights:
 
 Checking JavaScript is reasonably fast:
 
-* Checking all the examples in “JavaScript for impatient programmers” takes 49.9 seconds on a MacBook Pro with an M1 Pro processor. There is a lot of code in this book.
-* Checking one of the longer chapters takes 4.7 seconds.
+* Checking all the examples in “JavaScript for impatient programmers” takes 50 seconds on a MacBook Pro with an M1 Pro processor. There is a lot of code in this book.
+* Checking one of the longer chapters takes 5 seconds.
 
 **Caveats:**
 
@@ -39,6 +39,19 @@ Checking JavaScript is reasonably fast:
 ## What does Markcheck’s syntax look like?
 
 The following subsections show two common patterns. For more examples, see [the quick start part of Markcheck’s manual](doc/manual/quick-start.md#markdown-examples).
+
+### Checking basic code blocks
+
+``````md
+```js
+assert.equal(
+  'abc' + 'abc',
+  'abcabc'
+);
+```
+``````
+
+No additional configuration is needed: The Node.js `assert.*` methods are available by default.
 
 ### Checking standard output via `stdout`
 
