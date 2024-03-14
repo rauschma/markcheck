@@ -1,9 +1,13 @@
 {
   "name": "markcheck",
-  "version": "0.1.0",
-  "author": "Axel Rauschmayer",
-  "license": "MIT",
+  "version": "0.1.1",
   "type": "module",
+  "license": "MIT",
+  "repository": "github:rauschma/markcheck",
+  "author": "Axel Rauschmayer",
+  "bin": {
+    "markcheck": "./dist/src/markcheck.js"
+  },
   "files": [
     "package.json",
     "README.md",
@@ -12,9 +16,6 @@
     "!dist/**/*_test.js",
     "!dist/test/**/*.js"
   ],
-  "bin": {
-    "markcheck": "./dist/src/markcheck.js"
-  },
   "imports": {
     "#package_json": "./package.json",
     "#demo/*": "./demo/*"
