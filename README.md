@@ -26,6 +26,7 @@ Checking JavaScript is reasonably fast:
 
 **Caveats:**
 
+* Tested with Unix. I used cross-platform mechanisms where I could but I don’t know if Markcheck works on Windows. Please let me know either way.
 * ⚠️ There is currently no sandboxing of any kind: Only use Markcheck with files you trust.
 * Checking TypeScript code:
   * Downside: slow

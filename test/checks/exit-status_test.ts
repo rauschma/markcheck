@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mfs } from '@rauschma/nodejs-tools/testing/install-mem-node-fs.js';
 const { jsonToCleanDir } = await import('@rauschma/nodejs-tools/testing/dir-json.js');
 const { MarkcheckMockData } = await import('../../src/entity/snippet.js');
-const { runMarkdownForTests } = await import('../../src/util/test-tools.js');
+const { runMarkdownForTests } = await import('../test-tools.js');
 
 createSuite(import.meta.url);
 

@@ -8,7 +8,9 @@
     "package.json",
     "README.md",
     "LICENSE",
-    "dist/**/*.js"
+    "dist/**/*.js",
+    "!dist/**/*_test.js",
+    "!dist/test/**/*.js"
   ],
   "bin": {
     "markcheck": "./dist/src/markcheck.js"
@@ -18,6 +20,7 @@
     "#demo/*": "./demo/*"
   },
   "scripts": {
+    "\n========== Building ==========": "",
     "build": "npm run clean && tsc && npm run chmod",
     "watch": "tsc --watch",
     "clean": "shx rm -rf ./dist/*",
@@ -26,7 +29,11 @@
     "checkmd": "markcheck doc/manual/quick-start.md demo/demo-*.md",
     "test": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning",
     "testall": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
-    "circular": "npx madge --circular src/markcheck.ts"
+    "circular": "npx madge --circular src/markcheck.ts",
+    "\n========== Publishing ==========": "",
+    "dry-run": "npm publish --dry-run",
+    "prepublishOnly": "npm run build",
+    "pack": "npm pack && (tar --list --file markcheck-*.tgz | sort) && rm -f markcheck-*.tgz"
   },
   "dependencies": {
     "@rauschma/helpers": "^0.1.0",

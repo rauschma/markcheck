@@ -1,7 +1,7 @@
-import { parseMarkdown } from '../core/parse-markdown.js';
-import { runParsedMarkdown } from '../core/run-entities.js';
-import { LogLevel, MarkcheckMockData, StatusCounts } from '../entity/snippet.js';
-import { Output } from './errors.js';
+import { parseMarkdown } from '../src/core/parse-markdown.js';
+import { runParsedMarkdown } from '../src/core/run-entities.js';
+import { LogLevel, MarkcheckMockData, StatusCounts } from '../src/entity/snippet.js';
+import { Output } from '../src/util/errors.js';
 
 export type RunOptions = {
   markcheckMockData?: MarkcheckMockData,

@@ -2,6 +2,7 @@ import type { SearchAndReplace } from '@rauschma/helpers/string/escaper.js';
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/typescript/type.js';
+import * as os from 'node:os';
 import { InternalError, MarkcheckSyntaxError, type EntityContext, type LineNumber } from '../util/errors.js';
 
 const { stringify } = JSON;
@@ -333,10 +334,10 @@ export class Directive {
     }
     if (this.bodyLabel) {
       result += this.bodyLabel;
-      result += '\n';
+      result += os.EOL;
       for (const line of this.body) {
         result += line;
-        result += '\n';
+        result += os.EOL;
       }
     }
     result += '-->';
