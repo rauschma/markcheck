@@ -337,3 +337,18 @@ The ⎡half-brackets⎤ are used for hiding test code from readers:
 
 * Markcheck removes individual half-brackets before writing the code to disk.
 * Before you publish the Markdown (e.g. to HTML), you need to remove the half-brackets and what’s inside them. See [the reference](reference.md#config-property-searchandreplace) for more information.
+
+### Writing a configuration file to disk
+
+<!--markcheck containedInFile="../../demo/demo-babel.md"-->
+``````md
+<!--markcheck write="babel.config.json" body:
+{
+  "plugins": [
+    ["@babel/plugin-proposal-decorators", {"version": "2022-03"}]
+  ]
+}
+-->
+``````
+
+See [`demo/demo-babel.md`](../../demo/demo-babel.md) for more information.

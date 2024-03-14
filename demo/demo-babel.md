@@ -2,9 +2,11 @@
 
 ## Installing Babel and plugins
 
+The following packages must be installed manually via npm:
+
 <!--markcheck skip-->
 ```json
-// package.json
+// markcheck-data/package.json
 {
   "dependencies": {
     "@babel/plugin-proposal-decorators": "^7.21.0",
@@ -14,6 +16,8 @@
 ```
 
 ## Setting up Markcheck
+
+We use a directive to tell Markcheck to treat `js` code blocks as if they were `babel` code blocks.
 
 <!--markcheck config:
 {
