@@ -77,8 +77,8 @@ export class Config {
   idToLineMod = new Map<string, LineModJson>();
   toJson(): ConfigModJson {
     return {
-      "searchAndReplace": this.#searchAndReplaceData,
-      "lang": Object.fromEntries(
+      searchAndReplace: this.#searchAndReplaceData,
+      lang: Object.fromEntries(
         Array.from(
           this.#lang,
           ([key, value]) => [
