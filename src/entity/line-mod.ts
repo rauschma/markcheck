@@ -3,7 +3,8 @@ import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/
 import type { Translator } from '../translation/translation.js';
 import { EntityContextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
-import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, SearchAndReplaceSpec, type Directive } from './directive.js';
+import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, type Directive } from './directive.js';
+import { SearchAndReplaceSpec } from './search-and-replace-spec.js';
 import { InsertionRules, LineLocModifier, parseInsertionConditions } from './insertion-rules.js';
 import { lineLocSetToLineNumberSet, parseLineLocSet, type LineLocSet } from './line-loc-set.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
@@ -51,8 +52,8 @@ function lineModPropsEmpty(context: EntityContext): LineModProps {
 }
 
 function lineModPropsFromDirective(directive: Directive, allowBodyLabelInsert: boolean): LineModProps {
-  const context = new EntityContextLineNumber(directive.lineNumber);
-  const props = lineModPropsEmpty(context);
+  const entityContext = new EntityContextLineNumber(directive.lineNumber);
+  const props = lineModPropsEmpty(entityContext);
 
   const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
   if (ignoreLinesStr) {
@@ -60,9 +61,16 @@ function lineModPropsFromDirective(directive: Directive, allowBodyLabelInsert: b
   }
   const searchAndReplaceStr = directive.getString(ATTR_KEY_SEARCH_AND_REPLACE);
   if (searchAndReplaceStr) {
-    props.searchAndReplace = SearchAndReplaceSpec.fromString(
-      context, searchAndReplaceStr
-    );
+    try {
+      props.searchAndReplace = SearchAndReplaceSpec.fromString(
+        searchAndReplaceStr
+      );
+    } catch (err) {
+      throw new MarkcheckSyntaxError(
+        `Could not parse value of attribute ${stringify(ATTR_KEY_SEARCH_AND_REPLACE)}`,
+        { entityContext, cause: err }
+      );
+    }
   }
 
   const body = trimTrailingEmptyLines(directive.body.slice());

@@ -1,7 +1,8 @@
 import { createSequentialRegExpEscaper } from '@rauschma/helpers/string/escaper.js';
 import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { z } from 'zod';
-import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP, parseSearchAndReplaceString } from '../entity/directive.js';
+import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP } from '../entity/directive.js';
+import { parseSearchAndReplaceString } from '../entity/search-and-replace-spec.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
 import { EntityContextDescription, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
@@ -107,12 +108,19 @@ export class Config {
     }
   }
   #setSearchAndReplace(entityContext: EntityContext, data: Array<string>) {
-    this.searchAndReplaceFunc = createSequentialRegExpEscaper(
-      data.map(
-        (str) => parseSearchAndReplaceString(entityContext, str)
-      )
-    );
-    this.#searchAndReplaceData = data;
+    try {
+      this.searchAndReplaceFunc = createSequentialRegExpEscaper(
+        data.map(
+          (str) => parseSearchAndReplaceString(str)
+        )
+      );
+      this.#searchAndReplaceData = data;
+    } catch (err) {
+      throw new MarkcheckSyntaxError(
+        `Could not parse value of property ${stringify(CONFIG_KEY_SEARCH_AND_REPLACE)}`,
+        { entityContext, cause: err }
+      );
+    }
   }
   getLang(langKey: string): undefined | LangDef {
     const langDef = this.#lang.get(langKey);
@@ -321,6 +329,7 @@ export type ConfigModJson = {
   lineMods?: Record<string, LineModJson>,
 };
 export const CONFIG_KEY_LANG = 'lang';
+export const CONFIG_KEY_SEARCH_AND_REPLACE = 'searchAndReplace';
 
 export type LineModJson = {
   before?: Array<string>,

@@ -2,8 +2,7 @@ import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
 import { createSuite } from '@rauschma/helpers/testing/mocha.js';
 import assert from 'node:assert/strict';
 import { extractCommentContent } from '../core/parse-markdown.js';
-import { EntityContextLineNumber } from '../util/errors.js';
-import { Directive, SearchAndReplaceSpec, parseExternalSpecs, type ExternalSpec, LineScope } from './directive.js';
+import { Directive, LineScope, parseExternalSpecs, type ExternalSpec } from './directive.js';
 
 const { raw } = String;
 
@@ -112,57 +111,6 @@ test('parseExternalSpecs', () => {
       },
     ] satisfies Array<ExternalSpec>
   );
-});
-
-test('SearchAndReplaceSpec', () => {
-  const testObjs = [
-    {
-      title: 'No flags',
-      spec: raw`/[⎡⎤]//`,
-      in: '⎡await ⎤asyncFunc()',
-      out: 'await asyncFunc()',
-    },
-    {
-      title: 'Case insensitive matching',
-      spec: raw`/a/x/i`,
-      in: 'aAaA',
-      out: 'xxxx',
-    },
-    {
-      title: 'Case sensitive matching',
-      spec: raw`/a/x/`,
-      in: 'aAaA',
-      out: 'xAxA',
-    },
-    {
-      title: 'Escaped slash in search',
-      spec: raw`/\//o/`,
-      in: '/--/',
-      out: 'o--o',
-    },
-    {
-      title: 'Escaped slash in replace',
-      spec: raw`/o/\//`,
-      in: 'oo',
-      out: '//',
-    },
-  ];
-  for (const testObj of testObjs) {
-    const sar = SearchAndReplaceSpec.fromString(
-      new EntityContextLineNumber(1),
-      testObj.spec
-    );
-    assert.equal(
-      sar.toString(),
-      testObj.spec,
-      testObj.title + ': .toString()'
-    );
-    assert.equal(
-      sar.replaceAll(testObj.in),
-      testObj.out,
-      testObj.title + ': .replaceAll()'
-    );
-  }
 });
 
 function parseDirective(md: string): Directive {

@@ -1,12 +1,10 @@
-import type { SearchAndReplace } from '@rauschma/helpers/string/escaper.js';
 import { re } from '@rauschma/helpers/template-tag/re-template-tag.js';
 import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { assertNonNullable, assertTrue } from '@rauschma/helpers/typescript/type.js';
 import * as os from 'node:os';
-import { InternalError, MarkcheckSyntaxError, type EntityContext, type LineNumber } from '../util/errors.js';
+import { InternalError, MarkcheckSyntaxError, type LineNumber } from '../util/errors.js';
 
 const { stringify } = JSON;
-const { raw } = String;
 
 //#################### Constants ####################
 
@@ -432,52 +430,4 @@ export function parseSequenceNumber(str: string): null | SequenceNumber {
     return null;
   }
   return new SequenceNumber(pos, total);
-}
-
-//========== SearchAndReplaceSpec ==========
-
-const RE_INNER = /(?:[^/]|\\[/])*/;
-const RE_SEARCH_AND_REPLACE = re`/^[/](${RE_INNER})[/](${RE_INNER})[/]([i])?$/`;
-
-/**
- * Example: `"/[⎡⎤]//i"`
- */
-export class SearchAndReplaceSpec {
-  static fromString(entityContext: EntityContext, str: string): SearchAndReplaceSpec {
-    const { search, replace } = parseSearchAndReplaceString(entityContext, str);
-    return new SearchAndReplaceSpec(search, replace);
-  }
-  #search;
-  #replace;
-  private constructor(search: RegExp, replace: string) {
-    this.#search = search;
-    this.#replace = replace;
-  }
-  toString(): string {
-    // Stringification of RegExp automatically escapes slashes
-    const searchNoFlags = new RegExp(this.#search, '').toString();
-    const escapedReplace = this.#replace.replaceAll('/', String.raw`\/`);
-    const flags = this.#search.flags.slice(1); // remove 'g'
-    return searchNoFlags + escapedReplace + '/' + flags;
-  }
-  replaceAll(str: string): string {
-    return str.replaceAll(this.#search, this.#replace);
-  }
-}
-
-export function parseSearchAndReplaceString(entityContext: EntityContext, str: string): SearchAndReplace {
-  const match = RE_SEARCH_AND_REPLACE.exec(str);
-  if (!match) {
-    throw new MarkcheckSyntaxError(
-      `Not a valid searchAndReplace string: ${stringify(str)}`,
-      { entityContext }
-    );
-  }
-  const search = match[1];
-  const replace = match[2].replaceAll(raw`\/`, '/');
-  const flags = 'g' + (match[3] ?? '');
-  return {
-    search: new RegExp(search, flags),
-    replace,
-  };
 }
