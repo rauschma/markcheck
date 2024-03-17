@@ -2,7 +2,7 @@ import { createSequentialRegExpEscaper } from '@rauschma/helpers/string/escaper.
 import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { z } from 'zod';
 import { CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, LANG_ERROR_IF_RUN, LANG_SKIP } from '../entity/directive.js';
-import { parseSearchAndReplaceString } from '../entity/search-and-replace-spec.js';
+import { parseSearchAndReplaceString } from '../util/search-and-replace-spec.js';
 import { nodeReplToJs } from '../translation/repl-to-js-translator.js';
 import type { Translator } from '../translation/translation.js';
 import { EntityContextDescription, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';

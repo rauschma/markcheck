@@ -4,7 +4,7 @@ import type { Translator } from '../translation/translation.js';
 import { EntityContextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
 import { trimTrailingEmptyLines } from '../util/string.js';
 import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, type Directive } from './directive.js';
-import { SearchAndReplaceSpec } from './search-and-replace-spec.js';
+import { SearchAndReplaceSpec } from '../util/search-and-replace-spec.js';
 import { InsertionRules, LineLocModifier, parseInsertionConditions } from './insertion-rules.js';
 import { lineLocSetToLineNumberSet, parseLineLocSet, type LineLocSet } from './line-loc-set.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
