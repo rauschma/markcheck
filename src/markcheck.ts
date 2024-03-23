@@ -140,11 +140,13 @@ export function main() {
       totalFileCount === 1 ? ' file' : ' files'
     );
     if (failedFiles.length === 0) {
-      out.writeLine(`${totalStatus.getSummaryStatusEmoji()} All succeeded: ${totalString}`);
+      out.writeLine(`${totalStatus.getSummaryStatusEmoji()} All files succeeded: ${totalString}`);
+      out.writeLine(totalStatus.describe());
     } else {
-      out.writeLine(`${totalStatus.getSummaryStatusEmoji()} Failures: ${failedFiles.length} of ${totalString}`);
+      out.writeLine(`${totalStatus.getSummaryStatusEmoji()} Failed files: ${failedFiles.length} of ${totalString}`);
+      out.writeLine(totalStatus.describe());
       for (const failedFile of failedFiles) {
-        out.writeLine(`• ${failedFile}`);
+        out.writeLine(`• ${failedFile.toString()}`);
       }
     }
   }
