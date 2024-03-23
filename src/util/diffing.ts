@@ -1,7 +1,7 @@
 import { splitLinesExclEol } from '@rauschma/helpers/string/line.js';
-import { isEntryModule } from '@rauschma/nodejs-tools/misc/import-meta.js';
-import { style, type TextStyleResult } from '@rauschma/nodejs-tools/cli/text-style.js';
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
+import { style, type TextStyleResult } from '@rauschma/nodejs-tools/cli/text-style.js';
+import { isEntryModule } from '@rauschma/nodejs-tools/misc/import-meta.js';
 import * as diff from 'diff';
 import { Output } from './errors.js';
 
@@ -18,7 +18,7 @@ export function logDiff(out: Output, expectedLines: Array<string>, actualLines: 
       lineStyle = style.FgRed;
     } else {
       prefix = '  ';
-      lineStyle = style.Normal;
+      lineStyle = style.Reset;
     }
     for (const v of change.value) {
       out.writeLine(lineStyle(prefix + v));

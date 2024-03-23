@@ -116,7 +116,7 @@ export function main() {
       headingStyle = statusCounts.getHeadingStyle();
       statusEmoji = statusCounts.getSummaryStatusEmoji() + ' ';
     } else {
-      headingStyle = style.Normal;
+      headingStyle = style.Reset;
       statusEmoji = '';
     }
     out.writeLine(headingStyle`----- Summary of ${stringify(relFilePath)} -----`);
