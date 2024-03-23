@@ -1,12 +1,12 @@
 # TypeScript
 
-* Run TypeScript: https://github.com/privatenumber/tsx
+## Running TypeScript code via Node.js
+
+* https://github.com/privatenumber/tsx
 
 ## Testing types
 
-### TS Expect
-
-https://github.com/TypeStrong/ts-expect
+* https://github.com/TypeStrong/ts-expect
 
 ```ts
 import { expectType } from 'ts-expect';
@@ -20,6 +20,15 @@ import { expectType, type TypeEqual } from 'ts-expect';
 type Pair<T> = [T, T];
 expectType<TypeEqual<Pair<string>, [string,string]>>(true);
 ```
+
+### Other type libraries
+
+* tsafe: type utilities: https://github.com/garronej/tsafe
+* type-plus: type utilities. https://github.com/unional/type-plus/blob/main/packages/type-plus/readme.md
+
+## Related tools and libraries
+
+* TypeScript TwoSlash: https://www.npmjs.com/package/@typescript/twoslash
 
 ### eslint-plugin-expect-type
 
@@ -36,9 +45,3 @@ const value: string = 9001;
 // $ExpectType number
 9001;
 ```
-
-## TODO
-
-* TypeScript TwoSlash: https://www.npmjs.com/package/@typescript/twoslash
-* tsimp – TypeScript IMPort loader for Node.js: https://github.com/tapjs/tsimp
-* Compare types, check types of values: https://github.com/garronej/tsafe
