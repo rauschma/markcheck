@@ -21,10 +21,11 @@ type Pair<T> = [T, T];
 expectType<TypeEqual<Pair<string>, [string,string]>>(true);
 ```
 
-### Other type libraries
+### Other type utility libraries
 
-* tsafe: type utilities: https://github.com/garronej/tsafe
-* type-plus: type utilities. https://github.com/unional/type-plus/blob/main/packages/type-plus/readme.md
+* tsafe: https://github.com/garronej/tsafe
+* type-plus: https://github.com/unional/type-plus/blob/main/packages/type-plus/readme.md
+* type-fest: https://github.com/sindresorhus/type-fest
 
 ## Related tools and libraries
 
