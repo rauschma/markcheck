@@ -179,7 +179,7 @@ export const ATTRS_LOCAL_LM_APPLIABLE_LM = expectedAttrs([
 ]);
 
 export const ATTRS_SNIPPET = expectedAttrs([
-  // Snippet attributes are fed to local LineMod!
+  // These attributes are for the local LineMod:
   ...ATTRS_LOCAL_LM_APPLIABLE_LM,
   //
   [ATTR_KEY_ID, AttrValue.String],
@@ -229,6 +229,14 @@ export const ATTRS_APPLIABLE_LINE_MOD_BODY_LABEL_INSERT = expectedAttrs([
 
 export const ATTRS_LANGUAGE_LINE_MOD: ExpectedAttributeValues = new Map([
   [ATTR_KEY_EACH, AttrValue.String],
+  //
+  [ATTR_KEY_IGNORE_LINES, AttrValue.String],
+  [ATTR_KEY_SEARCH_AND_REPLACE, AttrValue.String],
+  //
+  [ATTR_KEY_SKIP, AttrValue.Valueless],
+  //
+  [ATTR_KEY_SEQUENCE, AttrValue.String],
+  [ATTR_KEY_INCLUDE, AttrValue.String],
 ]);
 
 export const ATTRS_CONFIG_MOD: ExpectedAttributeValues = new Map([

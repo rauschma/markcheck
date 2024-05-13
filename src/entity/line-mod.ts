@@ -1,13 +1,15 @@
 import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import { assertNonNullable, type PublicDataProperties } from '@rauschma/helpers/typescript/type.js';
+import type { Config } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
 import { EntityContextLineNumber, InternalError, MarkcheckSyntaxError, type EntityContext } from '../util/errors.js';
-import { trimTrailingEmptyLines } from '../util/string.js';
-import { ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, type Directive } from './directive.js';
 import { SearchAndReplaceSpec } from '../util/search-and-replace-spec.js';
+import { trimTrailingEmptyLines } from '../util/string.js';
+import { ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_AT, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_SEARCH_AND_REPLACE, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, type Directive } from './directive.js';
 import { InsertionRules, LineLocModifier, parseInsertionConditions } from './insertion-rules.js';
 import { lineLocSetToLineNumberSet, parseLineLocSet, type LineLocSet } from './line-loc-set.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
+import type { Snippet } from './snippet.js';
 
 const { stringify } = JSON;
 
@@ -42,6 +44,7 @@ function lineModPropsEmpty(context: EntityContext): LineModProps {
   return {
     context,
     //
+    includeIds: [],
     ignoreLines: [],
     searchAndReplace: null,
     //
@@ -54,6 +57,11 @@ function lineModPropsEmpty(context: EntityContext): LineModProps {
 function lineModPropsFromDirective(directive: Directive, allowBodyLabelInsert: boolean): LineModProps {
   const entityContext = new EntityContextLineNumber(directive.lineNumber);
   const props = lineModPropsEmpty(entityContext);
+
+  const include = directive.getString(ATTR_KEY_INCLUDE);
+  if (include) {
+    props.includeIds = include.split(/ *, */);
+  }
 
   const ignoreLinesStr = directive.getString(ATTR_KEY_IGNORE_LINES);
   if (ignoreLinesStr) {
@@ -129,6 +137,11 @@ function lineModPropsFromDirective(directive: Directive, allowBodyLabelInsert: b
 
 //#################### LineMod ####################
 
+export enum EmitLines {
+  Before,
+  After,
+}
+
 abstract class LineMod extends MarkcheckEntity {
 
   /**
@@ -137,6 +150,7 @@ abstract class LineMod extends MarkcheckEntity {
    */
   context: EntityContext;
   //
+  includeIds: Array<string>;
   ignoreLines: LineLocSet;
   searchAndReplace: null | SearchAndReplaceSpec;
   //
@@ -148,6 +162,7 @@ abstract class LineMod extends MarkcheckEntity {
     super();
     this.context = props.context;
     //
+    this.includeIds = props.includeIds;
     this.ignoreLines = props.ignoreLines;
     this.searchAndReplace = props.searchAndReplace;
     //
@@ -158,21 +173,70 @@ abstract class LineMod extends MarkcheckEntity {
   override getEntityContext(): EntityContext {
     return this.context;
   }
-  isEmpty(): boolean {
-    return (
-      this.ignoreLines.length === 0 &&
-      this.searchAndReplace === null &&
-      this.insertionRules.isEmpty() &&
-      this.beforeLines.length === 0 &&
-      this.afterLines.length === 0
-    );
+
+  throwIfThisChangesBody(): void {
+    if (
+      this.ignoreLines.length > 0 ||
+      this.searchAndReplace !== null ||
+      !this.insertionRules.isEmpty()
+    ) {
+      // In principle, ATTR_KEY_SEARCH_AND_REPLACE is composable, but
+      // excluding it is simpler because it is the only composable
+      // attribute that affects the body.
+      throw new MarkcheckSyntaxError(
+        `If there is the an ${stringify(ATTR_KEY_APPLY_TO_BODY)} LineMod then the internal LineMod must not change the body: No attributes ${stringify(ATTR_KEY_IGNORE_LINES)}, ${stringify(ATTR_KEY_SEARCH_AND_REPLACE)}; no body label ${stringify(BODY_LABEL_INSERT)}`,
+        { entityContext: this.context }
+      );
+    }
   }
 
-  pushModifiedBodyTo(lineNumber: number, body: Array<string>, translator: Translator | undefined, linesOut: Array<string>) {
-    // - Line-ignoring clashes with line insertion because both change line
-    //   numbers.
-    // - However, ignored line numbers would make no sense at all after
-    //   inserting lines, which is why we ignore first.
+  emitLines(emitLines: EmitLines, config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, linesOut: Array<string>, pathOfIncludeIds = new Set<string>()): void {
+
+    if (emitLines === EmitLines.After) {
+      // .afterLines comes before “after” includes
+      linesOut.push(...this.afterLines);
+    }
+
+    let thisWasIncluded = false;
+    for (const includeId of this.includeIds) {
+      if (includeId === INCL_ID_THIS) {
+        thisWasIncluded = true;
+        continue;
+      }
+      if (
+        (emitLines === EmitLines.Before && !thisWasIncluded)
+        || (emitLines === EmitLines.After && thisWasIncluded)
+      ) {
+        this.#assembleOneInclude(config, idToSnippet, idToLineMod, linesOut, pathOfIncludeIds, includeId);
+      }
+    } // for
+    // - Without INCL_ID_THIS, we pretend that it was mentioned last.
+    // - That works well for EmitLines.Before and EmitLines.After.
+
+    if (emitLines === EmitLines.Before) {
+      // .beforeLines comes after “before” includes
+      linesOut.push(...this.beforeLines);
+    }
+  }
+
+  #assembleOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
+    if (pathOfIncludeIds.has(includeId)) {
+      const idPath = [...pathOfIncludeIds, includeId];
+      throw new MarkcheckSyntaxError(`Cycle of includedIds ` + JSON.stringify(idPath));
+    }
+    const snippet = idToSnippet.get(includeId);
+    if (snippet === undefined) {
+      throw new MarkcheckSyntaxError(
+        `Snippet includes the unknown ID ${JSON.stringify(includeId)}`,
+        { entityContext: this.context }
+      );
+    }
+    pathOfIncludeIds.add(includeId);
+    snippet.assembleInnerLines(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds);
+    pathOfIncludeIds.delete(includeId);
+  }
+
+  transformBody(body: Array<string>, translator: Translator | undefined, lineNumber: number): Array<string> {
     const lineNumberSet = lineLocSetToLineNumberSet(this.context, this.ignoreLines, body);
     body = body.filter(
       (_line, index) => !lineNumberSet.has(index + 1)
@@ -200,17 +264,7 @@ abstract class LineMod extends MarkcheckEntity {
     if (translator) {
       body = translator.translate(lineNumber, body);
     }
-
-    linesOut.push(...this.beforeLines);
-    linesOut.push(...body);
-    linesOut.push(...this.afterLines);
-  }
-
-  pushBeforeLines(lines: Array<string>): void {
-    lines.push(...this.beforeLines);
-  }
-  pushAfterLines(lines: Array<string>): void {
-    lines.push(...this.afterLines);
+    return body;
   }
 
   toJson(): JsonValue {

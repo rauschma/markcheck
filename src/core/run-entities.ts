@@ -13,7 +13,7 @@ import { ZodError } from 'zod';
 import { ConfigMod } from '../entity/config-mod.js';
 import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, LineScope, type StdStreamContentSpec } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
-import { LineModAppliable, LineModLanguage } from '../entity/line-mod.js';
+import { EmitLines, LineModAppliable, LineModLanguage } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
 import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
@@ -101,7 +101,13 @@ function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
     const declaredIds = new Set<string>();
     const referencedIds = new Set<string>();
     for (const entity of parsedMarkdown.entities) {
-      if (entity instanceof Snippet) {
+      if (entity instanceof LineModAppliable || entity instanceof LineModLanguage) {
+        for (const inclId of entity.includeIds) {
+          if (inclId !== INCL_ID_THIS) {
+            referencedIds.add(inclId);
+          }
+        }
+      } else if (entity instanceof Snippet) {
         if (entity.id) {
           declaredIds.add(entity.id);
         }
@@ -114,9 +120,11 @@ function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
           if (snippet.sameAsId !== null) {
             referencedIds.add(snippet.sameAsId);
           }
-          for (const inclId of snippet.includeIds) {
-            if (inclId !== INCL_ID_THIS) {
-              referencedIds.add(inclId);
+          if (snippet.internalLineMod !== null) {
+            for (const inclId of snippet.internalLineMod.includeIds) {
+              if (inclId !== INCL_ID_THIS) {
+                referencedIds.add(inclId);
+              }
             }
           }
           if (snippet.stdoutSpec !== null) {
@@ -126,13 +134,16 @@ function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
             referencedIds.add(snippet.stderrSpec.snippetId);
           }
         });
+      } else if (entity instanceof ConfigMod || entity instanceof Heading) {
+        // There is nothing to do
+      } else {
+        throw new UnsupportedValueError(entity);
       }
-    }
+    } // for
     const unusedIds = setDifference(declaredIds, referencedIds);
     if (unusedIds.size > 0) {
-      out.writeLine(`${SnippetStatusEmoji.Warning} Unused ${stringify(ATTR_KEY_ID)} values: ${
-        Array.from(unusedIds, id => stringify(id)).join(', ')
-      }`);
+      out.writeLine(`${SnippetStatusEmoji.Warning} Unused ${stringify(ATTR_KEY_ID)} values: ${Array.from(unusedIds, id => stringify(id)).join(', ')
+        }`);
       statusCounts.warnings++;
     }
   }
@@ -490,7 +501,11 @@ function compareStdStreamLines(stdStreamName: string, config: Config, fileState:
       );
     }
     const tmpLines = new Array<string>();
-    lineMod.pushModifiedBodyTo(snippet.lineNumber, actualLines, undefined, tmpLines);
+    lineMod.emitLines(EmitLines.Before, config, fileState.idToSnippet, fileState.idToLineMod, tmpLines);
+    tmpLines.push(
+      ...lineMod.transformBody(actualLines, undefined, snippet.lineNumber)
+    );
+    lineMod.emitLines(EmitLines.After, config, fileState.idToSnippet, fileState.idToLineMod, tmpLines);
     actualLines = tmpLines;
   }
 

@@ -8,7 +8,7 @@ import { EntityContextSnippet, MarkcheckSyntaxError, SummaryStatusEmoji, type En
 import { getEndTrimmedLength } from '../util/string.js';
 import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, INCL_ID_THIS, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
 import type { Heading } from './heading.js';
-import { LineModAppliable, LineModInternal, LineModConfig, LineModLanguage } from './line-mod.js';
+import { LineModAppliable, LineModInternal, LineModConfig, LineModLanguage, EmitLines } from './line-mod.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
 
 const { stringify } = JSON;
@@ -52,24 +52,23 @@ export function assembleLocalLines(fileState: FileState, config: Config, snippet
  * - Language LineMod
  * - Config before lines
  */
-export function assembleAllLines(fileState: FileState, config: Config, snippet: Snippet, onlyLocalLines=snippet.runLocalLines): Array<string> {
+export function assembleAllLines(fileState: FileState, config: Config, snippet: Snippet, onlyLocalLines = snippet.runLocalLines): Array<string> {
   const lines = new Array<string>();
 
   const outerLineMods = collectOuterLineMods(onlyLocalLines);
 
   for (let i = 0; i < outerLineMods.length; i++) {
-    outerLineMods[i].pushBeforeLines(lines);
+    outerLineMods[i].emitLines(EmitLines.Before, config, fileState.idToSnippet, fileState.idToLineMod, lines);
   }
   // Once per snippet:
   // - SingleSnippet:
   //   - Internal LineMod (before, after, inserted lines)
   //   - `applyToBody` LineMod
-  //   - Includes
   // - SequenceSnippet:
   //   - Lines of sequence elements, concatenated
   snippet.assembleInnerLines(config, fileState.idToSnippet, fileState.idToLineMod, lines, new Set());
   for (let i = outerLineMods.length - 1; i >= 0; i--) {
-    outerLineMods[i].pushAfterLines(lines);
+    outerLineMods[i].emitLines(EmitLines.After, config, fileState.idToSnippet, fileState.idToLineMod, lines);
   }
   return lines;
 
@@ -149,6 +148,10 @@ export abstract class Snippet extends MarkcheckEntity {
 
   abstract toJson(): JsonValue;
 
+  /**
+   * - SingleSnippet: visit that snippet
+   * - SequenceSnippet: visit each element of the sequence
+   */
   abstract visitSingleSnippet(visitor: (singleSnippet: SingleSnippet) => void): void;
 }
 
@@ -194,11 +197,6 @@ export class SingleSnippet extends Snippet {
       const sequence = directive.getString(ATTR_KEY_SEQUENCE);
       if (sequence) {
         snippet.sequenceNumber = parseSequenceNumber(sequence);
-      }
-
-      const include = directive.getString(ATTR_KEY_INCLUDE);
-      if (include) {
-        snippet.includeIds = include.split(/ *, */);
       }
 
       snippet.applyToBodyId = directive.getString(ATTR_KEY_APPLY_TO_BODY);
@@ -279,7 +277,6 @@ export class SingleSnippet extends Snippet {
   runningMode: RuningMode = RuningMode.Normal;
   //
   sequenceNumber: null | SequenceNumber = null;
-  includeIds = new Array<string>();
   internalLineMod: null | LineModInternal = null;
   applyToBodyId: null | string = null;
   override applyToOuterId: null | string = null;
@@ -372,61 +369,38 @@ export class SingleSnippet extends Snippet {
     return this;
   }
 
-  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, lines: Array<string>, pathOfIncludeIds: Set<string>): void {
-    let thisWasIncluded = false;
-    for (const includeId of this.includeIds) {
-      if (includeId === INCL_ID_THIS) {
-        this.#assembleThis(config, idToLineMod, lines);
-        thisWasIncluded = true;
-        continue;
-      }
-      this.#assembleOneInclude(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds, includeId);
-    } // for
-    if (!thisWasIncluded) {
-      // Omitting `$THIS` is the same as putting it last
-      this.#assembleThis(config, idToLineMod, lines);
-    }
-  }
-
-  #assembleOneInclude(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, lines: Array<string>, pathOfIncludeIds: Set<string>, includeId: string) {
-    if (pathOfIncludeIds.has(includeId)) {
-      const idPath = [...pathOfIncludeIds, includeId];
-      throw new MarkcheckSyntaxError(`Cycle of includedIds ` + JSON.stringify(idPath));
-    }
-    const snippet = idToSnippet.get(includeId);
-    if (snippet === undefined) {
-      throw new MarkcheckSyntaxError(
-        `Snippet includes the unknown ID ${JSON.stringify(includeId)}`,
-        { lineNumber: this.lineNumber }
-      );
-    }
-    pathOfIncludeIds.add(includeId);
-    snippet.assembleInnerLines(config, idToSnippet, idToLineMod, lines, pathOfIncludeIds);
-    pathOfIncludeIds.delete(includeId);
-  }
-
-  #assembleThis(config: Config, idToLineMod: Map<string, LineModAppliable>, linesOut: Array<string>) {
-    let applyToBodyLineMod: LineModAppliable | LineModInternal | LineModConfig | null = this.#getApplyToBodyLineMod(config, idToLineMod);
-    if (applyToBodyLineMod) {
-      if (this.internalLineMod && !this.internalLineMod.isEmpty()) {
-        throw new MarkcheckSyntaxError(
-          `If there is a ${stringify(ATTR_KEY_APPLY_TO_BODY)} then the internal LineMod must be empty: No attributes ${stringify(ATTR_KEY_IGNORE_LINES)}, ${stringify(ATTR_KEY_SEARCH_AND_REPLACE)}. No body labels ${stringify(BODY_LABEL_BEFORE)}, ${stringify(BODY_LABEL_AFTER)}, ${stringify(BODY_LABEL_AROUND)}, ${stringify(BODY_LABEL_INSERT)}`,
-          { lineNumber: this.lineNumber }
-        );
-      }
+  override assembleInnerLines(config: Config, idToSnippet: Map<string, Snippet>, idToLineMod: Map<string, LineModAppliable>, linesOut: Array<string>, pathOfIncludeIds: Set<string>): void {
+    let lineModForBody: LineModAppliable | LineModInternal | LineModConfig | null = this.#getApplyToBodyLineMod(config, idToLineMod);
+    if (lineModForBody) {
+      this.internalLineMod?.throwIfThisChangesBody();
     } else {
-      applyToBodyLineMod = this.internalLineMod;
+      lineModForBody = this.internalLineMod;
     }
 
+    let body;
     const translator = this.#getTranslator(config);
-    if (applyToBodyLineMod) {
-      applyToBodyLineMod.pushModifiedBodyTo(this.lineNumber, this.body, translator, linesOut);
+    if (lineModForBody) {
+      body = lineModForBody.transformBody(this.body, translator, this.lineNumber);
     } else {
-      let body = this.body;
+      body = this.body;
       if (translator) {
         body = translator.translate(this.lineNumber, body);
       }
-      linesOut.push(...body);
+    }
+
+    const applyToBodyLineMod = this.#getApplyToBodyLineMod(config, idToLineMod);
+    if (this.internalLineMod) {
+      this.internalLineMod.emitLines(EmitLines.Before, config, idToSnippet, idToLineMod, linesOut, pathOfIncludeIds);
+    }
+    if (applyToBodyLineMod) {
+      applyToBodyLineMod.emitLines(EmitLines.Before, config, idToSnippet, idToLineMod, linesOut, pathOfIncludeIds);
+    }
+    linesOut.push(...body);
+    if (applyToBodyLineMod) {
+      applyToBodyLineMod.emitLines(EmitLines.After, config, idToSnippet, idToLineMod, linesOut, pathOfIncludeIds);
+    }
+    if (this.internalLineMod) {
+      this.internalLineMod.emitLines(EmitLines.After, config, idToSnippet, idToLineMod, linesOut, pathOfIncludeIds);
     }
   }
 
@@ -731,7 +705,7 @@ export class StatusCounts {
       warnings: this.warnings,
     };
   }
-  
+
   getHeadingStyle(): TextStyleResult {
     if (this.hasSucceeded()) {
       return style.FgGreen.Bold;
@@ -755,16 +729,16 @@ export class StatusCounts {
   describe(): string {
     const parts = [
       labeled('Successes', this.testSuccesses,
-       this.hasSucceeded(), style.Bold.FgGreen
+        this.hasSucceeded(), style.Bold.FgGreen
       ),
       labeled('Failures', this.testFailures,
-       this.testFailures > 0, style.Bold.FgRed
+        this.testFailures > 0, style.Bold.FgRed
       ),
       labeled('Syntax Errors', this.syntaxErrors,
-       this.syntaxErrors > 0, style.Bold.FgRed
+        this.syntaxErrors > 0, style.Bold.FgRed
       ),
       labeled('Warnings', this.warnings,
-       this.warnings > 0, style.Bold.FgYellow
+        this.warnings > 0, style.Bold.FgYellow
       ),
     ];
     return parts.join(', ');

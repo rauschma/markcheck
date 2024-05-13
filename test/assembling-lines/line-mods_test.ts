@@ -301,3 +301,38 @@ test('Assemble snippet with applyToBody LineMod from the config', () => {
     ]
   );
 });
+
+test('"each" plus "include"', () => {
+  const readme = outdent`
+    <!--markcheck each="js" include="promiseWithResolvers" before:
+    Promise.withResolvers = promiseWithResolvers;
+    -->
+
+    <!--markcheck id="promiseWithResolvers"-->
+    ▲▲▲js
+    function promiseWithResolvers() {}
+    ▲▲▲
+
+    ▲▲▲js
+    const { promise, resolve, reject } = Promise.withResolvers();
+    ▲▲▲
+  `.replaceAll('▲', '`');
+  jsonToCleanDir(mfs, {
+    '/tmp/markcheck-data': {},
+    '/tmp/markdown/readme.md': readme,
+  });
+  assert.ok(
+    runMarkdownForTests('/tmp/markdown/readme.md', readme).hasSucceeded()
+  );
+  assert.deepEqual(
+    dirToJson('/tmp/markcheck-data/tmp', { trimEndsOfFiles: true }),
+    {
+      'main.mjs': outdent`
+        import assert from 'node:assert/strict';
+        function promiseWithResolvers() {}
+        Promise.withResolvers = promiseWithResolvers;
+        const { promise, resolve, reject } = Promise.withResolvers();
+      `,
+    }
+  );
+});
