@@ -97,10 +97,14 @@ export const ATTR_KEY_EXIT_STATUS = 'exitStatus';
 export const ATTR_KEY_STDOUT = 'stdout';
 export const ATTR_KEY_STDERR = 'stderr';
 
-export type StdStreamContentSpec = {
+export const IGNORE_STD_STREAM = '[IGNORE]';
+
+export type StdStreamContentSpec = typeof IGNORE_STD_STREAM | StdStreamContentSpecIds;
+export type StdStreamContentSpecIds = {
   lineModId: null | string;
   snippetId: string;
 };
+
 const RE_SPEC = re`/^(\|(?<lineModId>${RE_LABEL})=)?(?<snippetId>${RE_LABEL})$/`;
 export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: string, str: string): StdStreamContentSpec {
   const match = RE_SPEC.exec(str);
