@@ -153,7 +153,7 @@ Running:
   * `skip`: Snippet is never run.
   * `alwaysRun`: Snippet is always run.
   * `only`: Affects the whole file. Only snippets with this attribute are run.
-  * Visitation mode `normal` (not an attribute): active if none of the previous attributes are present.
+  * Running mode `normal` (not an attribute): active if none of the previous attributes are present.
 * `id` sets running mode to `skip`.
   * Override via `alwaysRun` or `only`
 * `write`, `writeLocalLines`always prevent running. Alternatives to using these attributes:

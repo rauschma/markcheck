@@ -33,8 +33,7 @@
     "circular": "npx madge --circular src/markcheck.ts",
     "\n========== Publishing ==========": "",
     "dry-run": "npm publish --dry-run",
-    "prepublishOnly": "npm run build",
-    "pack": "npm pack && (tar --list --file markcheck-*.tgz | sort) && rm -f markcheck-*.tgz"
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@rauschma/helpers": "^0.1.0",
@@ -42,7 +41,6 @@
     "diff": "^5.2.0",
     "json5": "^2.2.3",
     "markdown-it": "^14.1.0",
-    "mocha": "^10.3.0",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.22.5"
   },
@@ -52,6 +50,7 @@
     "@types/markdown-it": "^13.0.7",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.11.30",
+    "mocha": "^10.3.0",
     "shx": "^0.3.4"
   }
 }

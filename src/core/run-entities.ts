@@ -11,11 +11,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { ZodError } from 'zod';
 import { ConfigMod } from '../entity/config-mod.js';
-import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, IGNORE_STD_STREAM, INCL_ID_THIS, LineScope, type StdStreamContentSpec } from '../entity/directive.js';
+import { ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_LINE_MOD_ID, ATTR_KEY_SAME_AS_ID, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, CMD_VAR_ALL_FILE_NAMES, CMD_VAR_FILE_NAME, INCL_ID_THIS, LineScope } from '../entity/directive.js';
 import { Heading } from '../entity/heading.js';
 import { EmitLines, LineModAppliable, LineModLanguage } from '../entity/line-mod.js';
 import { type MarkcheckEntity } from '../entity/markcheck-entity.js';
-import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData } from '../entity/snippet.js';
+import { GlobalRunningMode, LogLevel, RuningMode, Snippet, StatusCounts, assembleAllLines, assembleAllLinesForId, assembleInnerLines, assembleLocalLines, assembleLocalLinesForId, getTargetSnippet, type CommandResult, type FileState, type MarkcheckMockData, type StdStreamContentSpec } from '../entity/snippet.js';
 import { areLinesEqual, logDiff } from '../util/diffing.js';
 import { EntityContextDescription, EntityContextLineNumber, MarkcheckSyntaxError, Output, PROP_STDERR, PROP_STDOUT, SnippetStatusEmoji, StartupError, TestFailure } from '../util/errors.js';
 import { linesAreSame, linesContain } from '../util/line-tools.js';
@@ -127,10 +127,10 @@ function checkSnippetIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
               }
             }
           }
-          if (snippet.stdoutSpec !== null && snippet.stdoutSpec !== IGNORE_STD_STREAM) {
+          if (snippet.stdoutSpec !== null && snippet.stdoutSpec.kind === 'StdStreamContentSpecSnippetId') {
             referencedIds.add(snippet.stdoutSpec.snippetId);
           }
-          if (snippet.stderrSpec !== null && snippet.stderrSpec !== IGNORE_STD_STREAM) {
+          if (snippet.stderrSpec !== null && snippet.stderrSpec.kind === 'StdStreamContentSpecSnippetId') {
             referencedIds.add(snippet.stderrSpec.snippetId);
           }
         });
@@ -164,10 +164,10 @@ function checkLineModIds(parsedMarkdown: ParsedMarkdown, out: Output, statusCoun
         if (snippet.applyToOuterId !== null) {
           referencedIds.add(snippet.applyToOuterId);
         }
-        if (snippet.stdoutSpec !== null && snippet.stdoutSpec !== IGNORE_STD_STREAM && snippet.stdoutSpec.lineModId !== null) {
+        if (snippet.stdoutSpec !== null && snippet.stdoutSpec.kind === 'StdStreamContentSpecSnippetId' && snippet.stdoutSpec.lineModId !== null) {
           referencedIds.add(snippet.stdoutSpec.lineModId);
         }
-        if (snippet.stderrSpec !== null && snippet.stderrSpec !== IGNORE_STD_STREAM && snippet.stderrSpec.lineModId !== null) {
+        if (snippet.stderrSpec !== null && snippet.stderrSpec.kind === 'StdStreamContentSpecSnippetId' && snippet.stderrSpec.lineModId !== null) {
           referencedIds.add(snippet.stderrSpec.lineModId);
         }
       });
@@ -494,29 +494,42 @@ function checkShellCommandResult(fileState: FileState, config: Config, snippet: 
 
 function compareStdStreamLines(stdStreamName: string, config: Config, fileState: FileState, snippet: Snippet, expectedContentSpec: null | StdStreamContentSpec, actualLines: Array<string>, attrKey: typeof ATTR_KEY_STDOUT | typeof ATTR_KEY_STDERR, failurePropKey: typeof PROP_STDERR | typeof PROP_STDOUT): void {
   let expectedLines: Array<string>;
+
   if (expectedContentSpec === null) {
     expectedLines = [];
-  } else if (expectedContentSpec === IGNORE_STD_STREAM) {
-    return;
   } else {
-    if (expectedContentSpec.lineModId) {
-      const lineMod = fileState.idToLineMod.get(expectedContentSpec.lineModId);
-      if (lineMod === undefined) {
-        throw new MarkcheckSyntaxError(
-          `Could not find LineMod with id ${stringify(expectedContentSpec.lineModId)} (attribute ${stringify(attrKey)})`
-        );
-      }
-      const tmpLines = new Array<string>();
-      lineMod.emitLines(EmitLines.Before, config, fileState.idToSnippet, fileState.idToLineMod, tmpLines);
-      tmpLines.push(
-        ...lineMod.transformBody(actualLines, undefined, snippet.lineNumber)
-      );
-      lineMod.emitLines(EmitLines.After, config, fileState.idToSnippet, fileState.idToLineMod, tmpLines);
-      actualLines = tmpLines;
-    }
+    switch (expectedContentSpec.kind) {
+      case 'StdStreamContentSpecIgnore':
+        return;
+      case 'StdStreamContentSpecSnippetId': {
+        if (expectedContentSpec.lineModId) {
+          const lineMod = fileState.idToLineMod.get(expectedContentSpec.lineModId);
+          if (lineMod === undefined) {
+            throw new MarkcheckSyntaxError(
+              `Could not find LineMod with id ${stringify(expectedContentSpec.lineModId)} (attribute ${stringify(attrKey)})`
+            );
+          }
+          const modifiedActualLines = new Array<string>();
+          lineMod.emitLines(EmitLines.Before, config, fileState.idToSnippet, fileState.idToLineMod, modifiedActualLines);
+          modifiedActualLines.push(
+            ...lineMod.transformBody(actualLines, undefined, snippet.lineNumber)
+          );
+          lineMod.emitLines(EmitLines.After, config, fileState.idToSnippet, fileState.idToLineMod, modifiedActualLines);
+          actualLines = modifiedActualLines;
+        }
 
-    expectedLines = assembleLocalLinesForId(fileState, config, snippet.lineNumber, attrKey, expectedContentSpec.snippetId);
+        expectedLines = assembleLocalLinesForId(fileState, config, snippet.lineNumber, attrKey, expectedContentSpec.snippetId);
+        break;
+      }
+      case 'StdStreamContentSpecDefinitionSnippet': {
+        expectedLines = assembleLocalLines(fileState, config, expectedContentSpec.snippet);
+        break;
+      }
+      default:
+        throw new UnsupportedValueError(expectedContentSpec);
+    }
   }
+
   trimTrailingEmptyLines(expectedLines);
   if (!areLinesEqual(expectedLines, actualLines)) {
     throw new TestFailure(

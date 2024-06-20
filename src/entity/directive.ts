@@ -15,7 +15,7 @@ const RE_LABEL = /[A-Za-z0-9\-_]+/;
 // Referenced by attributes: external, sameAsId, include, stdout, stderr
 export const ATTR_KEY_ID = 'id';
 
-//----- Explicit visitation and running mode -----
+//----- Running mode -----
 
 export const ATTR_KEY_ONLY = 'only';
 export const ATTR_KEY_SKIP = 'skip';
@@ -33,6 +33,7 @@ export const ATTR_KEY_LANG = 'lang';
 //----- Assembling lines -----
 
 export const ATTR_KEY_SEQUENCE = 'sequence';
+export const ATTR_KEY_DEFINE = 'define';
 export const ATTR_KEY_INCLUDE = 'include';
 export const ATTR_KEY_APPLY_TO_BODY = 'applyToBody';
 export const ATTR_KEY_APPLY_TO_OUTER = 'applyToOuter';
@@ -97,16 +98,24 @@ export const ATTR_KEY_EXIT_STATUS = 'exitStatus';
 export const ATTR_KEY_STDOUT = 'stdout';
 export const ATTR_KEY_STDERR = 'stderr';
 
-export const IGNORE_STD_STREAM = '[IGNORE]';
-
-export type StdStreamContentSpec = typeof IGNORE_STD_STREAM | StdStreamContentSpecIds;
-export type StdStreamContentSpecIds = {
+export type StdStreamContentSpecSnippetId = {
+  kind: 'StdStreamContentSpecSnippetId',
   lineModId: null | string;
   snippetId: string;
 };
+export type StdStreamContentSpecIgnore = {
+  kind: 'StdStreamContentSpecIgnore',
+};
+
+export const IGNORE_STD_STREAM_STR = '[IGNORE]';
 
 const RE_SPEC = re`/^(\|(?<lineModId>${RE_LABEL})=)?(?<snippetId>${RE_LABEL})$/`;
-export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: string, str: string): StdStreamContentSpec {
+export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: string, str: string): StdStreamContentSpecIgnore | StdStreamContentSpecSnippetId {
+  if (str === IGNORE_STD_STREAM_STR) {
+    return {
+      kind: 'StdStreamContentSpecIgnore',
+    };
+  }
   const match = RE_SPEC.exec(str);
   if (!match) {
     throw new MarkcheckSyntaxError(
@@ -117,6 +126,7 @@ export function parseStdStreamContentSpec(directiveLineNumber: number, attrKey: 
   assertNonNullable(match.groups);
   assertNonNullable(match.groups.snippetId);
   return {
+    kind: 'StdStreamContentSpecSnippetId',
     lineModId: match.groups.lineModId ?? null,
     snippetId: match.groups.snippetId, // never null
   };
@@ -195,6 +205,7 @@ export const ATTRS_SNIPPET = expectedAttrs([
   [ATTR_KEY_LANG, RE_LANG_VALUE],
   //
   [ATTR_KEY_SEQUENCE, AttrValue.String],
+  [ATTR_KEY_DEFINE, AttrValue.String],
   [ATTR_KEY_INCLUDE, AttrValue.String],
   [ATTR_KEY_APPLY_TO_BODY, AttrValue.String],
   [ATTR_KEY_APPLY_TO_OUTER, AttrValue.String],
@@ -237,9 +248,6 @@ export const ATTRS_LANGUAGE_LINE_MOD: ExpectedAttributeValues = new Map([
   [ATTR_KEY_IGNORE_LINES, AttrValue.String],
   [ATTR_KEY_SEARCH_AND_REPLACE, AttrValue.String],
   //
-  [ATTR_KEY_SKIP, AttrValue.Valueless],
-  //
-  [ATTR_KEY_SEQUENCE, AttrValue.String],
   [ATTR_KEY_INCLUDE, AttrValue.String],
 ]);
 

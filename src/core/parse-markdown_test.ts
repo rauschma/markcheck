@@ -21,7 +21,7 @@ test('extractCommentContent()', () => {
 });
 
 test('parseMarkdown(): LineMod', () => {
-  const {entities} = parseMarkdown(outdent`
+  const { entities } = parseMarkdown(outdent`
     <!--markcheck each="js" around:
     Line before
     •••
@@ -41,6 +41,38 @@ test('parseMarkdown(): LineMod', () => {
         'Line after'
       ],
     }
+  );
+});
+
+test('parseMarkdown(): heading followed by code block', () => {
+  const { entities } = parseMarkdown(
+    outdent`
+      ## Creating Arrays
+      ▲▲▲js
+      const arr = [];
+      ▲▲▲
+      -->
+    `.replaceAll('▲', '`')
+  );
+  assert.deepEqual(
+    entities.map(e => e.toJson()),
+    [
+      {
+        heading: 'Creating Arrays',
+      },
+      {
+        body: [
+          'const arr = [];'
+        ],
+        define: null,
+        external: [],
+        id: null,
+        lang: 'js',
+        lineNumber: 2,
+        stderr: null,
+        stdout: null,
+      }
+    ]
   );
 });
 

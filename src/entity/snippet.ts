@@ -2,13 +2,13 @@ import { UnsupportedValueError } from '@rauschma/helpers/typescript/error.js';
 import { type JsonValue } from '@rauschma/helpers/typescript/json.js';
 import { assertNonNullable, assertTrue, type PublicDataProperties } from '@rauschma/helpers/typescript/type.js';
 import { style, type TextStyleResult } from '@rauschma/nodejs-tools/cli/text-style.js';
-import { Config, CONFIG_ENTITY_CONTEXT, CONFIG_KEY_LANG, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
+import { CONFIG_ENTITY_CONTEXT, CONFIG_KEY_LANG, Config, PROP_KEY_DEFAULT_FILE_NAME, type LangDef, type LangDefCommand } from '../core/config.js';
 import type { Translator } from '../translation/translation.js';
 import { EntityContextSnippet, MarkcheckSyntaxError, SummaryStatusEmoji, type EntityContext } from '../util/errors.js';
 import { getEndTrimmedLength } from '../util/string.js';
-import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_IGNORE_LINES, ATTR_KEY_INCLUDE, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEARCH_AND_REPLACE, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, BODY_LABEL_AFTER, BODY_LABEL_AROUND, BODY_LABEL_BEFORE, BODY_LABEL_INSERT, IGNORE_STD_STREAM, INCL_ID_THIS, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpec } from './directive.js';
+import { ATTR_ALWAYS_RUN, ATTR_KEY_APPLY_TO_BODY, ATTR_KEY_APPLY_TO_OUTER, ATTR_KEY_CONTAINED_IN_FILE, ATTR_KEY_DEFINE, ATTR_KEY_EXIT_STATUS, ATTR_KEY_EXTERNAL, ATTR_KEY_EXTERNAL_LOCAL_LINES, ATTR_KEY_ID, ATTR_KEY_LANG, ATTR_KEY_ONLY, ATTR_KEY_RUN_FILE_NAME, ATTR_KEY_RUN_LOCAL_LINES, ATTR_KEY_SAME_AS_ID, ATTR_KEY_SEQUENCE, ATTR_KEY_SKIP, ATTR_KEY_STDERR, ATTR_KEY_STDOUT, ATTR_KEY_WRITE, ATTR_KEY_WRITE_LOCAL_LINES, LANG_KEY_EMPTY, LineScope, parseExternalSpecs, parseSequenceNumber, parseStdStreamContentSpec, type Directive, type ExternalSpec, type SequenceNumber, type StdStreamContentSpecIgnore, type StdStreamContentSpecSnippetId } from './directive.js';
 import type { Heading } from './heading.js';
-import { LineModAppliable, LineModInternal, LineModConfig, LineModLanguage, EmitLines } from './line-mod.js';
+import { EmitLines, LineModAppliable, LineModConfig, LineModInternal, LineModLanguage } from './line-mod.js';
 import { MarkcheckEntity } from './markcheck-entity.js';
 
 const { stringify } = JSON;
@@ -139,7 +139,10 @@ export abstract class Snippet extends MarkcheckEntity {
   //
   abstract get exitStatus(): null | 'nonzero' | number;
   abstract get stdoutSpec(): null | StdStreamContentSpec;
+  abstract set stdoutSpec(spec: StdStreamContentSpec);
   abstract get stderrSpec(): null | StdStreamContentSpec;
+  abstract set stderrSpec(spec: StdStreamContentSpec);
+  abstract get define(): null | string;
 
   abstract getInternalFileName(langDef: LangDef): string;
   abstract isRun(globalRunningMode: GlobalRunningMode): boolean;
@@ -153,6 +156,36 @@ export abstract class Snippet extends MarkcheckEntity {
    * - SequenceSnippet: visit each element of the sequence
    */
   abstract visitSingleSnippet(visitor: (singleSnippet: SingleSnippet) => void): void;
+}
+
+export type StdStreamContentSpec = StdStreamContentSpecIgnore | StdStreamContentSpecSnippetId | StdStreamContentSpecDefinitionSnippet;
+export type StdStreamContentSpecDefinitionSnippet = {
+  kind: 'StdStreamContentSpecDefinitionSnippet',
+  snippet: SingleSnippet;
+};
+export type StdStreamContentSpecJson =
+  | 'StdStreamContentSpecIgnore'
+  | StdStreamContentSpecSnippetId
+  | {
+    /** Value: description of entity context */
+    definitionSnippet: string,
+  }
+  ;
+
+function stdStreamContentSpecToJson(spec: null | StdStreamContentSpec): null | StdStreamContentSpecJson {
+  if (spec === null) return null;
+  switch (spec.kind) {
+    case 'StdStreamContentSpecIgnore':
+      return 'StdStreamContentSpecIgnore';
+    case 'StdStreamContentSpecSnippetId':
+      return spec;
+    case 'StdStreamContentSpecDefinitionSnippet':
+      return {
+        definitionSnippet: spec.snippet.getEntityContext().describe()
+      };
+    default:
+      throw new UnsupportedValueError(spec);
+  }
 }
 
 //#################### SingleSnippet ####################
@@ -250,20 +283,13 @@ export class SingleSnippet extends Snippet {
     }
     const stdoutSpecStr = directive.getString(ATTR_KEY_STDOUT);
     if (stdoutSpecStr !== null) {
-      if (stdoutSpecStr === IGNORE_STD_STREAM) {
-        snippet.stdoutSpec = IGNORE_STD_STREAM;
-      } else {
-        snippet.stdoutSpec = parseStdStreamContentSpec(directive.lineNumber, ATTR_KEY_STDOUT, stdoutSpecStr);
-      }
+      snippet.stdoutSpec = parseStdStreamContentSpec(directive.lineNumber, ATTR_KEY_STDOUT, stdoutSpecStr);
     }
     const stderrSpecStr = directive.getString(ATTR_KEY_STDERR);
     if (stderrSpecStr !== null) {
-      if (stderrSpecStr === IGNORE_STD_STREAM) {
-        snippet.stderrSpec = IGNORE_STD_STREAM;
-      } else {
-        snippet.stderrSpec = parseStdStreamContentSpec(directive.lineNumber, ATTR_KEY_STDERR, stderrSpecStr);
-      }
+      snippet.stderrSpec = parseStdStreamContentSpec(directive.lineNumber, ATTR_KEY_STDERR, stderrSpecStr);
     }
+    snippet.define = directive.getString(ATTR_KEY_DEFINE);
 
     return snippet;
   }
@@ -303,6 +329,7 @@ export class SingleSnippet extends Snippet {
   override exitStatus: null | 'nonzero' | number = null;
   override stdoutSpec: null | StdStreamContentSpec = null;
   override stderrSpec: null | StdStreamContentSpec = null;
+  override define: null | string = null;
   //
   isClosed = false;
   body = new Array<string>();
@@ -331,7 +358,7 @@ export class SingleSnippet extends Snippet {
   }
 
   override isRun(globalRunningMode: GlobalRunningMode): boolean {
-    // this.visitationMode is set up by factory methods where `id` etc. are
+    // this.runningMode is set up by factory methods where `id` etc. are
     // considered.
     switch (globalRunningMode) {
       case GlobalRunningMode.Normal:
@@ -459,8 +486,9 @@ export class SingleSnippet extends Snippet {
       lang: this.lang,
       id: this.id,
       external: this.externalSpecs,
-      stdout: this.stdoutSpec,
-      stderr: this.stderrSpec,
+      stdout: stdStreamContentSpecToJson(this.stdoutSpec),
+      stderr: stdStreamContentSpecToJson(this.stderrSpec),
+      define: this.define,
       body: this.body,
     };
   }
@@ -583,9 +611,20 @@ export class SequenceSnippet extends Snippet {
   override get stdoutSpec(): null | StdStreamContentSpec {
     return this.firstElement.stdoutSpec;
   }
+  override set stdoutSpec(spec: StdStreamContentSpec) {
+    this.firstElement.stdoutSpec = spec;
+  }
   override get stderrSpec(): null | StdStreamContentSpec {
     return this.firstElement.stderrSpec;
   }
+  override set stderrSpec(spec: StdStreamContentSpec) {
+    this.firstElement.stderrSpec = spec;
+  }
+
+  override get define(): null | string {
+    return this.firstElement.define;
+  }
+
   toJson(): JsonValue {
     return this.elements.map(e => e.toJson());
   }
@@ -618,8 +657,9 @@ export type SingleSnippetJson = {
   lang: string,
   id: null | string,
   external: Array<ExternalSpec>,
-  stdout: null | StdStreamContentSpec,
-  stderr: null | StdStreamContentSpec,
+  stdout: null | StdStreamContentSpecJson,
+  stderr: null | StdStreamContentSpecJson,
+  define: null | string,
   body: Array<string>,
 };
 
@@ -632,6 +672,7 @@ export function snippetJson(partial: Partial<SingleSnippetJson>): SingleSnippetJ
     external: partial.external ?? [],
     stdout: partial.stdout ?? null,
     stderr: partial.stderr ?? null,
+    define: partial.define ?? null,
     body: partial.body ?? [],
   };
 }

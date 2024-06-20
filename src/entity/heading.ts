@@ -14,7 +14,7 @@ export class Heading extends MarkcheckEntity {
 
   toJson(): JsonValue {
     return {
-      content: this.content,
+      heading: this.content,
     };
   }
 }
