@@ -32,7 +32,7 @@
     "testall": "mocha --ui qunit --enable-source-maps --no-warnings=ExperimentalWarning \"./dist/**/*_test.js\"",
     "circular": "npx madge --circular src/markcheck.ts",
     "\n========== Publishing ==========": "",
-    "dry-run": "npm publish --dry-run",
+    "publishd": "npm publish --dry-run",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
