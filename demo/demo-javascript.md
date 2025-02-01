@@ -11,6 +11,17 @@ assert.equal(
 
 ### Checking standard output via `stdout`
 
+```js
+console.log('Hello!');
+```
+
+<!--markcheck define="stdout"-->
+```
+Hello!
+```
+
+**Alternative syntax:**
+
 <!--markcheck stdout="stdout-hello"-->
 ```js
 console.log('Hello!');
@@ -39,7 +50,7 @@ try {
 
 ### Assembling code fragments sequentially via `sequence`
 
-<!--markcheck sequence="1/3" stdout="sequence-output"-->
+<!--markcheck sequence="1/3"-->
 ```js
 console.log("Snippet 1/3");
 ```
@@ -56,7 +67,7 @@ console.log("Snippet 3/3");
 
 Expected output:
 
-<!--markcheck id="sequence-output"-->
+<!--markcheck define="stdout"-->
 ```
 Snippet 1/3
 Snippet 2/3
@@ -119,12 +130,11 @@ assert.equal(
 
 Checking output:
 
-<!--markcheck stdout="stdout-how-are-you"-->
 ```js
 console.log('How are you?');
 ```
 
-<!--markcheck id="stdout-how-are-you" body:
+<!--markcheck define="stdout" body:
 How are you?
 -->
 

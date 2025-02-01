@@ -1,5 +1,4 @@
-#!/usr/bin/env -S node --no-warnings=ExperimentalWarning
-// Importing JSON is experimental
+#!/usr/bin/env node
 
 import { outdent } from '@rauschma/helpers/template-tag/outdent-template-tag.js';
 import { assertTrue } from '@rauschma/helpers/typescript/type.js';
@@ -16,7 +15,6 @@ import { GlobalRunningMode, LogLevel, StatusCounts } from './entity/snippet.js';
 import { MarkcheckSyntaxError, Output, SnippetStatusEmoji } from './util/errors.js';
 import { relPath } from './util/path-tools.js';
 
-//@ts-expect-error: Module '#package_json' has no default export.
 import pkg from '#package_json' with { type: 'json' };
 
 const {stringify} = JSON;

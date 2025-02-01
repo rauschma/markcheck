@@ -160,9 +160,8 @@ export function ensurePositiveLineNumber(entityContext: EntityContext, lastLineN
     posLineNumber = lastLineNumber + posLineNumber + 1;
   }
   if (!(1 <= posLineNumber && posLineNumber <= lastLineNumber)) {
-    // FIXME: mention attribute key and line number
     throw new MarkcheckSyntaxError(
-      `Line number must be within the range [1, ${lastLineNumber}]. -1 means ${lastLineNumber} etc. (attribute ${stringify(attrKey)}): ${origLineNumber}`,
+      `Line number must be within the range [1, ${lastLineNumber}]. -1 means ${lastLineNumber} etc. (attribute ${stringify(attrKey)}): ${attrKey}=${stringify(origLineNumber)}`,
       { entityContext }
     );
   }

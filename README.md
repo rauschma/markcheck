@@ -57,12 +57,11 @@ No additional configuration is needed: The Node.js `assert.*` methods are availa
 
 <!--markcheck containedInFile="demo/demo-javascript.md"-->
 ``````md
-<!--markcheck stdout="stdout-hello"-->
 ```js
 console.log('Hello!');
 ```
 
-<!--markcheck id="stdout-hello"-->
+<!--markcheck define="stdout"-->
 ```
 Hello!
 ```
@@ -100,6 +99,6 @@ I have rewritten Markcheck several times over the years, until I arrived at the 
 * One-time donation:
   * [Paypal](https://paypal.me/rauschma)
   * [Stripe](https://buy.stripe.com/bIY4hd5etaYZ9d6cMM)
-* Recurring donation:
+* Recurring donations:
   * [GitHub Sponsors](https://github.com/sponsors/rauschma)
   * [Liberapay](https://liberapay.com/rauschma/donate)

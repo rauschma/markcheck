@@ -172,12 +172,11 @@ We can install the commands `ts-expect-error` and `tsx` in several ways:
 
 <!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
-<!--markcheck stdout="stdout-hello"-->
 ```js
 console.log('Hello!');
 ```
 
-<!--markcheck id="stdout-hello"-->
+<!--markcheck define="stdout"-->
 ```
 Hello!
 ```
@@ -206,7 +205,7 @@ try {
 
 <!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
-<!--markcheck sequence="1/3" stdout="sequence-output"-->
+<!--markcheck sequence="1/3"-->
 ```js
 console.log("Snippet 1/3");
 ```
@@ -223,7 +222,7 @@ console.log("Snippet 3/3");
 
 Expected output:
 
-<!--markcheck id="sequence-output"-->
+<!--markcheck define="stdout"-->
 ```
 Snippet 1/3
 Snippet 2/3
@@ -302,12 +301,11 @@ Checking output:
 
 <!--markcheck containedInFile="../../demo/demo-javascript.md"-->
 ``````md
-<!--markcheck stdout="stdout-how-are-you"-->
 ```js
 console.log('How are you?');
 ```
 
-<!--markcheck id="stdout-how-are-you" body:
+<!--markcheck define="stdout" body:
 How are you?
 -->
 ``````

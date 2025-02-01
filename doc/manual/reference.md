@@ -38,12 +38,12 @@ Only two Markdown constructs are considered by Markcheck:
 The following Markdown contains both constructs:
 
 ``````md
-<!--markcheck only stdout="stdout-hello"-->
+<!--markcheck only-->
 ```js
 console.log('Hello!');
 ```
 
-<!--markcheck id="stdout-hello" body:
+<!--markcheck define="stdout" body:
 Hello!
 -->
 
@@ -243,15 +243,20 @@ Writing and referring to files:
   * An element without `>` only tells Markcheck that the file exists. That is useful for some language – e.g., TypeScript where the shell command `ts-expect-error` must know all files that make up a program.
 * `externalLocalLines="id1>lib1.js, lib2.js"`: Same as `external` but only local lines are written to disk.
 
-Checking output:
+Checking output via `stdout` and `stderr`:
 
 * Only local lines are considered.
 * `stdout="snippet-id"`: Standard output must be the same as the snippet with the ID `snippet-id`.
-* `stderr="snippet-id"`
+  * `stderr="snippet-id"`: Same, but for standard error.
 * We have two options for configuring which part of the actual output human readers see. Consider, as an example, `stderr="snippet-id"`:
   * Changing the expected output: We can use LineMod operations such as `before:` to change the snippet with the ID `snippet-id`.
   * Changing the actual output: There is special syntax that lets us apply a LineMod to the actual output before it is compared with the expected output.
     * Example: `stdout="|line-mod-id=snippet-id"`
+
+Checking output via `define="stdout"` and `define="stderr"`:
+
+* A snippet with either of these attributes defines the output for the preceding snippet.
+* As of now, output can’t be changed via LineMods. If you need that functionality, use the attributes `stdout` and `stderr` (which you have to add to the preceding snippet).
 
 ### Internal LineMods and appliable LineMods used via `applyToBody`
 

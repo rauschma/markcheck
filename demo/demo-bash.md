@@ -15,14 +15,13 @@
 
 ### Checking standard output via `stdout`
 
-<!--markcheck stdout="stdout-hello"-->
 ```bash
 echo 'Hello!'
 ```
 
 Expected stdout:
 
-<!--markcheck id="stdout-hello"-->
+<!--markcheck define="stdout"-->
 ```
 Hello!
 ```

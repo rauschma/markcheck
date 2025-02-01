@@ -1,12 +1,12 @@
 {
   "include": ["src/**/*", "test/**/*"],
   "compilerOptions": {
-    // Could be "ts", but we need to import package.json
+    // Compilation output: dist/src and dist/test
     "rootDir": ".",
     "outDir": "dist",
-    "target": "es2022",
+    "target": "ES2023",
     "lib": [
-      "es2023", "DOM"
+      "ES2023", "DOM"
     ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
@@ -26,9 +26,5 @@
 
     // Importing JSON is generally useful
     "resolveJsonModule": true,
-
-    // https://preactjs.com/guide/v10/typescript#typescript-configuration
-    "jsx": "react-jsx",
-    "jsxImportSource": "preact",
   }
 }
