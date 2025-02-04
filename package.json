@@ -17,7 +17,7 @@
     "!dist/test/**/*.js"
   ],
   "imports": {
-    "#package_json": "./package.json",
+    "#root/*": "./*",
     "#demo/*": "./demo/*"
   },
   "scripts": {

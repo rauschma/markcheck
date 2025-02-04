@@ -15,7 +15,7 @@ import { GlobalRunningMode, LogLevel, StatusCounts } from './entity/snippet.js';
 import { MarkcheckSyntaxError, Output, SnippetStatusEmoji } from './util/errors.js';
 import { relPath } from './util/path-tools.js';
 
-import pkg from '#package_json' with { type: 'json' };
+import pkg from '#root/package.json' with { type: 'json' };
 
 const {stringify} = JSON;
 
