@@ -14,7 +14,7 @@ Highlights:
 
 * **Works for most programming languages:** The only requirement is that there is a shell command that runs text files with the language’s code. See [`demo/demo-bash.md`](demo/demo-bash.md?plain=1) for an example of testing a programming language that Markcheck has no built-in support for.
 
-* **Successfully used in a big project:** I tested almost all of the code shown in my book [“JavaScript for impatient programmers”](https://exploringjs.com/impatient-js/). Its PDF has 639 pages.
+* **Successfully used in a big project:** I tested almost all of the code shown in my book [“Exploring JavaScript”](https://exploringjs.com/js/). Its PDF has 687 pages.
 
 * **Provides versatile tools for checking code:** Human readers of the published Markdown never see the complexity that is occasionally needed to make code blocks testable. These are some of the tools at our disposal – they can all be used from within Markdown files:
   * Check stderr and/or stdout.
@@ -25,7 +25,7 @@ Highlights:
 
 Checking JavaScript is reasonably fast:
 
-* Checking all the examples in “JavaScript for impatient programmers” takes 50 seconds on a MacBook Pro with an M1 Pro processor. There is a lot of code in this book.
+* Checking all the examples in “Exploring JavaScript” takes 50 seconds on a MacBook Pro with an M1 Pro processor. There is a lot of code in this book.
 * Checking one of the longer chapters takes 5 seconds.
 
 **Caveats:**
