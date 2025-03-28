@@ -194,11 +194,14 @@ function* createSequenceSnippets(parsedEntities: Array<SoloEntity>): Iterable<Pa
   let openSequence: null | SequenceSnippet = null;
   for (const entity of parsedEntities) {
     if (openSequence !== null) {
-      if (!(entity instanceof SingleSnippet)) {
+      if (!(entity instanceof SingleSnippet || entity instanceof Heading)) {
         throw new MarkcheckSyntaxError(
           `Only SingleSnippets can be part of a sequence. Encountered a ${entity.constructor.name}`,
           { entity }
         );
+      }
+      if (!(entity instanceof SingleSnippet)) {
+        continue;
       }
       const num = entity.sequenceNumber;
       if (num === null) {
