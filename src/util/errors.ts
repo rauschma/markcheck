@@ -178,4 +178,7 @@ export class Output {
   writeLine(str = ''): void {
     this.#write(str + os.EOL);
   }
+  writeLineVerbose(str = ''): void {
+    this.writeLine(style.FgBlue`‣ ${str}`);
+  }
 }

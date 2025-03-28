@@ -213,7 +213,6 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
   try {
     const snippetState: SnippetState = {
       checksWerePerformed: false,
-      verboseLines: []
     };
 
     if (entity instanceof ConfigMod) {
@@ -222,7 +221,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
       const targetLanguage = entity.targetLanguage;
       fileState.languageLineMods.set(targetLanguage, entity);
     } else if (entity instanceof Snippet) {
-      handleSnippet(fileState, config, snippetState, entity);
+      handleSnippet(out, fileState, config, snippetState, entity);
     } else if (entity instanceof Heading) {
       fileState.prevHeading = entity; // update
     } else if (entity instanceof LineModAppliable) {
@@ -239,12 +238,6 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
       const description = entity.getEntityContext().describe();
       out.writeLine(`${description} ${SnippetStatusEmoji.Success}`);
       fileState.statusCounts.testSuccesses++;
-    }
-    if (snippetState.verboseLines.length > 0) {
-      for (const line of snippetState.verboseLines) {
-        out.write('• ');
-        out.writeLine(line);
-      }
     }
   } catch (err) {
     if (fileState.markcheckMockData?.passOnUserExceptions) {
@@ -279,7 +272,7 @@ function handleOneEntity(out: Output, fileState: FileState, config: Config, enti
 
 //#################### handleSnippet() ####################
 
-function handleSnippet(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet): void {
+function handleSnippet(out: Output, fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet): void {
 
   //----- Checks -----
 
@@ -320,13 +313,13 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
   const write: null | string = snippet.write;
   if (write) {
     const lines = assembleAllLines(fileState, config, snippet);
-    writeOneFile(fileState, config, snippetState, write, lines);
+    writeOneFile(out, fileState, config, snippetState, write, lines);
     return;
   }
   const writeLocalLines: null | string = snippet.writeLocalLines;
   if (writeLocalLines) {
     const lines = assembleLocalLines(fileState, config, snippet);
-    writeOneFile(fileState, config, snippetState, writeLocalLines, lines);
+    writeOneFile(out, fileState, config, snippetState, writeLocalLines, lines);
     return;
   }
 
@@ -357,7 +350,7 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
 
   const fileName = snippet.getInternalFileName(langDef);
   const lines = assembleAllLines(fileState, config, snippet);
-  writeFilesForRunning(fileState, config, snippetState, snippet, fileName, lines);
+  writeFilesForRunning(out, fileState, config, snippetState, snippet, fileName, lines);
 
   assertTrue(langDef.kind === 'LangDefCommand');
   if (!langDef.commands) {
@@ -369,14 +362,14 @@ function handleSnippet(fileState: FileState, config: Config, snippetState: Snipp
   if (langDef.commands.length > 0) {
     // Running a file is at least one check.
     snippetState.checksWerePerformed = true;
-    runShellCommands(fileState, config, snippetState, snippet, langDef, fileName, langDef.commands);
+    runShellCommands(out, fileState, config, snippetState, snippet, langDef, fileName, langDef.commands);
   }
 }
 
 //========== Write files ==========
 
-function writeFilesForRunning(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, fileName: string, lines: Array<string>): void {
-  writeOneFile(fileState, config, snippetState, fileName, lines);
+function writeFilesForRunning(out: Output, fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, fileName: string, lines: Array<string>): void {
+  writeOneFile(out, fileState, config, snippetState, fileName, lines);
 
   for (const { id, lineScope, fileName } of snippet.externalSpecs) {
     if (id !== null) {
@@ -391,15 +384,15 @@ function writeFilesForRunning(fileState: FileState, config: Config, snippetState
         default:
           throw new UnsupportedValueError(lineScope);
       }
-      writeOneFile(fileState, config, snippetState, fileName, lines);
+      writeOneFile(out, fileState, config, snippetState, fileName, lines);
     }
   }
 }
 
-function writeOneFile(fileState: FileState, config: Config, snippetState: SnippetState, fileName: string, lines: Array<string>) {
+function writeOneFile(out: Output, fileState: FileState, config: Config, snippetState: SnippetState, fileName: string, lines: Array<string>) {
   const filePath = path.resolve(fileState.tmpDir, fileName);
   if (fileState.logLevel === LogLevel.Verbose) {
-    snippetState.verboseLines.push('Write: ' + relPath(filePath));
+    out.writeLineVerbose('Write: ' + relPath(filePath));
   }
   let content = lines.join(os.EOL);
   content = config.searchAndReplaceFunc(content);
@@ -409,7 +402,7 @@ function writeOneFile(fileState: FileState, config: Config, snippetState: Snippe
 
 //========== runShellCommands() ==========
 
-function runShellCommands(fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
+function runShellCommands(out: Output, fileState: FileState, config: Config, snippetState: SnippetState, snippet: Snippet, langDef: LangDefCommand, fileName: string, commandsWithVars: Array<Array<string>>): void {
   const commands: Array<Array<string>> = fillInCommandVariables(commandsWithVars, {
     [CMD_VAR_FILE_NAME]: [fileName],
     [CMD_VAR_ALL_FILE_NAMES]: snippet.getAllFileNames(langDef),
@@ -417,9 +410,8 @@ function runShellCommands(fileState: FileState, config: Config, snippetState: Sn
   for (const [index, commandParts] of commands.entries()) {
     const isLastCommand = (index === commands.length - 1);
     if (fileState.logLevel === LogLevel.Verbose) {
-      snippetState.verboseLines.push('Run: ' + commandParts.join(' '));
+      out.writeLineVerbose('Run: ' + commandParts.join(' '));
     }
-
     if (fileState.markcheckMockData) {
       fileState.markcheckMockData.interceptedCommands.push(
         commandParts.join(' ')
@@ -548,7 +540,6 @@ function compareStdStreamLines(stdStreamName: string, config: Config, fileState:
 
 type SnippetState = {
   checksWerePerformed: boolean,
-  verboseLines: Array<string>,
 };
 
 //========== Logging helpers ==========

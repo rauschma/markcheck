@@ -804,6 +804,6 @@ export class StatusCounts {
 }
 
 export enum LogLevel {
-  Verbose,
-  Normal
+  Verbose = 'Verbose',
+  Normal = 'Normal',
 }
