@@ -72,7 +72,7 @@ test('node-repl: exceptions', () => {
         () => {
         structuredClone(() => {})
         },
-        {"name":"DOMException","message":"() => {} could not be cloned."}
+        {"name":"DataCloneError","message":"() => {} could not be cloned."}
         );
         assert.throws(
         () => {

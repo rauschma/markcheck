@@ -4,12 +4,16 @@ import { normalizeWhitespace } from '../util/string.js';
 import { type Translator } from './translation.js';
 
 const RE_INPUT = /^> ?(.*)$/;
+
 // Example:
 // "TypeError: Cannot mix BigInt and other types,"
 // "use explicit conversions"
 // Example:
 // "DOMException [DataCloneError]: Symbol() could not be cloned."
-const RE_EXCEPTION = /^([A-Z][A-Za-z0-9_$]+)(?: \[[A-Z][A-Za-z0-9_$]+\])?:/;
+const RE_EXCEPTION = /^([A-Z][A-Za-z0-9_$]+)(?: \[([A-Z][A-Za-z0-9_$]+)\])?:/;
+  // If there is a match:
+  // - Group 1 always exists
+  // - Group 2 may be undefined
 
 export const nodeReplToJs: Translator = {
   key: 'node-repl-to-js',
@@ -57,7 +61,12 @@ export const nodeReplToJs: Translator = {
         // "use explicit conversions"
         // Example:
         // "DOMException [DataCloneError]: Symbol() could not be cloned."
-        const name = exceptionMatch[1];
+        let name;
+        if (exceptionMatch[2] !== undefined) {
+          name = exceptionMatch[2]; // name in brackets is .name of exception
+        } else {
+          name = exceptionMatch[1]; // always a string
+        }
 
         // First line: remove prefixed exception name
         let message = lines[index].slice(exceptionMatch[0].length);
